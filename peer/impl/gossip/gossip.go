@@ -12,6 +12,7 @@ import (
 )
 
 type Layer struct {
+	// Replace by cryptography
 	network         *network.Layer
 	config          *peer.Configuration
 	rumorLock       sync.Mutex
