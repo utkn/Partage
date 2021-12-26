@@ -3,13 +3,15 @@ package impl
 import (
 	"errors"
 	"fmt"
+	"io"
+	"regexp"
+	"time"
+
+	"go.dedis.ch/cs438/peer/impl/cryptography"
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
-	"io"
-	"regexp"
-	"time"
 
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
@@ -30,6 +32,7 @@ type node struct {
 	data            *data.Layer
 	network         *network.Layer
 	consensus       *consensus.Layer
+	cryptography	*cryptography.Layer
 }
 
 // NewPeer creates a new peer.
@@ -41,7 +44,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	quitDistributor.NewListener("server")
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
-	gossipLayer := gossip.Construct(networkLayer, &conf, quitDistributor)
+	cryptographyLayer := cryptography.Construct(networkLayer) //TODO:
+	gossipLayer := gossip.Construct(cryptographyLayer, &conf, quitDistributor)
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 	node := &node{
@@ -55,6 +59,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		gossip:    gossipLayer,
 		consensus: consensusLayer,
 		data:      dataLayer,
+		cryptography: cryptographyLayer,
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()

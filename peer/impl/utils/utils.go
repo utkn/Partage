@@ -79,3 +79,5 @@ func HashBlock(index int, uniqID string, fileName string, metahash string, prevH
 	hashSlice := h.Sum(nil)
 	return hashSlice
 }
+
+
