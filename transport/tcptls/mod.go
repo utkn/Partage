@@ -1,8 +1,9 @@
-package tcp
+package tcptls
 
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -28,7 +29,7 @@ type TCP struct {
 // CreateSocket implements transport.Transport
 func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	// Load TLS certificate from memory or generate one (if no certificate is found)
-	certificate,err:=utils.LoadCertificate()
+	certificate,err:=utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
 	if err != nil {
 		return nil, err
 	}
@@ -39,13 +40,13 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(listener.Addr().String())
 
 	return &Socket{
 		listener: &listener,
 		ins:  []transport.Packet{},
 		outs: []transport.Packet{},
-		addr: address,
-		tlsConfig: &tls.Config{Certificates: []tls.Certificate{*certificate}},
+		tlsConfig: &tls.Config{Certificates: []tls.Certificate{*certificate}, InsecureSkipVerify: true}, //TODO: beware the insecureskipverify!!
 	}, nil
 }
 
@@ -59,8 +60,7 @@ type Socket struct {
 	listener     *net.Listener
 	ins      []transport.Packet
 	outs     []transport.Packet
-	addr     string
-	tlsConfig *tls.Config
+	tlsConfig *tls.Config 
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -84,6 +84,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 		}
 		return err
 	}
+	
 	defer conn.Close()
 
 	_, err = conn.Write(pktBytes)
@@ -133,7 +134,7 @@ func (s *Socket) Recv(timeout time.Duration) (transport.Packet, error) {
 // be useful in the case one provided a :0 address, which makes the system use a
 // random free port.
 func (s *Socket) GetAddress() string {
-	return s.addr
+	return (*s.listener).Addr().String()
 }
 
 func copyPacketList(original []transport.Packet) []transport.Packet {

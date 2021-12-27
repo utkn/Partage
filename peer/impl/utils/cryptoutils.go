@@ -4,44 +4,78 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"crypto/tls"
 	"encoding/pem"
 	"errors"
 	"math/big"
 	"os"
 	"time"
+	"strings"
 )
 
-const dir = "partage-storage/crypto/"
+
+const dir = "Partage/partage-storage/crypto/"
 const certificatePath = dir + "cert.pem"
 const keyPath = dir + "key.pem"
 
 
-func LoadCertificate() (*tls.Certificate,error) {
+func LoadCertificate(fromPersistentMem bool) (*tls.Certificate,error) {
+	if fromPersistentMem{
+		wd,_:=os.Getwd()
+		rt:=wd[:strings.Index(wd,"Partage")]
 
-	cert,err:=tls.LoadX509KeyPair(certificatePath, keyPath)
-	if err!=nil{
-		//generate a new key-pair
-		privateKey, _ := generateKeyPair()
-		keyPem,err:=storeKeyPair(privateKey, keyPath)
+		cert,err:=tls.LoadX509KeyPair(rt+certificatePath, rt+keyPath)
+		if err!=nil{
+
+			//generate a new key-pair
+			privateKey, _ := GenerateKeyPair()
+
+			keyPem,err:= storeKeyPair(privateKey, rt+keyPath)
+			if err!=nil{
+				return nil,err
+			}
+	
+			//generate a new certificate from the newly-generated key-pair
+			certificate, _:= generateCertificate(privateKey,nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
+
+			certPem,err:= storeCertificate(certificate,rt+certificatePath)
+			if err!=nil{
+				return nil,err
+			}
+	
+			cert, err = tls.X509KeyPair(certPem, keyPem)
+			if err!=nil{
+				return nil,err
+			}
+			return &cert,nil
+		}
+		return &cert,nil
+	}else{
+		// Generate a new fresh self-signed certificate..(GOOD FOR TESTING PURPOSES!)
+		privateKey, _ := GenerateKeyPair()
+		keyPem,err:=keyToPem(privateKey)
 		if err!=nil{
 			return nil,err
 		}
-		//generate a new certificate from the newly-generated key-pair
-		certificate, _:= generateCertificate(privateKey,nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
-		certPem,err:=storeCertificate(certificate,certificatePath)
+
+		certificate, _:= generateCertificate(privateKey,nil)
+		certPem,err:=certificateToPem(certificate)
 		if err!=nil{
 			return nil,err
 		}
-		cert, err = tls.X509KeyPair(certPem, keyPem)
+
+		cert, err := tls.X509KeyPair(certPem, keyPem)
 		if err!=nil{
 			return nil,err
 		}
+
+		return &cert,nil
 	}
-	return &cert,err
 }
+
+
 
 /*
 func LoadCryptoData() (*ecdsa.PrivateKey, *x509.Certificate) {
@@ -70,7 +104,7 @@ func loadCertificate(path string) (*x509.Certificate, error) {
 	return x509.ParseCertificate(data)
 }
 
-func loadKeyPair(path string) (*ecdsa.PrivateKey, error) {
+func LoadKeyPair(path string) (*ecdsa.PrivateKey, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.New("inexistent key file at " + path)
@@ -83,19 +117,7 @@ func loadKeyPair(path string) (*ecdsa.PrivateKey, error) {
 }
 */
 
-func storeCertificate(cert *x509.Certificate, path string) ([]byte,error) {
-	//serialize generated certificate into file
-	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
-	if pemCert == nil {
-		return nil,errors.New("failed to encode certificate to PEM")
-	}
-	if err := os.WriteFile(path, pemCert, 0644); err != nil {
-		return nil,err
-	}
-	return pemCert,nil
-}
-
-func storeKeyPair(privateKey *ecdsa.PrivateKey, path string) ([]byte,error) {
+func keyToPem(privateKey *ecdsa.PrivateKey) ([]byte,error){
 	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
 		return nil,errors.New("unable to marshal key pair")
@@ -104,14 +126,48 @@ func storeKeyPair(privateKey *ecdsa.PrivateKey, path string) ([]byte,error) {
 	if pemKey == nil {
 		return nil,errors.New("failed to encode key to PEM")
 	}
+
+	return pemKey,nil
+}
+
+func certificateToPem(cert *x509.Certificate) ([]byte,error){
+	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	if pemCert == nil {
+		return nil,errors.New("failed to encode certificate to PEM")
+	}
+	return pemCert,nil
+}
+
+func storeCertificate(cert *x509.Certificate, path string) ([]byte,error) {
+	//serialize generated certificate into file
+	pemCert,err:=certificateToPem(cert)
+	if err!=nil{
+		return nil,err
+	}
+
+
+	if err := os.WriteFile(path, pemCert, 0644); err != nil {
+		return nil,err
+	}
+	
+	return pemCert,nil
+}
+
+func storeKeyPair(privateKey *ecdsa.PrivateKey, path string) ([]byte,error) {
+	pemKey,err:=keyToPem(privateKey)
+	if err!=nil{
+		return nil,err
+	}
+
 	if err := os.WriteFile("key.pem", pemKey, 0600); err != nil {
 		return nil,err
 	}
-	return privBytes,nil
+
+	return pemKey,nil
 }
 
 //used to generate a private and public key using the P-256 elliptic curve
-func generateKeyPair() (*ecdsa.PrivateKey, error) {
+func GenerateKeyPair() (*ecdsa.PrivateKey, error) {
 	return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 }
 

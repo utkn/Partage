@@ -21,7 +21,7 @@ import (
 // Checking listen/close operations
 func Test_HW0_Network_Listen_Close(t *testing.T) {
 	net1 := udpFac()
-
+	
 	// > creating socket on a wrong address should raise an error
 
 	_, err := net1.CreateSocket("fake")
@@ -59,6 +59,46 @@ func Test_HW0_Network_Listen_Close(t *testing.T) {
 //
 // A simple send/recv
 func Test_HW0_Network_Simple(t *testing.T) {
+	/*
+	//ADAPTED TEST
+	net1 := tcpFac()
+	net2 := tcpFac()
+	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0")
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0")
+	defer node2.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+
+	// > n1 send to n2
+	fake := z.NewFakeMessage(t)
+
+	err := node1.Unicast(node2.GetAddr(), fake.GetNetMsg(t))
+	require.NoError(t, err)
+	fmt.Println(node1.GetIns(),"-----1---",node1.GetOuts())
+	fmt.Println(node2.GetIns(),"-----2---",node2.GetOuts())
+
+	// > n2 send to n1
+
+	fake = z.NewFakeMessage(t)
+
+	err = node2.Unicast(node1.GetAddr(), fake.GetNetMsg(t))
+	require.NoError(t, err)
+	fmt.Println(node1.GetIns(),"----1----",node1.GetOuts())
+	fmt.Println(node2.GetIns(),"----2----",node2.GetOuts())
+
+	// > n1 send to n1
+
+	fake = z.NewFakeMessage(t)
+
+	err = node1.Unicast(node1.GetAddr(), fake.GetNetMsg(t))
+	require.NoError(t, err)
+	fmt.Println(node1.GetIns(),"----1----",node1.GetOuts())
+	fmt.Println(node2.GetIns(),"----2----",node2.GetOuts())
+	*/
+	_ = tcpFac()
+	
 	net1 := udpFac()
 	net2 := udpFac()
 

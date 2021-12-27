@@ -3,7 +3,6 @@ package impl
 import (
 	"encoding/json"
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
@@ -30,21 +29,4 @@ func (n *node) EmptyMessageHandler(msg types.Message, pkt transport.Packet) erro
 	return nil
 }
 
-func (n *node) PrivateMessageHandler(msg types.Message, pkt transport.Packet) error {
-	utils.PrintDebug("handler", n.addr, "is at PrivateMessageHandler")
-	privateMsg, ok := msg.(*types.PrivateMessage)
-	if !ok {
-		return fmt.Errorf("could not parse the private msg message")
-	}
-	// Process the embedded packet if we are in the recipient list.
-	_, ok = privateMsg.Recipients[n.addr]
-	if ok {
-		transpPacket := transport.Packet{
-			Header: pkt.Header,
-			Msg:    privateMsg.Msg,
-		}
-		n.conf.MessageRegistry.ProcessPacket(transpPacket.Copy())
-		return nil
-	}
-	return nil
-}
+

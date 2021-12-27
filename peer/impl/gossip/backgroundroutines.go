@@ -19,7 +19,7 @@ func AntiEntropy(n *Layer, interval time.Duration) {
 			utils.PrintDebug("antientropy", n.GetAddress(), "has initiated anti-entropy")
 			time.Sleep(interval)
 			statusMsg := n.view.AsStatusMsg()
-			dest, err := n.network.ChooseRandomNeighbor(nil)
+			dest, err := n.cryptography.GetNetwork().ChooseRandomNeighbor(nil)
 			if err != nil {
 				continue
 			}
@@ -28,7 +28,7 @@ func AntiEntropy(n *Layer, interval time.Duration) {
 				fmt.Println("error during anti-entropy:", err)
 				break
 			}
-			n.network.Unicast(dest, transpMsg)
+			n.cryptography.GetNetwork().Unicast(dest, transpMsg)
 		}
 	}
 }
