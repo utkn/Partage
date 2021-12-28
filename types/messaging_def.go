@@ -65,8 +65,18 @@ type EmptyMessage struct{}
 // - implemented in HW1
 type PrivateMessage struct {
 	// Recipients is a bag of recipients
-	Recipients map[string]struct{}
+	//Recipients map[string]struct{}
+	Recipients map[string]struct{} //maps to encrypted symmetric-key
 
 	// Msg is the private message to be read by the recipients
 	Msg *transport.Message
+}
+
+//---------------Private Post
+type PrivatePost struct {
+	// Recipients is a bag of recipients that maps to encrypted symmetric-key
+	Recipients map[string][]byte 
+
+	// Msg is the private message to be read by the recipients
+	Msg []byte //encrypted transport.Message with AES-256
 }

@@ -186,6 +186,29 @@ func (p PrivateMessage) HTML() string {
 }
 
 // -----------------------------------------------------------------------------
+// PrivatePost
+
+// NewEmpty implements types.Message.
+func (p PrivatePost) NewEmpty() Message {
+	return &PrivatePost{}
+}
+
+// Name implements types.Message.
+func (p PrivatePost) Name() string {
+	return "privatePost"
+}
+
+// String implements types.Message.
+func (p PrivatePost) String() string {
+	return fmt.Sprintf("private post for %s", p.Recipients)
+}
+
+// HTML implements types.Message.
+func (p PrivatePost) HTML() string {
+	return fmt.Sprintf("private post for %s", p.Recipients)
+}
+
+// -----------------------------------------------------------------------------
 // utility functions
 
 // RumorByOrigin sorts rumor by origin

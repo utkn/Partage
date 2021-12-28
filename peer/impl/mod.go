@@ -44,7 +44,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	quitDistributor.NewListener("server")
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
-	cryptographyLayer := cryptography.Construct(networkLayer, &conf) //TODO:
+	cryptographyLayer := cryptography.Construct(networkLayer,&conf) //TODO:
 	gossipLayer := gossip.Construct(cryptographyLayer, &conf, quitDistributor)
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
@@ -68,6 +68,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	cryptographyLayer.RegisterHandlers()
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
+	conf.MessageRegistry.RegisterMessageCallback(types.PrivateMessage{}, node.PrivateMessageHandler)
 	// Start the quit signal distributor.
 	go quitDistributor.SingleRun()
 	return node

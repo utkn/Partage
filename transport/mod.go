@@ -40,6 +40,7 @@ type Socket interface {
 
 	// GetOuts must return all the messages sent so far.
 	GetOuts() []Packet
+
 }
 
 // ClosableSocket augments the Socket interface with a close function. We

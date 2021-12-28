@@ -29,12 +29,12 @@ type TCP struct {
 // CreateSocket implements transport.Transport
 func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	// Load TLS certificate from memory or generate one (if no certificate is found)
-	certificate,err:=utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
+	certificate, err := utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
 	if err != nil {
 		return nil, err
 	}
 	// Create tls config with loaded certificate
-	cfg:=&tls.Config{Certificates: []tls.Certificate{*certificate}}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}}
 	// Create the listening TCP/TLS socket.
 	listener, err := tls.Listen("tcp", address, cfg)
 	if err != nil {
@@ -43,10 +43,11 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	fmt.Println(listener.Addr().String())
 
 	return &Socket{
-		listener: &listener,
-		ins:  []transport.Packet{},
-		outs: []transport.Packet{},
-		tlsConfig: &tls.Config{Certificates: []tls.Certificate{*certificate}, InsecureSkipVerify: true}, //TODO: beware the insecureskipverify!!
+		listener:      &listener,
+		ins:           []transport.Packet{},
+		outs:          []transport.Packet{},
+		tlsConfig:     &tls.Config{Certificates: []tls.Certificate{*certificate}, InsecureSkipVerify: true}, //TODO: beware the insecureskipverify (=true means it will not check if the certificate issuer is trusted)!!
+		myCertificate: certificate,
 	}, nil
 }
 
@@ -55,12 +56,13 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 // - implements transport.Socket
 // - implements transport.ClosableSocket
 type Socket struct {
-	insLock  sync.RWMutex
-	outsLock sync.RWMutex
-	listener     *net.Listener
-	ins      []transport.Packet
-	outs     []transport.Packet
-	tlsConfig *tls.Config 
+	insLock       sync.RWMutex
+	outsLock      sync.RWMutex
+	listener      *net.Listener
+	ins           []transport.Packet
+	outs          []transport.Packet
+	tlsConfig     *tls.Config
+	myCertificate *tls.Certificate
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -75,7 +77,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 		return err
 	}
 	// Use Dialer to allow timeout on dial call
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout},"tcp", dest, s.tlsConfig)
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", dest, s.tlsConfig)
 	if err != nil {
 		// Convert to a network error to specifically check for timeout errors.
 		netErr, ok := err.(net.Error)
@@ -84,7 +86,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 		}
 		return err
 	}
-	
+
 	defer conn.Close()
 
 	_, err = conn.Write(pktBytes)
@@ -105,7 +107,7 @@ func (s *Socket) Recv(timeout time.Duration) (transport.Packet, error) {
 		return transport.Packet{}, err
 	}
 	tlscon := conn.(*tls.Conn)
-	defer tlscon.Close() 
+	defer tlscon.Close()
 	deadline := time.Now().Add(timeout)
 	err = tlscon.SetReadDeadline(deadline)
 	if err != nil {
@@ -157,4 +159,8 @@ func (s *Socket) GetOuts() []transport.Packet {
 	s.outsLock.RLock()
 	defer s.outsLock.RUnlock()
 	return copyPacketList(s.outs)
+}
+
+func (s *Socket) GetCertificate() *tls.Certificate {
+	return s.myCertificate
 }

@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/hex"
 	"fmt"
+
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/utils"
