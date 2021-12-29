@@ -209,6 +209,53 @@ func (p PrivatePost) HTML() string {
 }
 
 // -----------------------------------------------------------------------------
+// SearchPKRequestMessage
+
+// NewEmpty implements types.Message.
+func (s SearchPKRequestMessage) NewEmpty() Message {
+	return &SearchPKRequestMessage{}
+}
+
+// Name implements types.Message.
+func (s SearchPKRequestMessage) Name() string {
+	return "searchpkrequest"
+}
+
+// String implements types.Message.
+func (s SearchPKRequestMessage) String() string {
+	return fmt.Sprintf("searchpkrequest{%s %d}", s.Username, s.Budget)
+}
+
+// HTML implements types.Message.
+func (s SearchPKRequestMessage) HTML() string {
+	return s.String()
+}
+
+// -----------------------------------------------------------------------------
+// SearchPKReplyMessage
+
+// NewEmpty implements types.Message.
+func (s SearchPKReplyMessage) NewEmpty() Message {
+	return &SearchPKReplyMessage{}
+}
+
+// Name implements types.Message.
+func (s SearchPKReplyMessage) Name() string {
+	return "searchpkreply"
+}
+
+// String implements types.Message.
+func (s SearchPKReplyMessage) String() string {
+	return fmt.Sprintf("searchpkreply{%v}", s.Username)
+}
+
+// HTML implements types.Message.
+func (s SearchPKReplyMessage) HTML() string {
+	return fmt.Sprintf("searchpkreply %s", s.RequestID)
+}
+
+
+// -----------------------------------------------------------------------------
 // utility functions
 
 // RumorByOrigin sorts rumor by origin

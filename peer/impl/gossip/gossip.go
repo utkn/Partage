@@ -6,17 +6,14 @@ import (
 	"time"
 
 	"go.dedis.ch/cs438/peer"
-	"go.dedis.ch/cs438/peer/impl/cryptography"
-	//"go.dedis.ch/cs438/peer/impl/network"
+	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
 
 type Layer struct {
-	// Replace network by cryptography
-	cryptography	*cryptography.Layer
-	//network         *network.Layer	
+	network         *network.Layer	
 	config          *peer.Configuration
 	rumorLock       sync.Mutex
 	view            *PeerView
@@ -24,9 +21,9 @@ type Layer struct {
 	quitDistributor *utils.SignalDistributor
 }
 
-func Construct(cryptography *cryptography.Layer, config *peer.Configuration, quitDistributor *utils.SignalDistributor) *Layer {
+func Construct(network *network.Layer, config *peer.Configuration, quitDistributor *utils.SignalDistributor) *Layer {
 	layer := &Layer{
-		cryptography:         cryptography,
+		network:         network,
 		config:          config,
 		view:            NewPeerView(),
 		ackNotification: utils.NewAsyncNotificationHandler(),
@@ -47,12 +44,12 @@ func Construct(cryptography *cryptography.Layer, config *peer.Configuration, qui
 }
 
 func (l *Layer) GetAddress() string {
-	return l.cryptography.GetAddress() 
+	return l.network.GetAddress() 
 }
 
 func (l *Layer) SendRumorsMsg(msg transport.Message, unresponsiveNeighbors map[string]struct{}) error {
 	// Prepare the message to be sent to a random neighbor.
-	randNeighbor, err := l.cryptography.GetNetwork().ChooseRandomNeighbor(unresponsiveNeighbors) //TODO: 
+	randNeighbor, err := l.network.ChooseRandomNeighbor(unresponsiveNeighbors) //TODO: 
 	// If we could not find a random neighbor, terminate broadcast.
 	if err != nil {
 		utils.PrintDebug("communication", l.GetAddress(), "is terminating random unicast as there are no possible neighbors.")
@@ -66,7 +63,7 @@ func (l *Layer) SendRumorsMsg(msg transport.Message, unresponsiveNeighbors map[s
 	}
 	// Then, send it to the random peer selected without using the routing table.
 	utils.PrintDebug("network", l.GetAddress(), "is sending", randNeighbor, "a", pkt.Msg.Type)
-	err = l.cryptography.GetNetwork().Send(randNeighbor, pkt.Copy(), time.Second*1) //TODO:
+	err = l.network.Send(randNeighbor, pkt.Copy(), time.Second*1) //TODO:
 	if err != nil {
 		return fmt.Errorf("could not unicast the rumors message within the broadcast: %w", err)
 	}

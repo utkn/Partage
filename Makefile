@@ -14,6 +14,10 @@ test_hw0: test_unit_hw0 test_int_hw0
 test_hw1: test_unit_hw1 test_int_hw1
 test_hw2: test_unit_hw2 test_int_hw2
 test_hw3: test_unit_hw3 test_int_hw3
+test_partage: test_unit_partage
+
+test_unit_partage:
+	go test -v -race -run Test_Partage ./peer/tests/unit
 
 test_unit_hw0:
 	go test -v -race -run Test_HW0 ./peer/tests/unit

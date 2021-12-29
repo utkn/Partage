@@ -1,6 +1,8 @@
 package types
 
-import "go.dedis.ch/cs438/transport"
+import (
+	"go.dedis.ch/cs438/transport"
+)
 
 // ChatMessage is a message sent to exchange text messages between nodes.
 //
@@ -71,7 +73,7 @@ type PrivateMessage struct {
 	// Msg is the private message to be read by the recipients
 	Msg *transport.Message
 }
-
+//======================PARTAGE
 //---------------Private Post
 type PrivatePost struct {
 	// Recipients is a bag of recipients that maps to encrypted symmetric-key
@@ -79,4 +81,29 @@ type PrivatePost struct {
 
 	// Msg is the private message to be read by the recipients
 	Msg []byte //encrypted transport.Message with AES-256
+}
+
+type SearchPKRequestMessage struct {
+	// RequestID must be a unique identifier. Use xid.New().String() to generate
+	// it.
+	RequestID string
+	// Origin is the address of the peer that initiated the search request.
+	Origin string
+
+	Username string
+	Budget  uint
+}
+
+// SearchReplyMessage describes the response of a search request.
+//
+// - implements types.Message
+// - implemented in HW2
+type SearchPKReplyMessage struct {
+	// RequestID must be the same as the RequestID set in the
+	// SearchRequestMessage.
+	//Response *x509.Certificate
+	Response []byte
+	RequestID string
+	Username string
+	
 }

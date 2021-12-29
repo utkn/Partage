@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	
 	"regexp"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
+	"go.dedis.ch/cs438/transport/tcptls"
 
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
@@ -32,7 +34,8 @@ type node struct {
 	data            *data.Layer
 	network         *network.Layer
 	consensus       *consensus.Layer
-	cryptography	*cryptography.Layer
+	cryptography    *cryptography.Layer
+	username string
 }
 
 // NewPeer creates a new peer.
@@ -42,12 +45,24 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	// We wish to distribute the quit signal to multiple routines.
 	quitDistributor := utils.NewSignalDistributor(quitChannel)
 	quitDistributor.NewListener("server")
+
+	username:=""
+	tlsSock,ok:=conf.Socket.(*tcptls.Socket)
+	if ok{
+		username=tlsSock.GetUsername()
+	}
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
-	cryptographyLayer := cryptography.Construct(networkLayer,&conf) //TODO:
-	gossipLayer := gossip.Construct(cryptographyLayer, &conf, quitDistributor)
+	gossipLayer := gossip.Construct(networkLayer, &conf, quitDistributor)
+	
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
+	var cryptographyLayer *cryptography.Layer
+	if ok{
+		cryptographyLayer = cryptography.Construct(networkLayer, gossipLayer, &conf,username) //TODO:
+		cryptographyLayer.RegisterHandlers()
+	}
+	
 	node := &node{
 		addr: conf.Socket.GetAddress(),
 		conf: conf,
@@ -55,17 +70,18 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		quitDistributor: quitDistributor,
 		quit:            quitChannel,
 		// Layers
-		network:   networkLayer,
-		gossip:    gossipLayer,
-		consensus: consensusLayer,
-		data:      dataLayer,
+		network:      networkLayer,
+		gossip:       gossipLayer,
+		consensus:    consensusLayer,
+		data:         dataLayer,
 		cryptography: cryptographyLayer,
+		username: username,
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
-	cryptographyLayer.RegisterHandlers()
+	
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.PrivateMessage{}, node.PrivateMessageHandler)
@@ -193,4 +209,13 @@ func (n *node) SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) 
 // SearchFirst implements peer.DataSharing
 func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (string, error) {
 	return n.data.SearchFirst(pattern, conf)
+}
+
+//===================PARTAGE
+func (n *node) SendPrivatePost(msg transport.Message, recipients []string) error {
+	return n.cryptography.SendPrivatePost(msg,recipients)
+}
+
+func (n *node) GetUsername() string{
+	return n.username
 }

@@ -3,6 +3,7 @@ package impl
 import (
 	"encoding/json"
 	"fmt"
+
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"

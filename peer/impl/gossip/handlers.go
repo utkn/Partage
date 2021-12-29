@@ -32,7 +32,7 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 			// Save the rumor.
 			l.view.SaveRumor(rumor)
 			// Update the routing table with the rumor origin.
-			l.cryptography.GetNetwork().SetRoutingEntry(rumor.Origin, pkt.Header.RelayedBy)
+			l.network.SetRoutingEntry(rumor.Origin, pkt.Header.RelayedBy)
 		}
 	}
 	// End of critical section.
@@ -68,7 +68,7 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	}
 	// Send back the Acknowledgement.
 	utils.PrintDebug("gossip", l.GetAddress(), "is about to acknowledge packet", ackMsg.AckedPacketID, "to", pkt.Header.RelayedBy)
-	_ = l.cryptography.GetNetwork().Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
+	_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
 	return nil
 }
 
@@ -115,13 +115,13 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			return fmt.Errorf("could not convert the rumor message to a transport message: %w", err)
 		}
 		// Send the missing rumors back and do not wait for ack.
-		return l.cryptography.GetNetwork().Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 	}
 	// Request my missing rumors from the remote peer after I make sure that he is up to date.
 	if len(rmtNews) > 0 {
 		myStatusMsg := l.view.AsStatusMsg()
 		trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-		_ = l.cryptography.GetNetwork().Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 	}
 	// ContinueMongering process.
 	if len(thsNews) == 0 && len(rmtNews) == 0 {
@@ -129,14 +129,14 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			l.config.ContinueMongering)
 		if rand.Float64() < l.config.ContinueMongering {
 			utils.PrintDebug("gossip", l.GetAddress(), "is continuing mongering.")
-			dest, err := l.cryptography.GetNetwork().ChooseRandomNeighbor(map[string]struct{}{pkt.Header.RelayedBy: {}})
+			dest, err := l.network.ChooseRandomNeighbor(map[string]struct{}{pkt.Header.RelayedBy: {}})
 			if err != nil {
 				utils.PrintDebug("gossip", l.GetAddress(), "has stopped mongering since there are no neighbors to choose from.")
 				return nil
 			}
 			myStatusMsg := l.view.AsStatusMsg()
 			trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-			_ = l.cryptography.GetNetwork().Route(l.GetAddress(), dest, dest, trnspMsg)
+			_ = l.network.Route(l.GetAddress(), dest, dest, trnspMsg)
 		}
 		utils.PrintDebug("gossip", l.GetAddress(), "is stopping mongering.")
 	}

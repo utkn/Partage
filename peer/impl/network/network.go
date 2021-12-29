@@ -2,11 +2,13 @@ package network
 
 import (
 	"fmt"
+
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/utils"
-	"go.dedis.ch/cs438/transport"
 	"sync"
 	"time"
+
+	"go.dedis.ch/cs438/transport"
 )
 
 type Layer struct {
