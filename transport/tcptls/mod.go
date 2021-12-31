@@ -3,11 +3,9 @@ package tcptls
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -52,6 +50,9 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		myCertificate: certificate,
 		Catalog:       make(map[string]*x509.Certificate),
 		username:      username,
+		pktQueue: make(chan *transport.Packet,1024), 
+		connPool: newConnPool(),
+
 	}, nil
 }
 
@@ -70,6 +71,8 @@ type Socket struct {
 	Catalog       map[string]*x509.Certificate
 	CatalogLock   sync.RWMutex
 	username      string
+	connPool ConnPool
+	pktQueue chan *transport.Packet
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -83,21 +86,32 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	if err != nil {
 		return err
 	}
-	// Use Dialer to allow timeout on dial call
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", dest, s.tlsConfig)
-	if err != nil {
-		// Convert to a network error to specifically check for timeout errors.
-		netErr, ok := err.(net.Error)
-		if ok && netErr.Timeout() {
-			return transport.TimeoutErr(0)
-		}
-		return err
-	}
 
-	defer conn.Close()
+	newConn:=false
+	conn:=s.connPool.GetConn(dest)
+	if conn==nil{
+		newConn=true
+		// Use Dialer to allow timeout on dial call
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", dest, s.tlsConfig)
+		if err != nil {
+			// Convert to a network error to specifically check for timeout errors.
+			netErr, ok := err.(net.Error)
+			if ok && netErr.Timeout() {
+				return transport.TimeoutErr(0)
+			}
+			return err
+		}
+		// Add conn to pool
+		s.connPool.AddConn(dest,conn)
+
+		// Create a pkt listening goroutine for this new conn
+		go s.HandleTLSConn(conn)
+	}
 
 	_, err = conn.Write(pktBytes)
 	if err != nil {
+		//conn may have been closed due to read time out...
+		//return s.Send(dest,pkt,timeout)
 		return err
 	}
 
@@ -105,74 +119,56 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	s.outs = append(s.outs, pkt.Copy())
 	s.outsLock.Unlock()
 
-	go func() { //TODO: may follow other approach later if this adds to much overhead to socket..
-		//Save neighbors Cert..
-		cert := conn.ConnectionState().PeerCertificates[0]
-		username := cert.Subject.Organization[0]
-		s.CatalogLock.RLock()
-		_, exist := s.Catalog[username]
-		s.CatalogLock.RUnlock()
-		if !exist {
-			s.CatalogLock.Lock()
-			s.Catalog[username] = cert
-			s.CatalogLock.Unlock()
-		}
-	}()
+	if newConn{
+		// Save neighbors Cert..
+		go func() { //TODO: may follow other approach later if this adds to much overhead to socket..
+			cert := conn.ConnectionState().PeerCertificates[0]
+			username := cert.Subject.Organization[0]
+			s.CatalogLock.RLock()
+			_, exist := s.Catalog[username]
+			s.CatalogLock.RUnlock()
+			if !exist {
+				s.CatalogLock.Lock()
+				s.Catalog[username] = cert
+				s.CatalogLock.Unlock()
+			}
+		}()
+	}
 
 	return nil
+}
+
+func (s *Socket) Accept() (*tls.Conn,error){
+	conn, err := (*s.listener).Accept()
+	if err != nil {
+		return nil,err
+	}
+	tlsConn,ok:= conn.(*tls.Conn)
+	if !ok{
+		return nil,err
+	}
+	//add to connPool
+	s.connPool.AddConn(tlsConn.RemoteAddr().String(),tlsConn)
+
+	return tlsConn,nil
 }
 
 // Recv implements transport.Socket. It blocks until a packet is received, or
 // the timeout is reached. In the case the timeout is reached, return a
 // TimeoutErr.
 func (s *Socket) Recv(timeout time.Duration) (transport.Packet, error) {
-	conn, err := (*s.listener).Accept()
-	if err != nil {
-		return transport.Packet{}, err
-	}
-	tlscon := conn.(*tls.Conn)
-	defer tlscon.Close()
-	deadline := time.Now().Add(timeout)
-	err = tlscon.SetReadDeadline(deadline)
-	if err != nil {
-		return transport.Packet{}, err
-	}
-	buffer := make([]byte, bufSize)
-	size, err := tlscon.Read(buffer)
-	if errors.Is(err, os.ErrDeadlineExceeded) {
-		return transport.Packet{}, transport.TimeoutErr(0)
-	}
-	if err != nil {
-		return transport.Packet{}, err
-	}
-	var pkt transport.Packet
-	err = pkt.Unmarshal(buffer[:size])
-	if err != nil {
-		//try to read the rest of the packet
-		//Note..the pkts holding a certificate are too large so we're not able to read it in one Read() call, this is how we can go arround that problem
-		cum:=append([]byte{}, buffer[:size]...)
-		for{
-			size, err := tlscon.Read(buffer)
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				return transport.Packet{}, transport.TimeoutErr(0)
-			}
-			if err!=nil{
-				return transport.Packet{}, err
-			}
-			cum=append(cum, buffer[:size]...)
-			err = pkt.Unmarshal(cum)
-			if err!=nil{
-				continue
-			}else{
-				break
-			}
-		}
-		//return transport.Packet{}, err
-	}
+	// Method is kinda useless for the TCP socket since,
+	// packets are received through accepted/open connections, 
+	// and not directly through the socket
+
+	//create go routine with HandleTLSConn instead (to recv packets from TCP Conn)
+	return transport.Packet{}, nil
+}
+
+func (s *Socket) AddIn(pkt *transport.Packet){
 	s.insLock.Lock()
+	defer s.insLock.Unlock()
 	s.ins = append(s.ins, pkt.Copy())
-	s.insLock.Unlock()
-	return pkt, nil
 }
 
 // GetAddress implements transport.Socket. It returns the address assigned. Can
@@ -210,4 +206,94 @@ func (s *Socket) GetCertificate() *tls.Certificate {
 
 func (s *Socket) GetUsername() string {
 	return s.username
+}
+
+func (s *Socket) RemoveConn(tlsConn *tls.Conn){
+	s.connPool.CloseConn(tlsConn.RemoteAddr().String())
+}
+
+func (s *Socket) GetPktQueue() *chan *transport.Packet{
+	return &s.pktQueue
+}
+
+func (s *Socket) HandleTLSConn(tlsConn *tls.Conn){
+	fmt.Println(s.GetAddress()," created a goroutine to handle ",tlsConn.RemoteAddr().String()," conn")
+	recvTimeout:=time.Second * 60 * 2 //2 minutes
+	//conn
+	var pkt transport.Packet
+	buffer := make([]byte, bufSize)
+	deadline := time.Now().Add(recvTimeout)
+	err := tlsConn.SetReadDeadline(deadline)
+	if err != nil {
+		//discard conn
+		s.RemoveConn(tlsConn)
+	}
+	for{
+		size, err:= tlsConn.Read(buffer)
+		if err != nil {
+			s.RemoveConn(tlsConn)
+			return 
+		}
+		/*if errors.Is(err, os.ErrDeadlineExceeded){
+			//end conn
+			s.RemoveConn(tlsConn)
+			return 
+		}
+		if errors.Is(err, io.EOF){
+			//conn closed on the other end
+			s.RemoveConn(tlsConn)
+			return 
+		}
+		if err != nil {
+			fmt.Printf("could not receive from socket: %s", err.Error())
+			return 
+		}*/
+		//s.m.Lock()
+		err = pkt.Unmarshal(buffer[:size])
+		if err != nil { //unmarshaling error
+			//try to read the rest of the packet
+			//Note..the pkts holding a certificate are too large so we're not able to read it in one Read() call, this is how we can go arround that problem
+			cum:=append([]byte{}, buffer[:size]...)
+			for{
+				size, err := tlsConn.Read(buffer)
+				if err != nil {
+					s.RemoveConn(tlsConn)
+					return 
+				}
+				/*
+				if errors.Is(err, os.ErrDeadlineExceeded) {
+					//end conn
+					s.RemoveConn(tlsConn)
+					return 
+				}
+				if errors.Is(err, io.EOF){
+					//conn closed on the other end
+					s.RemoveConn(tlsConn)
+					return 
+				}
+				if err!=nil{
+					fmt.Printf("could not receive from socket: %s", err.Error())
+					s.RemoveConn(tlsConn)
+					return 
+					//continue
+				}*/
+				cum=append(cum, buffer[:size]...)
+				err = pkt.Unmarshal(cum)
+				if err!=nil{
+					continue
+				}else{
+					break
+				}
+			}
+		}
+		s.AddIn(&pkt)
+
+		//send to packet queue
+		cpkt:=pkt.Copy()
+		s.pktQueue<-&cpkt
+	}
+}
+
+func (s *Socket) CloseConns(){
+	s.connPool.Close()
 }

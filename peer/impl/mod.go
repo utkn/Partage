@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	
+
 	"regexp"
 	"time"
 
@@ -34,6 +34,7 @@ type node struct {
 	data            *data.Layer
 	network         *network.Layer
 	consensus       *consensus.Layer
+	//for tcp connections only
 	cryptography    *cryptography.Layer
 	username string
 }
@@ -58,6 +59,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 	var cryptographyLayer *cryptography.Layer
+
 	if ok{
 		cryptographyLayer = cryptography.Construct(networkLayer, gossipLayer, &conf,username) //TODO:
 		cryptographyLayer.RegisterHandlers()
@@ -76,6 +78,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		data:         dataLayer,
 		cryptography: cryptographyLayer,
 		username: username,
+		
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()
@@ -93,30 +96,40 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 // Start implements peer.Service
 func (n *node) Start() error {
 	// Start the listener.
-	go func() {
-		quitListener, _ := n.quitDistributor.GetListener("server")
-		for {
-			select {
-			case <-quitListener:
-				return
-			default:
-				// Wait for a new packet.
-				pkt, err := n.network.Receive(time.Second * 1)
-				if errors.Is(err, transport.TimeoutErr(0)) {
-					continue
+	if n.cryptography!=nil{
+		//TCP with TLS
+		sock:=n.conf.Socket.(*tcptls.Socket)
+		go func(){
+			for {
+				// Accept incoming connections..
+				tlsConn,err:=sock.Accept()
+				if err!=nil{
+					//socket closed..stopping node..
+					fmt.Println("OUT 0")
+					return
+				}else{
+					//create go routine to handle this connection (recv)
+					go sock.HandleTLSConn(tlsConn)
 				}
-				if err != nil {
-					fmt.Printf("could not receive from socket: %s", err.Error())
+				
+			}
+		}()
+		go func(){
+			pktQueue:= *sock.GetPktQueue()
+			// Wait for new packets...
+			for pkt := range pktQueue{
+				if pkt==nil{
+					fmt.Println("OUT 1")
 					return
 				}
-				utils.PrintDebug("network", n.addr, "listener has received a", pkt.Msg.Type)
 				cpkt := pkt.Copy()
+				utils.PrintDebug("network", n.addr, "listener has received a", cpkt.Msg.Type)
 				table := n.GetRoutingTable()
 				// Process the packet if the destination is this node.
 				if cpkt.Header.Destination == n.addr {
 					// Process the packet in a separate non-blocking goroutine.
 					go func() {
-						utils.PrintDebug("network", n.addr, "listener is about to process a", pkt.Msg.Type)
+						utils.PrintDebug("network", n.addr, "listener is about to process a", cpkt.Msg.Type)
 						err := n.conf.MessageRegistry.ProcessPacket(cpkt)
 						if err != nil {
 							fmt.Printf("could not process the packet: %s", err.Error())
@@ -125,23 +138,75 @@ func (n *node) Start() error {
 					continue
 				}
 				// Try to route the packet otherwise.
-				relay, ok := table[cpkt.Header.Destination]
+				relay, ok := table[pkt.Header.Destination]
 				if ok {
-					cpkt.Header.RelayedBy = n.addr
+					pkt.Header.RelayedBy = n.addr
 					utils.PrintDebug("network", n.addr, "is relaying", relay, "a", pkt.Msg.Type)
-					err := n.network.Send(relay, cpkt, time.Second*1)
+					err := n.network.Send(relay, *pkt, time.Second*1)
 					if err != nil {
 						fmt.Printf("could not relay the packet: %s", err.Error())
 					}
 				}
+			}	
+		}()
+	}else{
+		go func() {
+			quitListener, _ := n.quitDistributor.GetListener("server")
+			for {
+				select {
+				case <-quitListener:
+					return
+				default:
+					// Wait for a new packet.
+					pkt, err := n.network.Receive(time.Second * 1)
+					if errors.Is(err, transport.TimeoutErr(0)) {
+						continue
+					}
+					if err != nil {
+						fmt.Printf("could not receive from socket: %s", err.Error())
+						return
+					}
+					utils.PrintDebug("network", n.addr, "listener has received a", pkt.Msg.Type)
+					cpkt := pkt//pkt.Copy()
+					table := n.GetRoutingTable()
+					// Process the packet if the destination is this node.
+					if cpkt.Header.Destination == n.addr {
+						// Process the packet in a separate non-blocking goroutine.
+						go func() {
+							utils.PrintDebug("network", n.addr, "listener is about to process a", pkt.Msg.Type)
+							err := n.conf.MessageRegistry.ProcessPacket(cpkt)
+							if err != nil {
+								fmt.Printf("could not process the packet: %s", err.Error())
+							}
+						}()
+						continue
+					}
+					// Try to route the packet otherwise.
+					relay, ok := table[cpkt.Header.Destination]
+					if ok {
+						cpkt.Header.RelayedBy = n.addr
+						utils.PrintDebug("network", n.addr, "is relaying", relay, "a", pkt.Msg.Type)
+						err := n.network.Send(relay, cpkt, time.Second*1)
+						if err != nil {
+							fmt.Printf("could not relay the packet: %s", err.Error())
+						}
+					}
+				}
 			}
-		}
-	}()
+		}()
+	}
+	
 	return nil
 }
 
 // Stop implements peer.Service
 func (n *node) Stop() error {
+	if n.cryptography!=nil{
+		//tcp with tls is being used
+		sock:=n.conf.Socket.(*tcptls.Socket)
+		*sock.GetPktQueue()<-nil //exit queue reader goroutine
+		sock.Close()
+	}
 	n.quit <- true
 	return nil
 }

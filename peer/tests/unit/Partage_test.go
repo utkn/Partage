@@ -736,7 +736,7 @@ func Test_Partage_Messaging_Broadcast_BigGraph(t *testing.T) {
 
 	rand.Seed(1)
 
-	n := 5
+	n := 20
 	chatMsg := "hi from %s"
 	stopped := false
 
