@@ -2,7 +2,7 @@ package cryptography
 
 import (
 	"crypto/rsa"
-	
+
 	"encoding/json"
 	"fmt"
 	"time"
@@ -19,40 +19,36 @@ import (
 
 type Layer struct {
 	network                 *network.Layer
-	gossip	*gossip.Layer
+	gossip                  *gossip.Layer
 	notification            *utils.AsyncNotificationHandler
-	config     *peer.Configuration
-	myPrivateKey *rsa.PrivateKey
-	socket *tcptls.Socket
+	config                  *peer.Configuration
+	socket                  *tcptls.Socket
 	processedSearchRequests map[string]struct{}
-	expandingConf	 peer.ExpandingRing
-	username string
+	expandingConf           peer.ExpandingRing
 }
 
-func Construct(network *network.Layer,gossip *gossip.Layer, config *peer.Configuration,username string) *Layer {
+func Construct(network *network.Layer, gossip *gossip.Layer, config *peer.Configuration) *Layer {
 	socket, ok := config.Socket.(*tcptls.Socket)
 	if !ok {
 		panic("node must have a tcp socket in order to use tls")
 	}
-	sk,ok:=socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+	_, ok = socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
 	if !ok {
 		panic("node must have a RSA based TLS Certificate")
 	}
 	return &Layer{
-		network                 :network,
-		gossip:    gossip,
-		config:     config,
-		socket: socket,
-		myPrivateKey: sk,
+		network:                 network,
+		gossip:                  gossip,
+		config:                  config,
+		socket:                  socket,
 		processedSearchRequests: make(map[string]struct{}),
 		notification:            utils.NewAsyncNotificationHandler(),
-		expandingConf : peer.ExpandingRing{	//TODO: should be depend on the qnt of network nodes
+		expandingConf: peer.ExpandingRing{ //TODO: should be depend on the qnt of network nodes
 			Initial: 1,
 			Factor:  2,
 			Retry:   5,
 			Timeout: time.Second * 5,
 		},
-		username: username,
 	}
 }
 
@@ -60,69 +56,78 @@ func (l *Layer) GetAddress() string {
 	return l.gossip.GetAddress()
 }
 
-func (l *Layer) SendPrivatePost(msg transport.Message, recipients []string) error {
+//recipients will be a slice containing the each recipient hashed public key
+func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) error {
 	// Generate Symmetric Encryption Key (AES-256)
-	aesKey,err:=utils.GenerateAESKey()
-	if err!=nil{
+	aesKey, err := utils.GenerateAESKey()
+	if err != nil {
 		return err
 	}
 	// For each recipient, encrypt the aesKey with the user's RSA Public Key (associated with the user's TLS certificate)
-	users:=make(map[string][]byte) //user_y:EncPK_x(aesKey),user_y:EncPK_y(aesKey),...
-	for _,username := range recipients{
-		pk:=l.SearchPublicKey(username,&l.expandingConf)
-		if pk!=nil{
-			ciphertext,err:=utils.EncryptWithPublicKey(aesKey,pk)
-			if err!=nil{
+	users := types.RecipientsMap{} //user_y:EncPK_x(aesKey),user_y:EncPK_y(aesKey),...
+	var encryptedAESKey [128]byte 
+	for _, username := range recipients {
+		pk := l.SearchPublicKey(username, &l.expandingConf)
+		if pk != nil {
+			ciphertext, err := utils.EncryptWithPublicKey(aesKey, pk)
+			if err != nil {
 				return err
 			}
-			users[username]=ciphertext
+			copy(encryptedAESKey[:],ciphertext)
+			users[username] = encryptedAESKey
 		}
 	}
 
 	// Encrypt Message with AES-256 key
-	byteMsg,err:=json.Marshal(msg) //from transport.Message to []byte
-	if err!=nil{
+	byteMsg, err := json.Marshal(msg) //from transport.Message to []byte
+	if err != nil {
 		return err
 	}
 
-	encryptedMsg,err:=utils.EncryptAES(byteMsg,aesKey) 
-	if err!=nil{
+	encryptedMsg, err := utils.EncryptAES(byteMsg, aesKey)
+	if err != nil {
 		return err
 	}
 
+	bytes,err:=users.Encode()
+	if err!=nil{
+		//fmt.Println(err)
+		return err
+	}
 	//share Private Post
-	privatePost:= types.PrivatePost{
-		Recipients: users,
-		Msg: encryptedMsg,
+	privatePost := types.PrivatePost{
+		Recipients: bytes,
+		Msg:        encryptedMsg,
 	}
 	data, err := json.Marshal(&privatePost)
-	if err!=nil{
+	if err != nil {
 		return err
 	}
 	toSendMsg := transport.Message{
 		Type:    privatePost.Name(),
 		Payload: data,
 	}
-	fmt.Println("Broadcasted privatePost to recipients: ",users)
+	fmt.Println(l.GetAddress()," Broadcasted privatePost to",len(users),"recipients!")
 	err = l.gossip.Broadcast(toSendMsg) //share
 
 	return err
 }
 
+func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
+	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+}
 
-
-// SearchFirst implements peer.DataSharing
-func (l *Layer) SearchPublicKey(username string, conf *peer.ExpandingRing) *rsa.PublicKey {
+func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rsa.PublicKey {
 	// First look for a match locally.
-	if username==l.username{
+	if hashedPK == l.socket.GetHashedPublicKey() {
 		//x509Cert,_:=x509.ParseCertificate(l.socket.GetCertificate().Certificate[0])
-		return &l.myPrivateKey.PublicKey
+		return &l.GetPrivateKey().PublicKey
 	}
 	l.socket.CatalogLock.RLock()
-	cert,existsLocally:=l.socket.Catalog[username]
+	signedPK, existsLocally := l.socket.Catalog[hashedPK]
 	l.socket.CatalogLock.RUnlock()
-	if existsLocally{
-		return cert.PublicKey.(*rsa.PublicKey)
+	if existsLocally {
+		return signedPK.PublicKey
 	}
 
 	// Initiate the expanding ring search.
@@ -140,7 +145,7 @@ func (l *Layer) SearchPublicKey(username string, conf *peer.ExpandingRing) *rsa.
 			msg := types.SearchPKRequestMessage{
 				RequestID: searchRequestID,
 				Origin:    l.GetAddress(),
-				Username:   username,
+				Username:  hashedPK,
 				Budget:    budget,
 			}
 			transpMsg, _ := l.config.MessageRegistry.MarshalMessage(&msg)
@@ -156,14 +161,22 @@ func (l *Layer) SearchPublicKey(username string, conf *peer.ExpandingRing) *rsa.
 		collectedResponses := l.notification.MultiResponseCollector(searchRequestID, conf.Timeout, -1)
 		utils.PrintDebug("searchPK", l.GetAddress(), "has received the following search PK RESPONSES during the timeout", collectedResponses)
 		// Iterate through all the received responses within the timeout.
+		var signedPK types.SignedPublicKey
 		for _, resp := range collectedResponses {
 			searchResp := resp.(*types.SearchPKReplyMessage)
-			cert,_:=utils.PemToCertificate(searchResp.Response)
+			err:= signedPK.Decode(searchResp.Response)
+			if err!=nil{
+				fmt.Println("not able to unmarshal SignedPublicKey from search response")
+				continue
+			}
 			//if it is in the collectedResponses it's because it is valid...
-			return cert.PublicKey.(*rsa.PublicKey) //found the user's Public Key
+			return signedPK.PublicKey //found the user's Public Key
 		}
 		// no PK found yet..increase the budget and try again.
 		budget = budget * conf.Factor
 	}
 	return nil
 }
+
+
+

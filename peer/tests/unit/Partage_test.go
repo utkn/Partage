@@ -47,11 +47,13 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 
 	fakeMsg := fake.GetNetMsg(t)
 
-	fmt.Println("node2:",node2.GetUsername())
-	fmt.Println("node4:",node4.GetUsername())
-	recipients := []string{
-		node2.GetUsername(),
-		node4.GetUsername(),
+	fmt.Println("node1:",node1.GetAddr())
+	fmt.Println("node2:",node2.GetAddr())
+	fmt.Println("node3:",node3.GetAddr())
+	fmt.Println("node4:",node4.GetAddr())
+	recipients := [][32]byte{
+		node2.GetHashedPublicKey(),
+		node4.GetHashedPublicKey(),
 	}
 
 	bytes,_:=json.Marshal(fakeMsg)

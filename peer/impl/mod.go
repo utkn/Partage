@@ -35,8 +35,7 @@ type node struct {
 	network         *network.Layer
 	consensus       *consensus.Layer
 	//for tcp connections only
-	cryptography    *cryptography.Layer
-	username string
+	cryptography *cryptography.Layer
 }
 
 // NewPeer creates a new peer.
@@ -47,24 +46,30 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	quitDistributor := utils.NewSignalDistributor(quitChannel)
 	quitDistributor.NewListener("server")
 
-	username:=""
-	tlsSock,ok:=conf.Socket.(*tcptls.Socket)
-	if ok{
-		username=tlsSock.GetUsername()
+	tlsSock, isRunningTLS := conf.Socket.(*tcptls.Socket)
+	if isRunningTLS {
+		//check if Certificate in use is self-signed, if so..
+		if res,_:=utils.TLSIsSelfSigned(tlsSock.GetCertificate()); res{
+			fmt.Println("DEBUG: registering new user...")
+			if err:=tlsSock.RegisterUser();err==nil{
+				fmt.Println("DEBUG: successfully registered user!")
+			}
+		}
 	}
+	
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
 	gossipLayer := gossip.Construct(networkLayer, &conf, quitDistributor)
-	
+
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 	var cryptographyLayer *cryptography.Layer
 
-	if ok{
-		cryptographyLayer = cryptography.Construct(networkLayer, gossipLayer, &conf,username) //TODO:
+	if isRunningTLS {
+		cryptographyLayer = cryptography.Construct(networkLayer, gossipLayer, &conf) 
 		cryptographyLayer.RegisterHandlers()
 	}
-	
+
 	node := &node{
 		addr: conf.Socket.GetAddress(),
 		conf: conf,
@@ -77,48 +82,46 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		consensus:    consensusLayer,
 		data:         dataLayer,
 		cryptography: cryptographyLayer,
-		username: username,
-		
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
-	
+
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.PrivateMessage{}, node.PrivateMessageHandler)
 	// Start the quit signal distributor.
 	go quitDistributor.SingleRun()
-	return node
+
+	return node //if node is not properly registered (has a valid signed certificate..he won't be able to participate in the network)
 }
 
 // Start implements peer.Service
 func (n *node) Start() error {
 	// Start the listener.
-	if n.cryptography!=nil{
+	if n.cryptography != nil {
 		//TCP with TLS
-		sock:=n.conf.Socket.(*tcptls.Socket)
-		go func(){
+		sock := n.conf.Socket.(*tcptls.Socket)
+		go func() {
 			for {
 				// Accept incoming connections..
-				tlsConn,err:=sock.Accept()
-				if err!=nil{
+				tlsConn, err := sock.Accept()
+				if err != nil {
 					//socket closed..stopping node..
 					fmt.Println("OUT 0")
 					return
-				}else{
+				} else {
 					//create go routine to handle this connection (recv)
-					go sock.HandleTLSConn(tlsConn)
+					go sock.HandleTLSConn(tlsConn,false)
 				}
-				
 			}
 		}()
-		go func(){
-			pktQueue:= *sock.GetPktQueue()
+		go func() {
+			pktQueue := *sock.GetPktQueue()
 			// Wait for new packets...
-			for pkt := range pktQueue{
-				if pkt==nil{
+			for pkt := range pktQueue {
+				if pkt == nil {
 					fmt.Println("OUT 1")
 					return
 				}
@@ -147,9 +150,9 @@ func (n *node) Start() error {
 						fmt.Printf("could not relay the packet: %s", err.Error())
 					}
 				}
-			}	
+			}
 		}()
-	}else{
+	} else {
 		go func() {
 			quitListener, _ := n.quitDistributor.GetListener("server")
 			for {
@@ -167,7 +170,7 @@ func (n *node) Start() error {
 						return
 					}
 					utils.PrintDebug("network", n.addr, "listener has received a", pkt.Msg.Type)
-					cpkt := pkt//pkt.Copy()
+					cpkt := pkt //pkt.Copy()
 					table := n.GetRoutingTable()
 					// Process the packet if the destination is this node.
 					if cpkt.Header.Destination == n.addr {
@@ -195,16 +198,16 @@ func (n *node) Start() error {
 			}
 		}()
 	}
-	
+
 	return nil
 }
 
 // Stop implements peer.Service
 func (n *node) Stop() error {
-	if n.cryptography!=nil{
+	if n.cryptography != nil {
 		//tcp with tls is being used
-		sock:=n.conf.Socket.(*tcptls.Socket)
-		*sock.GetPktQueue()<-nil //exit queue reader goroutine
+		sock := n.conf.Socket.(*tcptls.Socket)
+		*sock.GetPktQueue() <- nil //exit queue reader goroutine
 		sock.Close()
 	}
 	n.quit <- true
@@ -277,10 +280,14 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 //===================PARTAGE
-func (n *node) SendPrivatePost(msg transport.Message, recipients []string) error {
-	return n.cryptography.SendPrivatePost(msg,recipients)
+func (n *node) SendPrivatePost(msg transport.Message, recipients [][32]byte) error {
+	return n.cryptography.SendPrivatePost(msg, recipients)
 }
 
-func (n *node) GetUsername() string{
-	return n.username
+func (n *node) GetHashedPublicKey() [32]byte{
+	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
+	if ok{
+		return tlsSock.GetHashedPublicKey()
+	}
+	return [32]byte{}
 }

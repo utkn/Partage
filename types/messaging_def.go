@@ -73,11 +73,12 @@ type PrivateMessage struct {
 	// Msg is the private message to be read by the recipients
 	Msg *transport.Message
 }
+
 //======================PARTAGE
 //---------------Private Post
 type PrivatePost struct {
 	// Recipients is a bag of recipients that maps to encrypted symmetric-key
-	Recipients map[string][]byte 
+	Recipients []byte// map[[32]byte][32]byte --> RecipientsMap
 
 	// Msg is the private message to be read by the recipients
 	Msg []byte //encrypted transport.Message with AES-256
@@ -90,8 +91,8 @@ type SearchPKRequestMessage struct {
 	// Origin is the address of the peer that initiated the search request.
 	Origin string
 
-	Username string
-	Budget  uint
+	Username [32]byte
+	Budget   uint
 }
 
 // SearchReplyMessage describes the response of a search request.
@@ -101,9 +102,9 @@ type SearchPKRequestMessage struct {
 type SearchPKReplyMessage struct {
 	// RequestID must be the same as the RequestID set in the
 	// SearchRequestMessage.
-	//Response *x509.Certificate
-	Response []byte
+	//Response *types.SignedPublicKey
+	Response  []byte
 	RequestID string
-	Username string
-	
 }
+
+

@@ -1,16 +1,17 @@
 package utils
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"fmt"
 	"io"
 
-	//"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 
@@ -21,27 +22,30 @@ import (
 )
 
 const dir = "Partage/partage-storage/crypto/"
+
 const certificatePath = dir + "cert.pem"
 const keyPath = dir + "key.pem"
+const signaturePath = dir + "publickey.signature"
 
-func LoadCertificate(fromPersistentMem bool,username string) (*tls.Certificate, error) {
+const CACertificatePath = dir + "CA/cert.pem"
+
+func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 	if fromPersistentMem {
 		wd, _ := os.Getwd()
 		rt := wd[:strings.Index(wd, "Partage")]
 
 		cert, err := tls.LoadX509KeyPair(rt+certificatePath, rt+keyPath)
 		if err != nil {
-
 			//generate a new key-pair
 			privateKey, _ := generateKey()
 
-			keyPem, err := storeKey(privateKey, rt+keyPath)
+			keyPem, err := storePrivateKey(privateKey, rt+keyPath)
 			if err != nil {
 				return nil, err
 			}
 
 			//generate a new certificate from the newly-generated key-pair
-			certificate, _ := generateCertificate(privateKey, username,nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
+			certificate, _ := GenerateCertificate(privateKey,nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
 
 			certPem, err := storeCertificate(certificate, rt+certificatePath)
 			if err != nil {
@@ -55,15 +59,17 @@ func LoadCertificate(fromPersistentMem bool,username string) (*tls.Certificate, 
 			return &cert, nil
 		}
 		return &cert, nil
+
 	} else {
 		// Generate a new fresh self-signed certificate..(GOOD FOR TESTING PURPOSES!)
+		// NOTE THAT THIS MODE DOESN'T STORE ANY key OR certificate
 		privateKey, _ := generateKey()
-		keyPem, err := privateKeyToPem(privateKey)
+		keyPem, err := PrivateKeyToPem(privateKey)
 		if err != nil {
 			return nil, err
 		}
 
-		certificate, _ := generateCertificate(privateKey,username, nil)
+		certificate, _ := GenerateCertificate(privateKey, nil)
 		certPem, err := CertificateToPem(certificate)
 		if err != nil {
 			return nil, err
@@ -74,7 +80,7 @@ func LoadCertificate(fromPersistentMem bool,username string) (*tls.Certificate, 
 			return nil, err
 		}
 
-		return &cert, nil
+		return &cert, nil 
 	}
 }
 
@@ -84,7 +90,7 @@ func EncryptWithPublicKey(msg []byte, publicKey *rsa.PublicKey) ([]byte, error) 
 	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, publicKey, msg)
 	if err != nil {
 		return nil, err
-	} 
+	}
 	return ciphertext, nil
 }
 
@@ -116,9 +122,9 @@ func EncryptAES(msg, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	nonce := make([]byte, gcm.NonceSize())
-    if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-        return nil, err
-    }
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
 	ciphertext := gcm.Seal(nonce, nonce, msg, nil)
 
 	return ciphertext, nil
@@ -130,33 +136,35 @@ func DecryptAES(ciphertext, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	gcm, err := cipher.NewGCM(c)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    nonceSize := gcm.NonceSize()
-    if len(ciphertext) < nonceSize {
-        return nil, err
-    }
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, err
+	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	msg, err := gcm.Open(nil, nonce, ciphertext, nil)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-	return msg,nil
+	return msg, nil
 }
 
-/*
+
 func loadCertificate(path string) (*x509.Certificate, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.New("inexistent certificate file at " + path)
 	}
-	return x509.ParseCertificate(data)
+	
+	return PemToCertificate(data)
 }
-
+/*
+//this
 func loadKey(path string) (*rsa.PrivateKey, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -182,7 +190,7 @@ func publicKeyToPem(publicKey *rsa.PublicKey) ([]byte, error) {
 	return pemKey, nil
 }
 
-func privateKeyToPem(privateKey *rsa.PrivateKey) ([]byte, error) {
+func PrivateKeyToPem(privateKey *rsa.PrivateKey) ([]byte, error) {
 	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 
 	pemKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
@@ -201,13 +209,19 @@ func CertificateToPem(cert *x509.Certificate) ([]byte, error) {
 	return pemCert, nil
 }
 
-func PemToCertificate(cert []byte ) (*x509.Certificate, error) {
-	block, _ := pem.Decode([]byte(cert))
+func PemToCertificate(cert []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(cert)
 	if block == nil {
-		return nil,errors.New("failed to parse certificate PEM")
+		return nil, errors.New("failed to decode certificate PEM to ASN.1 DER data")
 
 	}
 	return x509.ParseCertificate(block.Bytes)
+}
+
+func StoreCertificate(cert *x509.Certificate) ([]byte, error) {
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	return storeCertificate(cert, rt+certificatePath)
 }
 
 func storeCertificate(cert *x509.Certificate, path string) ([]byte, error) {
@@ -224,17 +238,28 @@ func storeCertificate(cert *x509.Certificate, path string) ([]byte, error) {
 	return pemCert, nil
 }
 
-func storeKey(privateKey *rsa.PrivateKey, path string) ([]byte, error) {
-	pemKey, err := privateKeyToPem(privateKey)
+func storePrivateKey(privateKey *rsa.PrivateKey, path string) ([]byte, error) {
+	pemKey, err := PrivateKeyToPem(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := os.WriteFile("key.pem", pemKey, 0600); err != nil {
+	if err := os.WriteFile(path, pemKey, 0600); err != nil {
 		return nil, err
 	}
 
 	return pemKey, nil
+}
+
+func storePublicKey(k *rsa.PublicKey,path string) (error){
+	pemKey, err := publicKeyToPem(k)
+	if err != nil {
+		return  err
+	}
+	if err := os.WriteFile(path, pemKey, 0600); err != nil {
+		return err
+	}
+	return nil
 }
 
 //used to generate a private and public key using the P-256 elliptic curve
@@ -244,7 +269,7 @@ func generateKey() (*rsa.PrivateKey, error) {
 
 //used to generate a signed certificate (if signingAuthority==nil, certificate is self-signed)
 //returns new certificate as ASN.1 DER data (can be parsed to x509.Certificate object with x509.ParseCertificate(der []byte) function)
-func generateCertificate(privateKey *rsa.PrivateKey, username string ,signingAuthority *x509.Certificate) (*x509.Certificate, error) {
+func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Certificate) (*x509.Certificate, error) {
 	//each certificate needs a unique serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -254,14 +279,9 @@ func generateCertificate(privateKey *rsa.PrivateKey, username string ,signingAut
 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			//Organization: []string{"Partage"},
-			Organization: []string{username},
-		},
-		//DNSNames:  []string{"localhost"}, //to make the certificate only valid for the localhost domain
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(1 * 365 * 24 * time.Hour), //TODO: time validity of the certificate (currently valid for 1 year)
-
+		IsCA: true,
 		BasicConstraintsValid: true,
 	}
 
@@ -279,4 +299,86 @@ func generateCertificate(privateKey *rsa.PrivateKey, username string ,signingAut
 		return nil, err
 	}
 	return x509.ParseCertificate(certBytes)
+}
+
+func IsSelfSigned(cert *x509.Certificate) bool {
+	return cert.CheckSignatureFrom(cert) == nil
+} 
+
+func TLSIsSelfSigned(cert *tls.Certificate) (bool,error){
+	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if err!=nil{
+		fmt.Println("[ERROR] parsing certificate from tls to x509")
+		return false,err
+	}
+	return IsSelfSigned(x509Cert),nil
+}
+
+/*
+func loadPublicKey(path string) *rsa.PublicKey{
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	pubKey, err := x509.ParsePKCS1PublicKey(data)
+	if err != nil {
+		return nil
+	}
+	return pubKey
+} */
+
+func loadPublicKeySignature( path string) []byte{
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+func LoadPublicKeySignature() []byte{
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	return loadPublicKeySignature(rt+signaturePath)
+}
+
+func LoadCACertificate() *x509.Certificate{
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	cert,_:=loadCertificate(rt+CACertificatePath)
+	return cert
+}
+
+func StoreCACertificate(cert *x509.Certificate) ([]byte,error){
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	return storeCertificate(cert,rt+CACertificatePath)
+}
+
+func StorePublicKeySignature(signature []byte) error{
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	path:=rt+signaturePath
+	return os.WriteFile(path, signature, 0644)
+}
+
+func VerifyPublicKeySignature(publicKey *rsa.PublicKey, signature []byte, CAPublicKey *rsa.PublicKey) bool{
+	pkBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		fmt.Println("[ERROR] marshaling public key to raw bytes")
+		return false
+	}
+	hashed := Hash(pkBytes)
+	return rsa.VerifyPKCS1v15(CAPublicKey,crypto.SHA256,hashed[:],signature)==nil
+}
+
+func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte,error){
+	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return nil, errors.New("failed to marshal public key")
+	}
+	return pubBytes,nil
+}
+
+func Hash(bytes []byte) [32]byte{
+	return sha256.Sum256(bytes)
 }

@@ -246,7 +246,7 @@ func (s SearchPKReplyMessage) Name() string {
 
 // String implements types.Message.
 func (s SearchPKReplyMessage) String() string {
-	return fmt.Sprintf("searchpkreply{%v}", s.Username)
+	return fmt.Sprintf("searchpkreply{%s}", s.RequestID)
 }
 
 // HTML implements types.Message.

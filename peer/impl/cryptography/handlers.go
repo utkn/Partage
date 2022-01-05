@@ -1,8 +1,6 @@
 package cryptography
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 
@@ -23,36 +21,41 @@ func (l *Layer) PrivatePostHandler(msg types.Message, pkt transport.Packet) erro
 	if !ok {
 		return fmt.Errorf("could not parse the private post message")
 	}
+	recipientsMap:= types.RecipientsMap{}
+	if err:=recipientsMap.Decode(privateMsg.Recipients); err!=nil{
+		//fmt.Println(err)
+		return err
+	}
 	// Process the embedded packet if we are in the recipient list.
-	ciphertext, ok := privateMsg.Recipients[l.username]
+	ciphertext, ok := recipientsMap[l.socket.GetHashedPublicKey()]
 	if !ok { //i'm not in the recipients list..
 		return nil
 	}
 	fmt.Println(l.GetAddress(), " rcvd a private post for me!")
 	//decrypt the encrypted AES key, using my RSA private key
-	aesKey,err:=utils.DecryptWithPrivateKey(ciphertext,l.myPrivateKey)
-	if err!=nil{
+	aesKey, err := utils.DecryptWithPrivateKey(ciphertext[:], l.GetPrivateKey())
+	if err != nil {
 		return err
 	}
-	
+
 	//decrypt bytes using the AES symmetric key
-	msgBytes,err:=utils.DecryptAES(privateMsg.Msg,aesKey) 
-	if err!=nil{
+	msgBytes, err := utils.DecryptAES(privateMsg.Msg, aesKey)
+	if err != nil {
 		return err
 	}
 	//convert from bytes to transport.Message type
 	var transportMsg transport.Message
 
-    if err := json.Unmarshal(msgBytes, &transportMsg); err != nil {
-        return err
-    }
-	fmt.Println(l.GetAddress(), "rcvd the following private post:",transportMsg)
+	if err := json.Unmarshal(msgBytes, &transportMsg); err != nil {
+		return err
+	}
+	fmt.Println(l.GetAddress(), "rcvd the following private post:", transportMsg)
 	//transport.Message
 	transpPacket := transport.Packet{
 		Header: pkt.Header,
-		Msg:    &transportMsg,//privateMsg.Msg,
+		Msg:    &transportMsg, //privateMsg.Msg,
 	}
-	
+
 	l.config.MessageRegistry.ProcessPacket(transpPacket.Copy())
 
 	return nil
@@ -64,22 +67,26 @@ func (l *Layer) SearchPKReplyMessageHandler(msg types.Message, pkt transport.Pac
 	if !ok {
 		return fmt.Errorf("could not parse the received search PK reply msg")
 	}
-	cert,err:=utils.PemToCertificate(searchPKReplyMsg.Response)
-	//TODO: CHECK IF CERTIFICATE IS SIGNED BY TRUSTED CA! and if it belongs to the user it claims to belong (certificate check)
-	isValid:= err==nil && cert!=nil &&  cert.Subject.Organization[0]==searchPKReplyMsg.Username//TODO: remove after implementing a validation check
-	if isValid{
-		_,ok:=cert.PublicKey.(*rsa.PublicKey) //check that certificate is using RSA
-		if !ok{
-			return nil
-		} 
-		l.notification.DispatchResponse(searchPKReplyMsg.RequestID, msg)
+	CAPublicKey:=l.socket.GetCAPublicKey()
+	if CAPublicKey==nil{
+		fmt.Println("No CA-signed public key..")
+		return nil
+	}
+	var signedPK types.SignedPublicKey
+	err:=signedPK.Decode(searchPKReplyMsg.Response)
 
-		//add certificate to catalog
+	// CHECK IF PUBLIC KEY IS SIGNED BY TRUSTED CA!
+	isValid := err == nil && utils.VerifyPublicKeySignature(signedPK.PublicKey,signedPK.Signature,CAPublicKey)
+	if isValid {
+		l.notification.DispatchResponse(searchPKReplyMsg.RequestID, msg)
+		
+		bytesPK,_:=utils.PublicKeyToBytes(signedPK.PublicKey)
+		//add entry to catalog
 		l.socket.CatalogLock.Lock()
-		l.socket.Catalog[searchPKReplyMsg.Username]=cert
+		l.socket.Catalog[utils.Hash(bytesPK)] = &signedPK
 		l.socket.CatalogLock.Unlock()
 	}
-	
+
 	return nil
 }
 
@@ -89,7 +96,7 @@ func (l *Layer) SearchPKRequestMessageHandler(msg types.Message, pkt transport.P
 	if !ok {
 		return fmt.Errorf("could not parse the received search PK request msg")
 	}
-	utils.PrintDebug("searchPK", l.GetAddress(), "looking for",searchPKRequestMsg.Username," certificate..")
+	utils.PrintDebug("searchPK", l.GetAddress(), "looking for Public Key..")
 	l.socket.CatalogLock.RLock()
 	_, ok = l.processedSearchRequests[searchPKRequestMsg.RequestID]
 	// Duplicate PK request received.
@@ -112,28 +119,32 @@ func (l *Layer) SearchPKRequestMessageHandler(msg types.Message, pkt transport.P
 		transpMsg, _ := l.config.MessageRegistry.MarshalMessage(searchPKRequestMsg)
 		_ = l.network.Route(searchPKRequestMsg.Origin, neighbor, neighbor, transpMsg)
 	}
-	//search for requested user's certificate in my catalog
-	var cert *x509.Certificate
-	if searchPKRequestMsg.Username==l.username{
-		cert,_=x509.ParseCertificate(l.socket.GetCertificate().Certificate[0])
-	}else{
+	//search for requested signed PK in my catalog
+	var signedPK *types.SignedPublicKey
+	//fmt.Println("searching for:",searchPKRequestMsg.Username,"\nmy:",l.socket.GetHashedPublicKey()," \n\nare equal?=",searchPKRequestMsg.Username == l.socket.GetHashedPublicKey())
+	if searchPKRequestMsg.Username == l.socket.GetHashedPublicKey() {
+		signedPK = l.socket.GetSignedPublicKey()
+	} else {
 		l.socket.CatalogLock.RLock()
-		cert,ok=l.socket.Catalog[searchPKRequestMsg.Username]
+		signedPK, ok = l.socket.Catalog[searchPKRequestMsg.Username]
 		l.socket.CatalogLock.RUnlock()
-		if !ok{ //no certificate found locally
+		if !ok { //no signed PK found locally
 			return nil //don't respond
 		}
 	}
-	utils.PrintDebug("searchPK", l.GetAddress(),"FOUND THE CERTIFICATE for",searchPKRequestMsg.Username)
-	byteCert,_:=utils.CertificateToPem(cert)
+	utils.PrintDebug("searchPK", l.GetAddress(), "FOUND THE Signed PK")
+	bytes, err := signedPK.Encode()
+	if err!=nil{
+		fmt.Println("[ERROR] marshaling signed PK to send...")
+		return nil
+	}
 	searchPKReplyMsg := types.SearchPKReplyMessage{
 		RequestID: searchPKRequestMsg.RequestID,
-		Response: byteCert,
-		Username: searchPKRequestMsg.Username,
+		Response:  bytes,
 	}
 	transpMsg, _ := l.config.MessageRegistry.MarshalMessage(&searchPKReplyMsg)
 	utils.PrintDebug("searchPK", l.GetAddress(), "is sending back a search PK reply to", pkt.Header.Source)
 	_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, searchPKRequestMsg.Origin, transpMsg)
-	
+
 	return nil
 }
