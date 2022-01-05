@@ -2,14 +2,11 @@ package cryptography
 
 import (
 	"crypto/rsa"
-
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer"
-	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
@@ -19,7 +16,6 @@ import (
 
 type Layer struct {
 	network                 *network.Layer
-	gossip                  *gossip.Layer
 	notification            *utils.AsyncNotificationHandler
 	config                  *peer.Configuration
 	socket                  *tcptls.Socket
@@ -27,7 +23,7 @@ type Layer struct {
 	expandingConf           peer.ExpandingRing
 }
 
-func Construct(network *network.Layer, gossip *gossip.Layer, config *peer.Configuration) *Layer {
+func Construct(network *network.Layer, config *peer.Configuration) *Layer {
 	socket, ok := config.Socket.(*tcptls.Socket)
 	if !ok {
 		panic("node must have a tcp socket in order to use tls")
@@ -38,7 +34,6 @@ func Construct(network *network.Layer, gossip *gossip.Layer, config *peer.Config
 	}
 	return &Layer{
 		network:                 network,
-		gossip:                  gossip,
 		config:                  config,
 		socket:                  socket,
 		processedSearchRequests: make(map[string]struct{}),
@@ -53,65 +48,70 @@ func Construct(network *network.Layer, gossip *gossip.Layer, config *peer.Config
 }
 
 func (l *Layer) GetAddress() string {
-	return l.gossip.GetAddress()
+	return l.socket.GetAddress()
 }
 
-//recipients will be a slice containing the each recipient hashed public key
-func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) error {
-	// Generate Symmetric Encryption Key (AES-256)
-	aesKey, err := utils.GenerateAESKey()
-	if err != nil {
-		return err
-	}
-	// For each recipient, encrypt the aesKey with the user's RSA Public Key (associated with the user's TLS certificate)
-	users := types.RecipientsMap{} //user_y:EncPK_x(aesKey),user_y:EncPK_y(aesKey),...
-	var encryptedAESKey [128]byte 
-	for _, username := range recipients {
-		pk := l.SearchPublicKey(username, &l.expandingConf)
-		if pk != nil {
-			ciphertext, err := utils.EncryptWithPublicKey(aesKey, pk)
-			if err != nil {
-				return err
-			}
-			copy(encryptedAESKey[:],ciphertext)
-			users[username] = encryptedAESKey
-		}
-	}
+//Send() encapsulates the transport.Message contained in pkt.Msg, into a types.SignedMessage by adding a layer of security and sends it through the TLS socket
+func (l *Layer) Send(dest string, pkt transport.Packet, timeout time.Duration) error {
+	// Add Validation check to packet's header (Signs packet with myPrivateKey!)
+	pkt.AddValidation(l.GetPrivateKey(),l.GetSignedPublicKey())
+	return l.network.Send(dest, pkt, timeout)
+}
 
-	// Encrypt Message with AES-256 key
-	byteMsg, err := json.Marshal(msg) //from transport.Message to []byte
-	if err != nil {
-		return err
+func (l *Layer) Unicast(dest string, msg transport.Message) error{
+	table := l.network.GetRoutingTable()
+	relay, ok := table[dest]
+	// If the destination is a neighbor, it is the relay.
+	if l.network.IsNeighbor(dest) {
+		relay = dest
+		ok = true
 	}
-
-	encryptedMsg, err := utils.EncryptAES(byteMsg, aesKey)
-	if err != nil {
-		return err
+	if !ok {
+		utils.PrintDebug("communication", l.GetAddress(), "could not crypto unicast to", dest)
+		return fmt.Errorf("could not find a relay for the unicast")
 	}
+	return l.Route(l.GetAddress(), relay, dest, msg)
+}
 
-	bytes,err:=users.Encode()
+//Only use cryptography.Route() when sending transport.Messages that actually need a cryptographic validation check added to packet's header!
+func (l *Layer) Route(source string, relay string, dest string, msg transport.Message) error {
+	header := transport.NewHeader(source, l.GetAddress(), dest, 0)
+	pkt := transport.Packet{
+		Header: &header,
+		Msg:    &msg,
+	}
+	/*
+	validation,err:=l.GenerateValidation(&msg)
 	if err!=nil{
-		//fmt.Println(err)
-		return err
+		return fmt.Errorf("error generating validation check : %w", err)
 	}
-	//share Private Post
-	privatePost := types.PrivatePost{
-		Recipients: bytes,
-		Msg:        encryptedMsg,
-	}
-	data, err := json.Marshal(&privatePost)
+	//set validation check for packet
+	pkt.Header.Check=validation */
+	err := l.Send(relay, pkt, time.Second*5)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not crypto route through socket: %w", err)
 	}
-	toSendMsg := transport.Message{
-		Type:    privatePost.Name(),
-		Payload: data,
-	}
-	fmt.Println(l.GetAddress()," Broadcasted privatePost to",len(users),"recipients!")
-	err = l.gossip.Broadcast(toSendMsg) //share
-
-	return err
+	return nil
 }
+/*
+func (l *Layer) GenerateValidation(msg *transport.Message) (*transport.Validation,error){
+	byteMsg, err := json.Marshal(msg)
+	if err!=nil{
+		return nil,err
+	}
+	// Hash(packet.Msg||packet.Header.Source)
+	hashedContent:=utils.Hash(append(byteMsg,[]byte(l.GetAddress())...))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, l.GetPrivateKey(), crypto.SHA256, hashedContent[:])
+	if err != nil {
+		return nil,err
+	}
+
+	return &transport.Validation{
+		Signature: signature,
+		SrcPublicKey: *l.socket.GetSignedPublicKey(),
+	},nil
+} */
+
 
 func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
 	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
@@ -161,16 +161,11 @@ func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rs
 		collectedResponses := l.notification.MultiResponseCollector(searchRequestID, conf.Timeout, -1)
 		utils.PrintDebug("searchPK", l.GetAddress(), "has received the following search PK RESPONSES during the timeout", collectedResponses)
 		// Iterate through all the received responses within the timeout.
-		var signedPK types.SignedPublicKey
+		//var signedPK types.SignedPublicKey
 		for _, resp := range collectedResponses {
 			searchResp := resp.(*types.SearchPKReplyMessage)
-			err:= signedPK.Decode(searchResp.Response)
-			if err!=nil{
-				fmt.Println("not able to unmarshal SignedPublicKey from search response")
-				continue
-			}
 			//if it is in the collectedResponses it's because it is valid...
-			return signedPK.PublicKey //found the user's Public Key
+			return searchResp.Response.PublicKey // signedPK.PublicKey //found the user's Public Key
 		}
 		// no PK found yet..increase the budget and try again.
 		budget = budget * conf.Factor
@@ -179,4 +174,18 @@ func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rs
 }
 
 
+func (l *Layer) GetExpandingConf() *peer.ExpandingRing{
+	return &l.expandingConf
+}
 
+func (l *Layer) GetHashedPublicKey() [32]byte{
+	return l.socket.GetHashedPublicKey()
+}
+
+func (l *Layer) GetSignedPublicKey() (*transport.SignedPublicKey){
+	return l.socket.GetSignedPublicKey()
+}
+
+func (l *Layer) GetCAPublicKey() *rsa.PublicKey{
+	return l.socket.GetCAPublicKey()
+}

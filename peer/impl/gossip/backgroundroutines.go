@@ -28,7 +28,11 @@ func AntiEntropy(n *Layer, interval time.Duration) {
 				fmt.Println("error during anti-entropy:", err)
 				break
 			}
-			n.network.Unicast(dest, transpMsg)
+			if n.cryptography!=nil{
+				n.cryptography.Unicast(dest,transpMsg)
+			}else{
+				n.network.Unicast(dest, transpMsg)
+			}
 		}
 	}
 }

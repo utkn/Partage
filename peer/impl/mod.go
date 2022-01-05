@@ -59,16 +59,15 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
-	gossipLayer := gossip.Construct(networkLayer, &conf, quitDistributor)
-
-	consensusLayer := consensus.Construct(gossipLayer, &conf)
-	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 	var cryptographyLayer *cryptography.Layer
-
 	if isRunningTLS {
-		cryptographyLayer = cryptography.Construct(networkLayer, gossipLayer, &conf) 
+		cryptographyLayer = cryptography.Construct(networkLayer, &conf) 
 		cryptographyLayer.RegisterHandlers()
 	}
+
+	gossipLayer := gossip.Construct(networkLayer,cryptographyLayer,&conf, quitDistributor)
+	consensusLayer := consensus.Construct(gossipLayer, &conf)
+	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 
 	node := &node{
 		addr: conf.Socket.GetAddress(),
@@ -231,6 +230,9 @@ func (n *node) SetRoutingEntry(origin, relayAddr string) {
 
 // Unicast implements peer.Messaging
 func (n *node) Unicast(dest string, msg transport.Message) error {
+	if n.cryptography!=nil{
+		return n.cryptography.Unicast(dest, msg)
+	}
 	return n.network.Unicast(dest, msg)
 }
 
@@ -280,8 +282,23 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 //===================PARTAGE
-func (n *node) SendPrivatePost(msg transport.Message, recipients [][32]byte) error {
-	return n.cryptography.SendPrivatePost(msg, recipients)
+func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
+	//msg should be a marshaled types.Post message..
+	return n.gossip.SendPrivatePost(msg, recipients)
+}
+
+func (n *node) BlockUser(publicKeyHash [32]byte){
+	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
+	if ok{
+		tlsSock.Block(publicKeyHash)
+	}
+}
+
+func (n *node) UnblockUser(publicKeyHash [32]byte){
+	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
+	if ok{
+		tlsSock.Unblock(publicKeyHash)
+	}
 }
 
 func (n *node) GetHashedPublicKey() [32]byte{

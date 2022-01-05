@@ -11,7 +11,6 @@ import (
 
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
-	"go.dedis.ch/cs438/types"
 )
 
 const bufSize = 65000
@@ -50,13 +49,14 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		listener:      &listener,
 		ins:           []transport.Packet{},
 		outs:          []transport.Packet{},
-		tlsConfig:     cfg, //TODO: beware the insecureskipverify (=true means it will not check if the certificate issuer is trusted)!!
+		tlsConfig:     cfg, 
 		myCertificate: certificate,
 		CA: ca,
-		Catalog:       make(map[[32]byte]*types.SignedPublicKey), //hashed public key maps to *rsa.PublicKey
+		Catalog:       make(map[[32]byte]*transport.SignedPublicKey), //hashed public key maps to *rsa.PublicKey
 		myPKSignature:      pkSignature,
 		pktQueue:      make(chan *transport.Packet, 1024),
 		connPool:      newConnPool(),
+		blockedUsers: make(map[[32]byte]struct{}),
 	}, nil
 }
 
@@ -73,11 +73,13 @@ type Socket struct {
 	tlsConfig     *tls.Config
 	myCertificate *tls.Certificate
 	myPKSignature	[]byte
-	Catalog       map[[32]byte]*types.SignedPublicKey
+	Catalog       map[[32]byte]*transport.SignedPublicKey
 	CatalogLock   sync.RWMutex
 	connPool      ConnPool
 	pktQueue      chan *transport.Packet
 	CA *x509.Certificate
+	blockedUsers	map[[32]byte]struct{}
+	blockedUsersMutex sync.RWMutex
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -202,7 +204,7 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
 				}
 			}
 		}
-		s.AddIn(&pkt)
+		
 		//check packet RelayedBy parameter and not the actual tlsConn source addr parameter. Because you can't use the same addr socket to listen from and to dial from, so nodes will dial from a different addr than the one they are listening to. We just care about the listening-socket addr
 		//add to connPool
 		if !connSaved{
@@ -212,6 +214,27 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
 			}
 			connSaved=true
 		}
+
+		//VALIDATE PACKET!
+		// Validate packet signatures
+		if pkt.Validate(s.GetCAPublicKey())!=nil{
+			//signatures aren't valid..drop packet
+			fmt.Println("pkt signature no valid")
+			continue
+		}
+		// Check for banned users packets and drop the ones that are for me! (still relay packets from blocked users)
+		if pkt.Header.Destination==s.GetAddress() && pkt.Header.Check!=nil {
+			pkBytes,_:=utils.PublicKeyToBytes(pkt.Header.Check.SrcPublicKey.PublicKey)
+			if s.isBlocked(utils.Hash(pkBytes)){
+				fmt.Println("avoided packet from blocked user")
+				continue
+			}
+		}
+		/*If node A blocks node B, node A still forwards node B’s packets but stops
+		processing/reading node B’s messages or updating his view with node B’s view
+		(i.e., node A stops	saving node B’s rumors)*/
+
+		s.AddIn(&pkt) 
 		
 		//send to packet queue
 		cpkt := pkt.Copy()
@@ -332,8 +355,8 @@ func (s *Socket) GetPublicKey() *rsa.PublicKey{
 	return &s.myCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
 }
 
-func (s *Socket) GetSignedPublicKey() (*types.SignedPublicKey){
-	return &types.SignedPublicKey{PublicKey:s.GetPublicKey(), Signature: s.myPKSignature}
+func (s *Socket) GetSignedPublicKey() (*transport.SignedPublicKey){
+	return &transport.SignedPublicKey{PublicKey:s.GetPublicKey(), Signature: s.myPKSignature}
 }
 
 func (s *Socket) GetHashedPublicKey() [32]byte{
@@ -353,4 +376,24 @@ func (s *Socket) GetCAPublicKey() *rsa.PublicKey{
 		}
 	}
 	return nil
+}
+
+func (s *Socket) isBlocked(publicKeyHash [32]byte) bool{
+	s.blockedUsersMutex.RLock()
+	defer s.blockedUsersMutex.RUnlock()
+	_,exists:=s.blockedUsers[publicKeyHash]
+	return exists
+}
+
+func (s *Socket) Block(publicKeyHash [32]byte){
+	s.blockedUsersMutex.Lock()
+	defer s.blockedUsersMutex.Unlock()
+	s.blockedUsers[publicKeyHash]=struct{}{}
+	
+}
+
+func (s *Socket) Unblock(publicKeyHash [32]byte){
+	s.blockedUsersMutex.Lock()
+	defer s.blockedUsersMutex.Unlock()
+	delete(s.blockedUsers,publicKeyHash)
 }

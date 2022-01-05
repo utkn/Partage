@@ -1,6 +1,11 @@
 package transport
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -144,6 +149,9 @@ type Header struct {
 	// Destination is empty in the case of a broadcast, otherwise contains the
 	// destination address.
 	Destination string
+
+	//---PARTAGE allows to check integrity and authenticity check
+	Check *Validation
 }
 
 func (h Header) String() string {
@@ -200,4 +208,84 @@ func (p ByPacketID) Swap(i, j int) {
 
 func (p ByPacketID) Less(i, j int) bool {
 	return p[i].Header.PacketID < p[j].Header.PacketID
+}
+
+//================PARTAGE
+//---------
+type SignedPublicKey struct{
+	PublicKey *rsa.PublicKey
+	Signature []byte
+}
+
+type Validation struct{
+	Signature []byte
+	SrcPublicKey SignedPublicKey
+}
+
+func (p *Packet) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *SignedPublicKey) error{
+	//Adds a validation check to the Packet's header (provides integrity and authenticity check!)
+	byteMsg, err := json.Marshal(p.Msg)
+	if err!=nil{
+		return err
+	}
+	// Hash(packet.Msg||packet.Header.Source)
+	hashedContent:=Hash(append(byteMsg,[]byte(p.Header.Source)...))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, myPrivateKey, crypto.SHA256, hashedContent[:])
+	if err != nil {
+		return err
+	}
+
+	p.Header.Check =&Validation{
+		Signature: signature,
+		SrcPublicKey: *mySignedPublicKey,
+	}
+
+	return nil
+}
+
+func (p *Packet) Validate(publicKeyCA *rsa.PublicKey) error{
+	if p.Header.Check==nil{
+		if p.Msg.Type=="searchpkrequest" || p.Msg.Type=="searchpkreply" || p.Msg.Type=="datarequest" || p.Msg.Type=="datareply" ||  p.Msg.Type=="searchrequest" ||  p.Msg.Type=="searchreply"{
+			return nil
+			//exceptions!
+			//no need to check for integrity or authenticity in searchpkrequest or searchpkreply
+			//since the content of the msg is what's really important..neither of these types implements Validation
+		}
+		return fmt.Errorf("pkt.Header has empty validation check")
+	}
+
+	//1- Check if the Public Key of the user who signed the message is valid (signed by trusted CA)
+	srcPKBytes, err := x509.MarshalPKIXPublicKey(p.Header.Check.SrcPublicKey.PublicKey)
+	if err != nil {
+		return err
+	}
+	hashedSrcPK := Hash(srcPKBytes)
+	if err:=rsa.VerifyPKCS1v15(publicKeyCA,crypto.SHA256,hashedSrcPK[:],p.Header.Check.SrcPublicKey.Signature); err!=nil{
+		//invalid SignedPublicKey (not signed by trusted CA)
+		return fmt.Errorf("src public key is not signed by trusted CA")
+	}
+
+	//2- Check if Hash(packet.Msg||packet.Header.Source) was signed by src's private key
+	byteMsg,_:=json.Marshal(p.Msg)
+	hashedContent := Hash(append(byteMsg,[]byte(p.Header.Source)...))
+	if rsa.VerifyPKCS1v15(p.Header.Check.SrcPublicKey.PublicKey,crypto.SHA256,hashedContent[:],p.Header.Check.Signature)!=nil{
+		//invalid signature
+		return fmt.Errorf("message is not signed by src private key")
+	}
+
+	//VALID!
+	return nil
+}
+
+
+func (k *SignedPublicKey) Encode() ([]byte, error) {
+	return json.Marshal(k)
+}
+
+func (k *SignedPublicKey) Decode(bytes []byte) error {
+	return json.Unmarshal(bytes, &k)
+}
+
+func Hash(bytes []byte) [32]byte{
+	return sha256.Sum256(bytes)
 }

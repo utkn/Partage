@@ -12,6 +12,8 @@ func (l *Layer) RegisterHandlers() {
 	l.config.MessageRegistry.RegisterMessageCallback(types.RumorsMessage{}, l.RumorsMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.StatusMessage{}, l.StatusMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.AckMessage{}, l.AckMessageHandler)
+	l.config.MessageRegistry.RegisterMessageCallback(types.PrivatePost{}, l.PrivatePostHandler) //Partage
+	l.config.MessageRegistry.RegisterMessageCallback(types.Post{}, l.PostHandler) //Partage
 }
 
 func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) error {
@@ -68,7 +70,12 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	}
 	// Send back the Acknowledgement.
 	utils.PrintDebug("gossip", l.GetAddress(), "is about to acknowledge packet", ackMsg.AckedPacketID, "to", pkt.Header.RelayedBy)
-	_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
+	
+	if l.cryptography!=nil{
+		_ = l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
+	}else{
+		_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
+	}
 	return nil
 }
 
@@ -115,13 +122,21 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			return fmt.Errorf("could not convert the rumor message to a transport message: %w", err)
 		}
 		// Send the missing rumors back and do not wait for ack.
-		return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		if l.cryptography!=nil{
+			return l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		}else{
+			return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		}
 	}
 	// Request my missing rumors from the remote peer after I make sure that he is up to date.
 	if len(rmtNews) > 0 {
 		myStatusMsg := l.view.AsStatusMsg()
 		trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-		_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		if l.cryptography!=nil{
+			_ = l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		}else{
+			_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		}
 	}
 	// ContinueMongering process.
 	if len(thsNews) == 0 && len(rmtNews) == 0 {
@@ -136,7 +151,12 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			}
 			myStatusMsg := l.view.AsStatusMsg()
 			trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-			_ = l.network.Route(l.GetAddress(), dest, dest, trnspMsg)
+			if l.cryptography!=nil{
+				_ = l.cryptography.Route(l.GetAddress(), dest, dest, trnspMsg)
+			}else{
+				_ = l.network.Route(l.GetAddress(), dest, dest, trnspMsg)
+			}
+			
 		}
 		utils.PrintDebug("gossip", l.GetAddress(), "is stopping mongering.")
 	}

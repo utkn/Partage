@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.dedis.ch/cs438/peer"
+	"go.dedis.ch/cs438/peer/impl/cryptography"
 	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
@@ -14,6 +15,7 @@ import (
 
 type Layer struct {
 	network         *network.Layer	
+	cryptography	*cryptography.Layer
 	config          *peer.Configuration
 	rumorLock       sync.Mutex
 	view            *PeerView
@@ -21,9 +23,10 @@ type Layer struct {
 	quitDistributor *utils.SignalDistributor
 }
 
-func Construct(network *network.Layer, config *peer.Configuration, quitDistributor *utils.SignalDistributor) *Layer {
+func Construct(network *network.Layer,cryptography *cryptography.Layer, config *peer.Configuration, quitDistributor *utils.SignalDistributor) *Layer {
 	layer := &Layer{
 		network:         network,
+		cryptography: cryptography,
 		config:          config,
 		view:            NewPeerView(),
 		ackNotification: utils.NewAsyncNotificationHandler(),
@@ -63,9 +66,17 @@ func (l *Layer) SendRumorsMsg(msg transport.Message, unresponsiveNeighbors map[s
 	}
 	// Then, send it to the random peer selected without using the routing table.
 	utils.PrintDebug("network", l.GetAddress(), "is sending", randNeighbor, "a", pkt.Msg.Type)
-	err = l.network.Send(randNeighbor, pkt.Copy(), time.Second*1) //TODO:
-	if err != nil {
-		return fmt.Errorf("could not unicast the rumors message within the broadcast: %w", err)
+	if l.cryptography!=nil{
+		//send it via the cryptography layer (signed header)
+		err = l.cryptography.Send(randNeighbor, pkt.Copy(), time.Second*5) 
+		if err != nil {
+			return fmt.Errorf("could not unicast the rumors message, using the crypto layer, within the broadcast: %w", err)
+		}
+	}else{
+		err = l.network.Send(randNeighbor, pkt.Copy(), time.Second*1) 
+		if err != nil {
+			return fmt.Errorf("could not unicast the rumors message within the broadcast: %w", err)
+		}
 	}
 	// Wait for an Ack.
 	if l.config.AckTimeout > 0 {

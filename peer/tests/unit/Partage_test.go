@@ -58,7 +58,7 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 
 	bytes,_:=json.Marshal(fakeMsg)
 	fmt.Println("private message to be sent to node2 and node4:",bytes)
-	err := node1.SendPrivatePost(fakeMsg,recipients)
+	err := node1.SharePrivatePost(fakeMsg,recipients)
 	require.NoError(t, err)
 
 	time.Sleep(time.Second * 10)

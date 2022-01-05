@@ -46,11 +46,6 @@ type Messaging interface {
 	//
 	// - implemented in HW0
 	SetRoutingEntry(origin, relayAddr string)
-
-
-	SendPrivatePost(msg transport.Message, recipients [][32]byte) error 
-
-	GetHashedPublicKey() [32]byte //TODO: remove later..just for testing purposes
 }
 
 // RoutingTable defines a simple next-hop routing table. The key is the origin
