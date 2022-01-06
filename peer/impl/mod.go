@@ -105,8 +105,11 @@ func (n *node) Start() error {
 		go func() {
 			for {
 				// Accept incoming connections..
-				tlsConn, err := sock.Accept()
+				tlsConn,keep,err := sock.Accept()
 				if err != nil {
+					if keep{
+						continue
+					}
 					//socket closed..stopping node..
 					fmt.Println("OUT 0")
 					return

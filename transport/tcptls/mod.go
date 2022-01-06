@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -147,22 +148,22 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	return nil
 }
 
-func (s *Socket) Accept() (*tls.Conn, error) {
+func (s *Socket) Accept() (*tls.Conn, bool,error) {
 	conn, err := (*s.listener).Accept()
 	if err != nil {
-		return nil, err
+		return nil, false,err
 	}
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
-		return nil, err
+		return nil, true,errors.New("not tls conn")
 	}
 
 	tlsConn.Handshake()
 	if tlsConn.ConnectionState().HandshakeComplete && tlsConn.ConnectionState().PeerCertificates[0].CheckSignatureFrom(s.CA)==nil{
-		return tlsConn, nil
+		return tlsConn, true,nil
 	}
 	fmt.Println("Refused Connection: Certificate is not signed by the trusted CA!")
-	return nil,err
+	return nil,true,errors.New("refused: certificate isnt signed by trusted CA")
 }
 
 func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
