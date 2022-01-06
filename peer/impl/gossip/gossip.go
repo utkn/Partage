@@ -120,6 +120,12 @@ func (l *Layer) BroadcastAway(msg transport.Message) error {
 	rumor.Msg = &msg
 	rumor.Origin = l.GetAddress()
 	rumor.Sequence = l.view.GetSequence(l.GetAddress()) + 1
+	if l.cryptography!=nil{
+		if err:=rumor.AddValidation(l.cryptography.GetPrivateKey(),l.cryptography.GetSignedPublicKey());err!=nil{
+			fmt.Println("broadcast away:",err)
+			return err
+		}
+	}
 	// Wrap the rumor in a rumors message.
 	rumorsMsg := types.RumorsMessage{}
 	rumorsMsg.Rumors = append(rumorsMsg.Rumors, rumor)

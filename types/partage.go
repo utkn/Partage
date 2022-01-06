@@ -1,10 +1,68 @@
 package types
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+
+	"go.dedis.ch/cs438/transport"
 )
+
+//--------------------------------------------------------------
+// Rumor
+func (r *Rumor) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *transport.SignedPublicKey) error{
+	//Adds a validation check to Rumor (provides integrity and authenticity check!)
+	byteMsg, err := json.Marshal(r.Msg)
+	if err!=nil{
+		return err
+	}
+	// Hash(rumor.Msg||rumor.Origin||rumor.Sequence)
+	hashedContent:=transport.Hash(append(byteMsg,append([]byte(r.Origin),[]byte(strconv.Itoa(int(r.Sequence)))...)...))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, myPrivateKey, crypto.SHA256, hashedContent[:])
+	if err != nil {
+		return err
+	}
+
+	r.Check =&transport.Validation{
+		Signature: signature,
+		SrcPublicKey: *mySignedPublicKey,
+	}
+
+	return nil
+}
+
+func (r *Rumor) Validate(publicKeyCA *rsa.PublicKey) error{
+	if r.Check==nil{
+		return fmt.Errorf("rumor has empty validation check")
+	}
+
+	//1- Check if the Public Key of the user who signed the message is valid (signed by trusted CA)
+	srcPKBytes, err := x509.MarshalPKIXPublicKey(r.Check.SrcPublicKey.PublicKey)
+	if err != nil {
+		return err
+	}
+	hashedSrcPK := transport.Hash(srcPKBytes)
+	if err:=rsa.VerifyPKCS1v15(publicKeyCA,crypto.SHA256,hashedSrcPK[:],r.Check.SrcPublicKey.Signature); err!=nil{
+		//invalid SignedPublicKey (not signed by trusted CA)
+		return fmt.Errorf("rumor's src public key is not signed by trusted CA")
+	}
+
+	//2- Check if Hash(rumor.Msg||rumor.Origin||rumor.Sequence) was signed by src's private key
+	byteMsg,_:=json.Marshal(r.Msg)
+	hashedContent :=transport.Hash(append(byteMsg,append([]byte(r.Origin),[]byte(strconv.FormatInt(int64(r.Sequence), 10))...)...))
+	if rsa.VerifyPKCS1v15(r.Check.SrcPublicKey.PublicKey,crypto.SHA256,hashedContent[:],r.Check.Signature)!=nil{
+		//invalid signature
+		return fmt.Errorf("rumor is not signed by src private key")
+	}
+
+	//VALID!
+	return nil
+}
 
 // -----------------------------------------------------------------------------
 // Post

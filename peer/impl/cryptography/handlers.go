@@ -31,9 +31,7 @@ func (l *Layer) SearchPKReplyMessageHandler(msg types.Message, pkt transport.Pac
 		
 		bytesPK,_:=utils.PublicKeyToBytes(searchPKReplyMsg.Response.PublicKey)
 		//add entry to catalog
-		l.socket.CatalogLock.Lock()
-		l.socket.Catalog[utils.Hash(bytesPK)] = &searchPKReplyMsg.Response
-		l.socket.CatalogLock.Unlock()
+		l.AddUserToCatalog(utils.Hash(bytesPK),&searchPKReplyMsg.Response)
 	}
 
 	return nil
@@ -74,9 +72,7 @@ func (l *Layer) SearchPKRequestMessageHandler(msg types.Message, pkt transport.P
 	if searchPKRequestMsg.Username == l.socket.GetHashedPublicKey() {
 		signedPK = l.socket.GetSignedPublicKey()
 	} else {
-		l.socket.CatalogLock.RLock()
-		signedPK, ok = l.socket.Catalog[searchPKRequestMsg.Username]
-		l.socket.CatalogLock.RUnlock()
+		signedPK, ok = l.GetUserFromCatalog(searchPKRequestMsg.Username)
 		if !ok { //no signed PK found locally
 			return nil //don't respond
 		}

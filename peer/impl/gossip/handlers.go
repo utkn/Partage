@@ -29,6 +29,20 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	for _, rumor := range rumorsMsg.Rumors {
 		// Only consider the expected rumors.
 		if l.view.IsExpected(rumor.Origin, rumor.Sequence) {
+			// Validate rumor's signature
+			if l.cryptography!=nil{
+				if err:=rumor.Validate(l.cryptography.GetCAPublicKey()); err!=nil{
+					fmt.Println("dropped rumor duo to invalid signature..",err)
+					continue
+				}else{
+					// Valid..Store rumor's SignedPublicKey in Catalog..(helps to get to know users in the network!)
+					bytesPK,_:=utils.PublicKeyToBytes(rumor.Check.SrcPublicKey.PublicKey)
+					hashPK:=utils.Hash(bytesPK)
+					if _,exists:=l.cryptography.GetUserFromCatalog(hashPK); !exists{
+						l.cryptography.AddUserToCatalog(hashPK,&rumor.Check.SrcPublicKey)
+					}
+				}
+			}
 			utils.PrintDebug("gossip", l.GetAddress(), "will process a rumor from", rumor.Origin, "with sequence", rumor.Sequence)
 			rumorsOfInterest = append(rumorsOfInterest, rumor)
 			// Save the rumor.

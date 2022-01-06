@@ -117,15 +117,27 @@ func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
 	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
 }
 
+func (l *Layer) GetUserFromCatalog(hashedPK [32]byte) (*transport.SignedPublicKey,bool){
+	l.socket.CatalogLock.RLock()
+	defer l.socket.CatalogLock.RUnlock()
+	signedPK, existsLocally := l.socket.Catalog[hashedPK]
+	return signedPK,existsLocally
+}
+
+func (l *Layer) AddUserToCatalog(hashedPK [32]byte, sigPK *transport.SignedPublicKey){
+	l.socket.CatalogLock.Lock()
+	defer l.socket.CatalogLock.Unlock()
+	l.socket.Catalog[hashedPK]=sigPK
+}
+
 func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rsa.PublicKey {
 	// First look for a match locally.
 	if hashedPK == l.socket.GetHashedPublicKey() {
 		//x509Cert,_:=x509.ParseCertificate(l.socket.GetCertificate().Certificate[0])
 		return &l.GetPrivateKey().PublicKey
 	}
-	l.socket.CatalogLock.RLock()
-	signedPK, existsLocally := l.socket.Catalog[hashedPK]
-	l.socket.CatalogLock.RUnlock()
+
+	signedPK, existsLocally := l.GetUserFromCatalog(hashedPK)
 	if existsLocally {
 		return signedPK.PublicKey
 	}

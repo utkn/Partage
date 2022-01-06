@@ -23,6 +23,9 @@ type RumorsMessage struct {
 
 // Rumor wraps a message to ensure delivery to all peers-
 type Rumor struct {
+	//signature(Hash(msg||origin||sequence))
+	Check *transport.Validation
+
 	// Origin is the address of the node that initiated the rumor
 	Origin string
 
