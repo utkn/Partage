@@ -60,7 +60,8 @@ type Configuration struct {
 	// Default: {2s 2 5}
 	BackoffDataRequest Backoff
 
-	Storage storage.Storage
+	Storage           storage.Storage
+	BlockchainStorage storage.MultipurposeStorage
 
 	// TotalPeers is the total number of peers in Peerster. If it is <= 1 then
 	// there is no use of Paxos/TLC/Blockchain.
