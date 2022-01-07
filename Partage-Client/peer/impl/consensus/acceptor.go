@@ -131,31 +131,31 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 	return nil
 }
 
-func (p *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
-	utils.PrintDebug("proposer", p.gossip.GetAddress(), "is handling paxos accept for ID", msg.ID)
-	p.clock.Lock.Lock()
+func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
+	utils.PrintDebug("proposer", a.gossip.GetAddress(), "is handling paxos accept for ID", msg.ID)
+	a.clock.Lock.Lock()
 	// Do not consider accept messages for an invalid step or ID.
-	if p.clock.ShouldIgnorePropose(msg.Step, int(msg.ID)) {
-		p.clock.Lock.Unlock()
+	if a.clock.ShouldIgnorePropose(msg.Step, int(msg.ID)) {
+		a.clock.Lock.Unlock()
 		return nil
 	}
 	// Let the proposer handle the acceptance message in the background.
-	p.notification.DispatchResponse(fmt.Sprint("accept-id", msg.ID), msg)
+	a.notification.DispatchResponse(fmt.Sprint("accept-id", msg.ID), msg)
 	// Save the received acceptance message.
-	reachedThreshold := p.clock.NotifyAcceptance(msg.Value, p.config.PaxosThreshold(p.config.TotalPeers))
+	reachedThreshold := a.clock.NotifyAcceptance(msg.Value, a.config.PaxosThreshold(a.config.TotalPeers))
 	// If we haven't reached the threshold, or we have already broadcasted a TLC message, leave it be.
-	if !reachedThreshold || p.clock.HasBroadcasted(int(msg.Step)) {
-		p.clock.Lock.Unlock()
+	if !reachedThreshold || a.clock.HasBroadcasted(int(msg.Step)) {
+		a.clock.Lock.Unlock()
 		return nil
 	}
-	p.clock.MarkBroadcasted(int(msg.Step))
-	p.clock.Lock.Unlock()
+	a.clock.MarkBroadcasted(int(msg.Step))
+	a.clock.Lock.Unlock()
 	// If we finally reached a threshold, broadcast a TLC message.
 	// To do that, first construct the blockchain block.
 	prevHash := make([]byte, 32)
-	lastBlockHashBytes := p.config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
+	lastBlockHashBytes := a.config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
 	lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
-	lastBlockBuf := p.config.Storage.GetBlockchainStore().Get(lastBlockHash)
+	lastBlockBuf := a.config.Storage.GetBlockchainStore().Get(lastBlockHash)
 	if lastBlockBuf != nil {
 		var lastBlock types.BlockchainBlock
 		_ = lastBlock.Unmarshal(lastBlockBuf)
@@ -181,8 +181,8 @@ func (p *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 		Step:  msg.Step,
 		Block: block,
 	}
-	tlcTranspMessage, _ := p.config.MessageRegistry.MarshalMessage(&tlcMessage)
-	utils.PrintDebug("proposer", p.gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
+	tlcTranspMessage, _ := a.config.MessageRegistry.MarshalMessage(&tlcMessage)
+	utils.PrintDebug("proposer", a.gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
 		"for step", msg.Step, "from accepthandler")
-	return p.gossip.Broadcast(tlcTranspMessage)
+	return a.gossip.Broadcast(tlcTranspMessage)
 }
