@@ -18,6 +18,11 @@ type Storage interface {
 	GetBlockchainStore() Store
 }
 
+// MultipurposeStorage is used to maintain multiple named stores.
+type MultipurposeStorage interface {
+	GetStore(string) Store
+}
+
 // Store describes the primitives of a simple storage.
 type Store interface {
 	// Get returns nil if not found

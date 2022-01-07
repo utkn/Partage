@@ -45,13 +45,15 @@ func Test_HW3_Integration_Multiple_Consensus(t *testing.T) {
 		defer os.RemoveAll(tmpFolder)
 
 		storage, err := file.NewPersistency(tmpFolder)
+		blockchainStorage, err := file.NewPersistentMultipurposeStorage(tmpFolder)
 		require.NoError(t, err)
 
 		node := z.NewTestNode(t, referenceFac, referenceTransp, "127.0.0.1:0",
 			z.WithMessageRegistry(proxy.NewRegistry()),
 			z.WithTotalPeers(uint(totalNodes)),
 			z.WithPaxosID(uint(i+1)),
-			z.WithStorage(storage))
+			z.WithStorage(storage),
+			z.WithBlockchainStorage(blockchainStorage))
 		nodes[i] = node
 	}
 
