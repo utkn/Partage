@@ -320,6 +320,7 @@ func NewTestNode(t *testing.T, f peer.Factory, trans transport.Transport,
 	config.ContinueMongering = template.ContinueMongering
 	config.AckTimeout = template.AckTimeout
 	config.Storage = template.storage
+	config.BlockchainStorage = template.blockchainStorage
 	config.ChunkSize = template.chunkSize
 	config.BackoffDataRequest = template.dataRequestBackoff
 	config.TotalPeers = template.totalPeers
