@@ -17,12 +17,12 @@ type Registration struct {
 //======================PARTAGE
 //---------------Post
 type Post struct {
-	//Sign(Hash(Content+Timestamp)) ..provides integrity and authenticity to Post
+	// Sign(Hash(Content+Timestamp)) provides integrity and authenticity to Post
 	Check *transport.Validation
 
 	Timestamp int64
 
-	//only allow Content with a maximum of 128 characters (bytes)
+	// Only allow Content with a maximum of 128 characters (bytes)
 	Content string
 }
 
@@ -36,7 +36,7 @@ type PrivatePost struct {
 	Msg []byte //encrypted transport.Message with AES-256 ---> NOTE: this should be a Post message!
 }
 
-//----------------Search for Signed Public Key in the network
+// SearchPKRequestMessage is used to search for a Signed Public Key in the network.
 type SearchPKRequestMessage struct {
 	// RequestID must be a unique identifier. Use xid.New().String() to generate it.
 	RequestID string

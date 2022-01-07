@@ -1,4 +1,4 @@
-package consensus
+package paxos
 
 import (
 	"fmt"
@@ -8,24 +8,24 @@ import (
 
 type ProposerBeginState struct {
 	State
-	consensus *Layer
-	value     types.PaxosValue
+	paxos *Paxos
+	value types.PaxosValue
 }
 
 func (s ProposerBeginState) Next() State {
-	s.consensus.Clock.Lock.RLock()
+	s.paxos.Clock.Lock.RLock()
 	// Catch up with the clock!
-	for int(s.consensus.LastProposalID) < s.consensus.Clock.MaxID {
-		s.consensus.LastProposalID += s.consensus.Config.TotalPeers
+	for int(s.paxos.LastProposalID) < s.paxos.Clock.MaxID {
+		s.paxos.LastProposalID += s.paxos.Config.TotalPeers
 	}
-	proposalID := s.consensus.LastProposalID
-	proposalStep := s.consensus.Clock.Step
-	s.consensus.Clock.Lock.RUnlock()
+	proposalID := s.paxos.LastProposalID
+	proposalStep := s.paxos.Clock.Step
+	s.paxos.Clock.Lock.RUnlock()
 	//println("proposer", p.gossip.GetAddress(), "is proposing", value.String(), "with ID", proposalID, "at step", proposalStep)
 	// Update the next proposal ID.
-	s.consensus.LastProposalID += s.consensus.Config.TotalPeers
+	s.paxos.LastProposalID += s.paxos.Config.TotalPeers
 	return ProposerWaitPromiseState{
-		consensus:     s.consensus,
+		paxos:         s.paxos,
 		proposalID:    proposalID,
 		proposalStep:  proposalStep,
 		notification:  utils.NewAsyncNotificationHandler(),
@@ -43,7 +43,7 @@ func (s ProposerBeginState) Name() string {
 
 type ProposerWaitPromiseState struct {
 	State
-	consensus     *Layer
+	paxos         *Paxos
 	proposalID    uint
 	proposalStep  uint
 	originalValue types.PaxosValue
@@ -55,29 +55,29 @@ func (s ProposerWaitPromiseState) Next() State {
 	prepareMsg := types.PaxosPrepareMessage{
 		Step:   s.proposalStep,
 		ID:     s.proposalID,
-		Source: s.consensus.GetAddress(),
+		Source: s.paxos.Gossip.GetAddress(),
 	}
 	// Pass the created prepare message to the next state.
-	prepareTranspMsg, _ := s.consensus.Config.MessageRegistry.MarshalMessage(&prepareMsg)
+	prepareTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&prepareMsg)
 	// Broadcast the prepare message.
-	_ = s.consensus.Gossip.Broadcast(prepareTranspMsg)
+	_ = s.paxos.Gossip.Broadcast(prepareTranspMsg)
 	// Find the threshold.
-	threshold := s.consensus.Config.PaxosThreshold(s.consensus.Config.TotalPeers)
+	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	// Collect the promises in the background.
 	var promises []*types.PaxosPromiseMessage
-	utils.PrintDebug("proposer", s.consensus.GetAddress(), "has started waiting for paxos promises with ID", s.proposalID)
-	responses := s.notification.MultiResponseCollector(fmt.Sprint("proposer-promise-id", s.proposalID), s.consensus.Config.PaxosProposerRetry, threshold)
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has started waiting for paxos promises with ID", s.proposalID)
+	responses := s.notification.MultiResponseCollector(fmt.Sprint("proposer-promise-id", s.proposalID), s.paxos.Config.PaxosProposerRetry, threshold)
 	for _, r := range responses {
 		promises = append(promises, r.(*types.PaxosPromiseMessage))
 	}
-	utils.PrintDebug("proposer", s.consensus.Gossip.GetAddress(), "has received", len(promises), "promises with ID", s.proposalID)
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has received", len(promises), "promises with ID", s.proposalID)
 	// Retry with new proposal ID.
 	if len(promises) < threshold {
-		utils.PrintDebug("proposer", s.consensus.GetAddress(), "couldn't collect enough promises.")
+		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "couldn't collect enough promises.")
 		//println(p.gossip.GetAddress(), "NOT ENOUGH PROMISES")
 		return ProposerBeginState{
-			consensus: s.consensus,
-			value:     s.originalValue,
+			paxos: s.paxos,
+			value: s.originalValue,
 		}
 	}
 	// Get the highest last accepted value if it exists.
@@ -94,11 +94,11 @@ func (s ProposerWaitPromiseState) Next() State {
 	// Choose either the original value or the already accepted value.
 	chosenValue := s.originalValue
 	if alreadyAcceptedValue != nil {
-		utils.PrintDebug("proposer", s.consensus.Gossip.GetAddress(), "is switching to propose for", alreadyAcceptedValue)
+		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "is switching to propose for", alreadyAcceptedValue)
 		chosenValue = *alreadyAcceptedValue
 	}
 	return ProposerWaitAcceptState{
-		consensus:     s.consensus,
+		paxos:         s.paxos,
 		originalValue: s.originalValue,
 		chosenValue:   chosenValue,
 		proposalID:    s.proposalID,
@@ -127,7 +127,7 @@ func (s ProposerWaitPromiseState) Name() string {
 
 type ProposerWaitAcceptState struct {
 	State
-	consensus     *Layer
+	paxos         *Paxos
 	notification  *utils.AsyncNotificationHandler
 	proposalStep  uint
 	proposalID    uint
@@ -136,20 +136,20 @@ type ProposerWaitAcceptState struct {
 }
 
 func (s ProposerWaitAcceptState) Next() State {
-	threshold := s.consensus.Config.PaxosThreshold(s.consensus.Config.TotalPeers)
+	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	proposeMsg := types.PaxosProposeMessage{
 		Step:  s.proposalStep,
 		ID:    s.proposalID,
 		Value: s.chosenValue,
 	}
-	proposeTranspMsg, _ := s.consensus.Config.MessageRegistry.MarshalMessage(&proposeMsg)
+	proposeTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&proposeMsg)
 	// Broadcast the proposal.
-	utils.PrintDebug("proposer", s.consensus.GetAddress(), "is broadcasting a propose for ID", s.proposalID, "and value", s.chosenValue)
-	_ = s.consensus.Gossip.Broadcast(proposeTranspMsg)
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "is broadcasting a propose for ID", s.proposalID, "and value", s.chosenValue)
+	_ = s.paxos.Gossip.Broadcast(proposeTranspMsg)
 	// Collect accept messages.
-	utils.PrintDebug("proposer", s.consensus.GetAddress(), "has started waiting for paxos accepts with ID", s.proposalID)
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has started waiting for paxos accepts with ID", s.proposalID)
 	var accepts []*types.PaxosAcceptMessage
-	responses := s.notification.MultiResponseCollector(fmt.Sprint("proposer-accept-id", proposeMsg.ID), s.consensus.Config.PaxosProposerRetry, threshold)
+	responses := s.notification.MultiResponseCollector(fmt.Sprint("proposer-accept-id", proposeMsg.ID), s.paxos.Config.PaxosProposerRetry, threshold)
 	for _, r := range responses {
 		acceptMsg := r.(*types.PaxosAcceptMessage)
 		// Do not consider irrelevant accept messages.
@@ -158,18 +158,18 @@ func (s ProposerWaitAcceptState) Next() State {
 		}
 		accepts = append(accepts, acceptMsg)
 	}
-	utils.PrintDebug("proposer", s.consensus.GetAddress(), "has received", len(accepts), "paxos accepts with ID", s.proposalID)
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has received", len(accepts), "paxos accepts with ID", s.proposalID)
 	// Retry with new proposal ID if we couldn't collect enough accepts.
 	if len(accepts) < threshold {
-		utils.PrintDebug("proposer", s.consensus.GetAddress(), "couldn't collect enough accepts. Retrying...")
+		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "couldn't collect enough accepts. Retrying...")
 		//println(p.gossip.GetAddress(), "NOT ENOUGH ACCEPTS")
 		return ProposerBeginState{
-			consensus: s.consensus,
-			value:     s.originalValue,
+			paxos: s.paxos,
+			value: s.originalValue,
 		}
 	}
 	return ProposerDoneState{
-		consensus:     s.consensus,
+		paxos:         s.paxos,
 		proposalStep:  s.proposalStep,
 		proposalID:    s.proposalID,
 		proposedValue: s.chosenValue,
@@ -195,7 +195,7 @@ func (s ProposerWaitAcceptState) Name() string {
 
 type ProposerDoneState struct {
 	State
-	consensus     *Layer
+	paxos         *Paxos
 	proposalStep  uint
 	proposalID    uint
 	proposedValue types.PaxosValue
@@ -204,23 +204,23 @@ type ProposerDoneState struct {
 
 func (s ProposerDoneState) Next() State {
 	// Listen to the tick from the global notification handler.
-	success := s.consensus.Notification.ResponseCollector(fmt.Sprint("tick", s.proposalStep), s.consensus.Config.PaxosProposerRetry) != nil
+	success := s.paxos.Notification.ResponseCollector(fmt.Sprint("tick", s.proposalStep), s.paxos.Config.PaxosProposerRetry) != nil
 	// Retry if the whole proposal has timed out.
 	if !success {
-		utils.PrintDebug("proposer", s.consensus.GetAddress(), "timed out for some reason. Retrying...")
+		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "timed out for some reason. Retrying...")
 		//println(p.gossip.GetAddress(), "NO TICK!")
 		return ProposerBeginState{
-			consensus: s.consensus,
+			paxos: s.paxos,
 		}
 	}
 	// Retry if the proposed value is not ours.
 	if s.originalValue.UniqID != s.proposedValue.UniqID {
-		utils.PrintDebug("proposer", s.consensus.GetAddress(), "will now retry to propose its own value.")
+		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "will now retry to propose its own value.")
 		return ProposerBeginState{
-			consensus: s.consensus,
+			paxos: s.paxos,
 		}
 	}
-	utils.PrintDebug("proposer", s.consensus.GetAddress(), "has concluded the proposal with ID",
+	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has concluded the proposal with ID",
 		s.proposalID, "and value", s.proposedValue.String())
 	return nil
 }

@@ -1,4 +1,4 @@
-package consensus
+package paxos
 
 import (
 	"go.dedis.ch/cs438/peer/impl/utils"
