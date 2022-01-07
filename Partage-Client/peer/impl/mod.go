@@ -49,23 +49,23 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	tlsSock, isRunningTLS := conf.Socket.(*tcptls.Socket)
 	if isRunningTLS {
 		//check if Certificate in use is self-signed, if so..
-		if res,_:=utils.TLSIsSelfSigned(tlsSock.GetCertificate()); res{
+		if res, _ := utils.TLSIsSelfSigned(tlsSock.GetCertificate()); res {
 			fmt.Println("DEBUG: registering new user...")
-			if err:=tlsSock.RegisterUser();err==nil{
+			if err := tlsSock.RegisterUser(); err == nil {
 				fmt.Println("DEBUG: successfully registered user!")
 			}
 		}
 	}
-	
+
 	// Create the layers.
 	networkLayer := network.Construct(&conf)
 	var cryptographyLayer *cryptography.Layer
 	if isRunningTLS {
-		cryptographyLayer = cryptography.Construct(networkLayer, &conf) 
+		cryptographyLayer = cryptography.Construct(networkLayer, &conf)
 		cryptographyLayer.RegisterHandlers()
 	}
 
-	gossipLayer := gossip.Construct(networkLayer,cryptographyLayer,&conf, quitDistributor)
+	gossipLayer := gossip.Construct(networkLayer, cryptographyLayer, &conf, quitDistributor)
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
 
@@ -105,9 +105,9 @@ func (n *node) Start() error {
 		go func() {
 			for {
 				// Accept incoming connections..
-				tlsConn,keep,err := sock.Accept()
+				tlsConn, keep, err := sock.Accept()
 				if err != nil {
-					if keep{
+					if keep {
 						continue
 					}
 					//socket closed..stopping node..
@@ -115,7 +115,7 @@ func (n *node) Start() error {
 					return
 				} else {
 					//create go routine to handle this connection (recv)
-					go sock.HandleTLSConn(tlsConn,false)
+					go sock.HandleTLSConn(tlsConn, false)
 				}
 			}
 		}()
@@ -233,7 +233,7 @@ func (n *node) SetRoutingEntry(origin, relayAddr string) {
 
 // Unicast implements peer.Messaging
 func (n *node) Unicast(dest string, msg transport.Message) error {
-	if n.cryptography!=nil{
+	if n.cryptography != nil {
 		return n.cryptography.Unicast(dest, msg)
 	}
 	return n.network.Unicast(dest, msg)
@@ -290,23 +290,23 @@ func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) er
 	return n.gossip.SendPrivatePost(msg, recipients)
 }
 
-func (n *node) BlockUser(publicKeyHash [32]byte){
-	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
-	if ok{
+func (n *node) BlockUser(publicKeyHash [32]byte) {
+	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
+	if ok {
 		tlsSock.Block(publicKeyHash)
 	}
 }
 
-func (n *node) UnblockUser(publicKeyHash [32]byte){
-	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
-	if ok{
+func (n *node) UnblockUser(publicKeyHash [32]byte) {
+	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
+	if ok {
 		tlsSock.Unblock(publicKeyHash)
 	}
 }
 
-func (n *node) GetHashedPublicKey() [32]byte{
-	tlsSock,ok:=n.conf.Socket.(*tcptls.Socket)
-	if ok{
+func (n *node) GetHashedPublicKey() [32]byte {
+	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
+	if ok {
 		return tlsSock.GetHashedPublicKey()
 	}
 	return [32]byte{}

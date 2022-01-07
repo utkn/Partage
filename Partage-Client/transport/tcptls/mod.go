@@ -43,21 +43,21 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		return nil, err
 	}
 
-	ca:=utils.LoadCACertificate()
-	pkSignature:=utils.LoadPublicKeySignature()
+	ca := utils.LoadCACertificate()
+	pkSignature := utils.LoadPublicKeySignature()
 
 	return &Socket{
 		listener:      &listener,
 		ins:           []transport.Packet{},
 		outs:          []transport.Packet{},
-		tlsConfig:     cfg, 
+		tlsConfig:     cfg,
 		myCertificate: certificate,
-		CA: ca,
+		CA:            ca,
 		Catalog:       make(map[[32]byte]*transport.SignedPublicKey), //hashed public key maps to *rsa.PublicKey
-		myPKSignature:      pkSignature,
+		myPKSignature: pkSignature,
 		pktQueue:      make(chan *transport.Packet, 1024),
 		connPool:      newConnPool(),
-		blockedUsers: make(map[[32]byte]struct{}),
+		blockedUsers:  make(map[[32]byte]struct{}),
 	}, nil
 }
 
@@ -66,20 +66,20 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 // - implements transport.Socket
 // - implements transport.ClosableSocket
 type Socket struct {
-	insLock       sync.RWMutex
-	outsLock      sync.RWMutex
-	listener      *net.Listener
-	ins           []transport.Packet
-	outs          []transport.Packet
-	tlsConfig     *tls.Config
-	myCertificate *tls.Certificate
-	myPKSignature	[]byte
-	Catalog       map[[32]byte]*transport.SignedPublicKey
-	CatalogLock   sync.RWMutex
-	connPool      ConnPool
-	pktQueue      chan *transport.Packet
-	CA *x509.Certificate
-	blockedUsers	map[[32]byte]struct{}
+	insLock           sync.RWMutex
+	outsLock          sync.RWMutex
+	listener          *net.Listener
+	ins               []transport.Packet
+	outs              []transport.Packet
+	tlsConfig         *tls.Config
+	myCertificate     *tls.Certificate
+	myPKSignature     []byte
+	Catalog           map[[32]byte]*transport.SignedPublicKey
+	CatalogLock       sync.RWMutex
+	connPool          ConnPool
+	pktQueue          chan *transport.Packet
+	CA                *x509.Certificate
+	blockedUsers      map[[32]byte]struct{}
 	blockedUsersMutex sync.RWMutex
 }
 
@@ -114,7 +114,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 		fmt.Println(s.GetAddress(), " created a goroutine to handle ", dest, " conn")
 
 		// Create a pkt listening goroutine for this new conn
-		go s.HandleTLSConn(conn,true)
+		go s.HandleTLSConn(conn, true)
 	}
 
 	_, err = conn.Write(pktBytes)
@@ -129,44 +129,44 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	s.outsLock.Unlock()
 
 	/*
-	if newConn {
-		// Save neighbors Cert..
-		go func() { //TODO: may follow other approach later if this adds to much overhead to socket..
-			cert := conn.ConnectionState().PeerCertificates[0]
-			username := cert.Subject.Organization[0]
-			s.CatalogLock.RLock()
-			_, exist := s.Catalog[username]
-			s.CatalogLock.RUnlock()
-			if !exist {
-				s.CatalogLock.Lock()
-				s.Catalog[username] = cert
-				s.CatalogLock.Unlock()
-			}
-		}()
-	} */
+		if newConn {
+			// Save neighbors Cert..
+			go func() { //TODO: may follow other approach later if this adds to much overhead to socket..
+				cert := conn.ConnectionState().PeerCertificates[0]
+				username := cert.Subject.Organization[0]
+				s.CatalogLock.RLock()
+				_, exist := s.Catalog[username]
+				s.CatalogLock.RUnlock()
+				if !exist {
+					s.CatalogLock.Lock()
+					s.Catalog[username] = cert
+					s.CatalogLock.Unlock()
+				}
+			}()
+		} */
 
 	return nil
 }
 
-func (s *Socket) Accept() (*tls.Conn, bool,error) {
+func (s *Socket) Accept() (*tls.Conn, bool, error) {
 	conn, err := (*s.listener).Accept()
 	if err != nil {
-		return nil, false,err
+		return nil, false, err
 	}
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
-		return nil, true,errors.New("not tls conn")
+		return nil, true, errors.New("not tls conn")
 	}
 
 	tlsConn.Handshake()
-	if tlsConn.ConnectionState().HandshakeComplete && tlsConn.ConnectionState().PeerCertificates[0].CheckSignatureFrom(s.CA)==nil{
-		return tlsConn, true,nil
+	if tlsConn.ConnectionState().HandshakeComplete && tlsConn.ConnectionState().PeerCertificates[0].CheckSignatureFrom(s.CA) == nil {
+		return tlsConn, true, nil
 	}
 	fmt.Println("Refused Connection: Certificate is not signed by the trusted CA!")
-	return nil,true,errors.New("refused: certificate isnt signed by trusted CA")
+	return nil, true, errors.New("refused: certificate isnt signed by trusted CA")
 }
 
-func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
+func (s *Socket) HandleTLSConn(tlsConn *tls.Conn, connSaved bool) {
 	recvTimeout := time.Second * 60 * 3 //3 minutes
 	//conn
 	var pkt transport.Packet
@@ -205,28 +205,28 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
 				}
 			}
 		}
-		
+
 		//check packet RelayedBy parameter and not the actual tlsConn source addr parameter. Because you can't use the same addr socket to listen from and to dial from, so nodes will dial from a different addr than the one they are listening to. We just care about the listening-socket addr
 		//add to connPool
-		if !connSaved{
-			if !s.connPool.ConnExists(pkt.Header.RelayedBy){
+		if !connSaved {
+			if !s.connPool.ConnExists(pkt.Header.RelayedBy) {
 				s.connPool.AddConn(pkt.Header.RelayedBy, tlsConn)
 				fmt.Println(s.GetAddress(), " created a goroutine to handle ", pkt.Header.RelayedBy, " conn")
 			}
-			connSaved=true
+			connSaved = true
 		}
 
 		//VALIDATE PACKET!
 		// Validate packet signatures
-		if pkt.Validate(s.GetCAPublicKey())!=nil{
+		if pkt.Validate(s.GetCAPublicKey()) != nil {
 			//signatures aren't valid..drop packet
 			fmt.Println("pkt signature no valid")
 			continue
 		}
 		// Check for banned users packets and drop the ones that are for me! (still relay packets from blocked users)
-		if pkt.Header.Destination==s.GetAddress() && pkt.Header.Check!=nil {
-			pkBytes,_:=utils.PublicKeyToBytes(pkt.Header.Check.SrcPublicKey.PublicKey)
-			if s.isBlocked(utils.Hash(pkBytes)){
+		if pkt.Header.Destination == s.GetAddress() && pkt.Header.Check != nil {
+			pkBytes, _ := utils.PublicKeyToBytes(pkt.Header.Check.SrcPublicKey.PublicKey)
+			if s.isBlocked(utils.Hash(pkBytes)) {
 				fmt.Println("avoided packet from blocked user")
 				continue
 			}
@@ -235,8 +235,8 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn,connSaved bool) {
 		processing/reading node B’s messages or updating his view with node B’s view
 		(i.e., node A stops	saving node B’s rumors)*/
 
-		s.AddIn(&pkt) 
-		
+		s.AddIn(&pkt)
+
 		//send to packet queue
 		cpkt := pkt.Copy()
 		s.pktQueue <- &cpkt
@@ -320,15 +320,15 @@ func (s *Socket) UpdateCertificate(cert *x509.Certificate, privKey *rsa.PrivateK
 		return err
 	}
 	var newTLSConf *tls.Config
-	ca:=utils.LoadCACertificate()
-	if ca!=nil{
-		//TLS will check every connection against his CA's Certificate 
-		caCertPool:=x509.NewCertPool()
-		caPem,_:=utils.CertificateToPem(ca)
+	ca := utils.LoadCACertificate()
+	if ca != nil {
+		//TLS will check every connection against his CA's Certificate
+		caCertPool := x509.NewCertPool()
+		caPem, _ := utils.CertificateToPem(ca)
 		caCertPool.AppendCertsFromPEM(caPem)
 		//TODO:
-		newTLSConf = &tls.Config{Certificates: []tls.Certificate{tlsCert},InsecureSkipVerify: true, RootCAs: caCertPool, ClientCAs: caCertPool, ClientAuth: tls.RequireAndVerifyClientCert}
-	}else{
+		newTLSConf = &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, RootCAs: caCertPool, ClientCAs: caCertPool, ClientAuth: tls.RequireAndVerifyClientCert}
+	} else {
 		newTLSConf = &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, ClientAuth: tls.RequestClientCert}
 	}
 	addr := s.GetAddress()
@@ -342,7 +342,7 @@ func (s *Socket) UpdateCertificate(cert *x509.Certificate, privKey *rsa.PrivateK
 	s.listener = &newListener
 	s.myCertificate = &tlsCert
 	s.connPool = newConnPool()
-	s.CA=ca
+	s.CA = ca
 	s.myPKSignature = publicKeySignature
 
 	return nil
@@ -352,49 +352,49 @@ func (s *Socket) GetTLSConfig() *tls.Config {
 	return s.tlsConfig
 }
 
-func (s *Socket) GetPublicKey() *rsa.PublicKey{
+func (s *Socket) GetPublicKey() *rsa.PublicKey {
 	return &s.myCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
 }
 
-func (s *Socket) GetSignedPublicKey() (*transport.SignedPublicKey){
-	return &transport.SignedPublicKey{PublicKey:s.GetPublicKey(), Signature: s.myPKSignature}
+func (s *Socket) GetSignedPublicKey() *transport.SignedPublicKey {
+	return &transport.SignedPublicKey{PublicKey: s.GetPublicKey(), Signature: s.myPKSignature}
 }
 
-func (s *Socket) GetHashedPublicKey() [32]byte{
+func (s *Socket) GetHashedPublicKey() [32]byte {
 	//stringify user's public key
-	bytes,err:=utils.PublicKeyToBytes(s.GetPublicKey())
-	if err==nil{
+	bytes, err := utils.PublicKeyToBytes(s.GetPublicKey())
+	if err == nil {
 		return utils.Hash(bytes)
 	}
 	return [32]byte{}
 }
 
-func (s *Socket) GetCAPublicKey() *rsa.PublicKey{
-	if s.CA!=nil{
-		pubK,ok:=s.CA.PublicKey.(*rsa.PublicKey)
-		if ok{
+func (s *Socket) GetCAPublicKey() *rsa.PublicKey {
+	if s.CA != nil {
+		pubK, ok := s.CA.PublicKey.(*rsa.PublicKey)
+		if ok {
 			return pubK
 		}
 	}
 	return nil
 }
 
-func (s *Socket) isBlocked(publicKeyHash [32]byte) bool{
+func (s *Socket) isBlocked(publicKeyHash [32]byte) bool {
 	s.blockedUsersMutex.RLock()
 	defer s.blockedUsersMutex.RUnlock()
-	_,exists:=s.blockedUsers[publicKeyHash]
+	_, exists := s.blockedUsers[publicKeyHash]
 	return exists
 }
 
-func (s *Socket) Block(publicKeyHash [32]byte){
+func (s *Socket) Block(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
 	defer s.blockedUsersMutex.Unlock()
-	s.blockedUsers[publicKeyHash]=struct{}{}
-	
+	s.blockedUsers[publicKeyHash] = struct{}{}
+
 }
 
-func (s *Socket) Unblock(publicKeyHash [32]byte){
+func (s *Socket) Unblock(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
 	defer s.blockedUsersMutex.Unlock()
-	delete(s.blockedUsers,publicKeyHash)
+	delete(s.blockedUsers, publicKeyHash)
 }

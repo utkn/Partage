@@ -21,7 +21,7 @@ import (
 // Checking listen/close operations
 func Test_HW0_Network_Listen_Close(t *testing.T) {
 	net1 := udpFac()
-	
+
 	// > creating socket on a wrong address should raise an error
 
 	_, err := net1.CreateSocket("fake")
@@ -58,7 +58,7 @@ func Test_HW0_Network_Listen_Close(t *testing.T) {
 // 0-2
 //
 // A simple send/recv
-func Test_HW0_Network_Simple(t *testing.T) {	
+func Test_HW0_Network_Simple(t *testing.T) {
 	net1 := udpFac()
 	net2 := udpFac()
 

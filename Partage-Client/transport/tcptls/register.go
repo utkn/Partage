@@ -13,6 +13,7 @@ import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
+
 const serverAddr = "127.0.0.1:1234" //Certificate Authority Server address
 
 // Since we are using Certificates in order to authenticate users, the users authentication is directly related to the TLS Socket
@@ -30,9 +31,9 @@ func (tlsSock *Socket) RegisterUser() error {
 			fmt.Println("[ERROR] timeout while trying to establish connection with CA server...")
 			return transport.TimeoutErr(0)
 		}
-		if err==io.EOF{
+		if err == io.EOF {
 			fmt.Println("[WARNING] the CA server closed the connection!")
-		}else{
+		} else {
 			fmt.Println("[ERROR] dialing CA server...", err)
 		}
 		return err
@@ -68,7 +69,7 @@ func (tlsSock *Socket) RegisterUser() error {
 			}
 		}
 	}
-	
+
 	//PROCESS CA response
 	if msg.Type == "ERROR" {
 		fmt.Println("[ERROR] " + string(msg.Payload))
@@ -77,7 +78,7 @@ func (tlsSock *Socket) RegisterUser() error {
 		var details types.Registration
 		//SUCESS!
 		err = details.Decode(msg.Payload)
-		if err!=nil{
+		if err != nil {
 			fmt.Println("[ERROR] marshaling Registration details from CA server OK-response...", err)
 			return err
 		}

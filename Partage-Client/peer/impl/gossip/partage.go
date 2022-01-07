@@ -15,31 +15,31 @@ import (
 	"go.dedis.ch/cs438/types"
 )
 
-func (l *Layer) SendPost(content string) error{
-	if len(content)>128{
+func (l *Layer) SendPost(content string) error {
+	if len(content) > 128 {
 		//limit max size of content
 		return fmt.Errorf("post content exceeds size limit of 128 characters")
 	}
-	timestamp:=time.Now().UnixNano()
+	timestamp := time.Now().UnixNano()
 	//Hash(content||timestamp)
-	hashed:=utils.Hash(append([]byte(content),[]byte(strconv.FormatInt(timestamp, 10))...))
+	hashed := utils.Hash(append([]byte(content), []byte(strconv.FormatInt(timestamp, 10))...))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, l.cryptography.GetPrivateKey(), crypto.SHA256, hashed[:])
 	if err != nil {
 		return err
 	}
-	post:=types.Post{
+	post := types.Post{
 		Timestamp: timestamp,
-		Content: content,
+		Content:   content,
 		Check: &transport.Validation{
-			Signature: signature,
+			Signature:    signature,
 			SrcPublicKey: *l.cryptography.GetSignedPublicKey(),
 		},
 	}
-	tMsg,err:=l.config.MessageRegistry.MarshalMessage(&post)
-	if err!=nil{
+	tMsg, err := l.config.MessageRegistry.MarshalMessage(&post)
+	if err != nil {
 		return err
 	}
-	
+
 	return l.Broadcast(tMsg)
 }
 
@@ -86,16 +86,16 @@ func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) er
 		Recipients: bytes,
 		Msg:        encryptedMsg,
 	}
-	toSendMsg,err:=l.config.MessageRegistry.MarshalMessage(&privatePost)
+	toSendMsg, err := l.config.MessageRegistry.MarshalMessage(&privatePost)
 	/*
-	data, err := json.Marshal(&privatePost)
-	if err != nil {
-		return err
-	}
-	toSendMsg := transport.Message{
-		Type:    privatePost.Name(),
-		Payload: data,
-	} */
+		data, err := json.Marshal(&privatePost)
+		if err != nil {
+			return err
+		}
+		toSendMsg := transport.Message{
+			Type:    privatePost.Name(),
+			Payload: data,
+		} */
 	fmt.Println(l.GetAddress(), " Broadcasted privatePost to", len(users), "recipients!")
 
 	return l.Broadcast(toSendMsg) //share
@@ -109,7 +109,7 @@ func (l *Layer) PostHandler(msg types.Message, pkt transport.Packet) error {
 		return fmt.Errorf("could not parse the private post message")
 	}
 	//check validity of post
-	if len(post.Content)>128{
+	if len(post.Content) > 128 {
 		return fmt.Errorf("post content exceeds size limit of 128 characters")
 	}
 
@@ -119,20 +119,20 @@ func (l *Layer) PostHandler(msg types.Message, pkt transport.Packet) error {
 		return err
 	}
 	hashedPK := utils.Hash(srcPKBytes)
-	if err:=rsa.VerifyPKCS1v15(l.cryptography.GetCAPublicKey(),crypto.SHA256,hashedPK[:],post.Check.SrcPublicKey.Signature); err!=nil{
+	if err := rsa.VerifyPKCS1v15(l.cryptography.GetCAPublicKey(), crypto.SHA256, hashedPK[:], post.Check.SrcPublicKey.Signature); err != nil {
 		//invalid SignedPublicKey (not signed by trusted CA)
 		return fmt.Errorf("post's public key is not signed by trusted CA")
 	}
 
 	//2- Check if Hash(packet.Msg||packet.Header.Source) was signed by src's private key
-	hashed := utils.Hash(append([]byte(post.Content),[]byte(strconv.FormatInt(post.Timestamp, 10))...))
-	if rsa.VerifyPKCS1v15(post.Check.SrcPublicKey.PublicKey,crypto.SHA256,hashed[:],post.Check.Signature)!=nil{
+	hashed := utils.Hash(append([]byte(post.Content), []byte(strconv.FormatInt(post.Timestamp, 10))...))
+	if rsa.VerifyPKCS1v15(post.Check.SrcPublicKey.PublicKey, crypto.SHA256, hashed[:], post.Check.Signature) != nil {
 		//invalid signature
 		return fmt.Errorf("message has invalid signature")
 	}
 
 	//VALID!
-	fmt.Println("Received: ",post)
+	fmt.Println("Received: ", post)
 	return nil
 }
 
@@ -143,8 +143,8 @@ func (l *Layer) PrivatePostHandler(msg types.Message, pkt transport.Packet) erro
 	if !ok {
 		return fmt.Errorf("could not parse the private post message")
 	}
-	recipientsMap:= types.RecipientsMap{}
-	if err:=recipientsMap.Decode(privateMsg.Recipients); err!=nil{
+	recipientsMap := types.RecipientsMap{}
+	if err := recipientsMap.Decode(privateMsg.Recipients); err != nil {
 		//fmt.Println(err)
 		return err
 	}

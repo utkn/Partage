@@ -9,8 +9,8 @@ type CertificateAuthorityMessage struct {
 	Type    string
 	Payload []byte
 }
-type Registration struct{
-	SignedCertificate []byte
+type Registration struct {
+	SignedCertificate  []byte
 	PublicKeySignature []byte
 }
 
@@ -18,7 +18,7 @@ type Registration struct{
 //---------------Post
 type Post struct {
 	//Sign(Hash(Content+Timestamp)) ..provides integrity and authenticity to Post
-	Check *transport.Validation 
+	Check *transport.Validation
 
 	Timestamp int64
 
@@ -30,7 +30,7 @@ type Post struct {
 type RecipientsMap map[[32]byte][128]byte
 type PrivatePost struct {
 	// Recipients is a bag of recipients that maps to encrypted symmetric-key
-	Recipients []byte// map[[32]byte][32]byte --> RecipientsMap
+	Recipients []byte // map[[32]byte][32]byte --> RecipientsMap
 
 	// Msg is the private message to be read by the recipients
 	Msg []byte //encrypted transport.Message with AES-256 ---> NOTE: this should be a Post message!
@@ -51,7 +51,7 @@ type SearchPKRequestMessage struct {
 type SearchPKReplyMessage struct {
 	// RequestID must be the same as the RequestID set in the SearchPKRequestMessage.
 	//Response  []byte //encoded types.SignedPublicKey
-	Response transport.SignedPublicKey
+	Response  transport.SignedPublicKey
 	RequestID string
 }
 
@@ -61,5 +61,5 @@ type SignedMessage struct{
 	SrcPublicKey transport.SignedPublicKey
 	Signature []byte
 	Msg *transport.Message
-} 
+}
 */

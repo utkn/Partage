@@ -45,7 +45,7 @@ func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 			}
 
 			//generate a new certificate from the newly-generated key-pair
-			certificate, _ := GenerateCertificate(privateKey,nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
+			certificate, _ := GenerateCertificate(privateKey, nil) //SELF-SIGNED! TODO: ..to later be implemented with the CA
 
 			certPem, err := storeCertificate(certificate, rt+certificatePath)
 			if err != nil {
@@ -80,7 +80,7 @@ func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 			return nil, err
 		}
 
-		return &cert, nil 
+		return &cert, nil
 	}
 }
 
@@ -154,15 +154,15 @@ func DecryptAES(ciphertext, key []byte) ([]byte, error) {
 	return msg, nil
 }
 
-
 func loadCertificate(path string) (*x509.Certificate, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.New("inexistent certificate file at " + path)
 	}
-	
+
 	return PemToCertificate(data)
 }
+
 /*
 //this
 func loadKey(path string) (*rsa.PrivateKey, error) {
@@ -251,10 +251,10 @@ func storePrivateKey(privateKey *rsa.PrivateKey, path string) ([]byte, error) {
 	return pemKey, nil
 }
 
-func storePublicKey(k *rsa.PublicKey,path string) (error){
+func storePublicKey(k *rsa.PublicKey, path string) error {
 	pemKey, err := publicKeyToPem(k)
 	if err != nil {
-		return  err
+		return err
 	}
 	if err := os.WriteFile(path, pemKey, 0600); err != nil {
 		return err
@@ -278,10 +278,10 @@ func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Cert
 	}
 
 	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(1 * 365 * 24 * time.Hour), //TODO: time validity of the certificate (currently valid for 1 year)
-		IsCA: true,
+		SerialNumber:          serialNumber,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(1 * 365 * 24 * time.Hour), //TODO: time validity of the certificate (currently valid for 1 year)
+		IsCA:                  true,
 		BasicConstraintsValid: true,
 	}
 
@@ -303,15 +303,15 @@ func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Cert
 
 func IsSelfSigned(cert *x509.Certificate) bool {
 	return cert.CheckSignatureFrom(cert) == nil
-} 
+}
 
-func TLSIsSelfSigned(cert *tls.Certificate) (bool,error){
+func TLSIsSelfSigned(cert *tls.Certificate) (bool, error) {
 	x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err!=nil{
+	if err != nil {
 		fmt.Println("[ERROR] parsing certificate from tls to x509")
-		return false,err
+		return false, err
 	}
-	return IsSelfSigned(x509Cert),nil
+	return IsSelfSigned(x509Cert), nil
 }
 
 /*
@@ -327,7 +327,7 @@ func loadPublicKey(path string) *rsa.PublicKey{
 	return pubKey
 } */
 
-func loadPublicKeySignature( path string) []byte{
+func loadPublicKeySignature(path string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -335,50 +335,50 @@ func loadPublicKeySignature( path string) []byte{
 	return data
 }
 
-func LoadPublicKeySignature() []byte{
+func LoadPublicKeySignature() []byte {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	return loadPublicKeySignature(rt+signaturePath)
+	return loadPublicKeySignature(rt + signaturePath)
 }
 
-func LoadCACertificate() *x509.Certificate{
+func LoadCACertificate() *x509.Certificate {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	cert,_:=loadCertificate(rt+CACertificatePath)
+	cert, _ := loadCertificate(rt + CACertificatePath)
 	return cert
 }
 
-func StoreCACertificate(cert *x509.Certificate) ([]byte,error){
+func StoreCACertificate(cert *x509.Certificate) ([]byte, error) {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	return storeCertificate(cert,rt+CACertificatePath)
+	return storeCertificate(cert, rt+CACertificatePath)
 }
 
-func StorePublicKeySignature(signature []byte) error{
+func StorePublicKeySignature(signature []byte) error {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	path:=rt+signaturePath
+	path := rt + signaturePath
 	return os.WriteFile(path, signature, 0644)
 }
 
-func VerifyPublicKeySignature(publicKey *rsa.PublicKey, signature []byte, CAPublicKey *rsa.PublicKey) bool{
+func VerifyPublicKeySignature(publicKey *rsa.PublicKey, signature []byte, CAPublicKey *rsa.PublicKey) bool {
 	pkBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		fmt.Println("[ERROR] marshaling public key to raw bytes")
 		return false
 	}
 	hashed := Hash(pkBytes)
-	return rsa.VerifyPKCS1v15(CAPublicKey,crypto.SHA256,hashed[:],signature)==nil
+	return rsa.VerifyPKCS1v15(CAPublicKey, crypto.SHA256, hashed[:], signature) == nil
 }
 
-func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte,error){
+func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte, error) {
 	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return nil, errors.New("failed to marshal public key")
 	}
-	return pubBytes,nil
+	return pubBytes, nil
 }
 
-func Hash(bytes []byte) [32]byte{
+func Hash(bytes []byte) [32]byte {
 	return sha256.Sum256(bytes)
 }

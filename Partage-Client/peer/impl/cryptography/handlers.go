@@ -19,19 +19,19 @@ func (l *Layer) SearchPKReplyMessageHandler(msg types.Message, pkt transport.Pac
 	if !ok {
 		return fmt.Errorf("could not parse the received search PK reply msg")
 	}
-	CAPublicKey:=l.socket.GetCAPublicKey()
-	if CAPublicKey==nil{
+	CAPublicKey := l.socket.GetCAPublicKey()
+	if CAPublicKey == nil {
 		fmt.Println("No CA-signed public key..")
 		return nil
 	}
 	// CHECK IF PUBLIC KEY IS SIGNED BY TRUSTED CA!
-	isValid := utils.VerifyPublicKeySignature(searchPKReplyMsg.Response.PublicKey,searchPKReplyMsg.Response.Signature,CAPublicKey)
+	isValid := utils.VerifyPublicKeySignature(searchPKReplyMsg.Response.PublicKey, searchPKReplyMsg.Response.Signature, CAPublicKey)
 	if isValid {
 		l.notification.DispatchResponse(searchPKReplyMsg.RequestID, msg)
-		
-		bytesPK,_:=utils.PublicKeyToBytes(searchPKReplyMsg.Response.PublicKey)
+
+		bytesPK, _ := utils.PublicKeyToBytes(searchPKReplyMsg.Response.PublicKey)
 		//add entry to catalog
-		l.AddUserToCatalog(utils.Hash(bytesPK),&searchPKReplyMsg.Response)
+		l.AddUserToCatalog(utils.Hash(bytesPK), &searchPKReplyMsg.Response)
 	}
 
 	return nil

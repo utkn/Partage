@@ -25,19 +25,19 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	handler3, status3 := fake.GetHandler(t)
 	handler4, status4 := fake.GetHandler(t)
 
-	net1:=tcpFac()
+	net1 := tcpFac()
 	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0", z.WithMessage(fake, handler1), z.WithAntiEntropy(time.Millisecond*50))
 	defer node1.Stop()
 
-	net2:=tcpFac()
+	net2 := tcpFac()
 	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2), z.WithAntiEntropy(time.Millisecond*50))
 	defer node2.Stop()
 
-	net3:=tcpFac()
+	net3 := tcpFac()
 	node3 := z.NewTestNode(t, peerFac, net3, "127.0.0.1:0", z.WithMessage(fake, handler3), z.WithAntiEntropy(time.Millisecond*50))
 	defer node3.Stop()
 
-	net4:=tcpFac()
+	net4 := tcpFac()
 	node4 := z.NewTestNode(t, peerFac, net4, "127.0.0.1:0", z.WithMessage(fake, handler4), z.WithAntiEntropy(time.Millisecond*50))
 	defer node4.Stop()
 
@@ -47,18 +47,18 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 
 	fakeMsg := fake.GetNetMsg(t)
 
-	fmt.Println("node1:",node1.GetAddr())
-	fmt.Println("node2:",node2.GetAddr())
-	fmt.Println("node3:",node3.GetAddr())
-	fmt.Println("node4:",node4.GetAddr())
+	fmt.Println("node1:", node1.GetAddr())
+	fmt.Println("node2:", node2.GetAddr())
+	fmt.Println("node3:", node3.GetAddr())
+	fmt.Println("node4:", node4.GetAddr())
 	recipients := [][32]byte{
 		node2.GetHashedPublicKey(),
 		node4.GetHashedPublicKey(),
 	}
 
-	bytes,_:=json.Marshal(fakeMsg)
-	fmt.Println("private message to be sent to node2 and node4:",bytes)
-	err := node1.SharePrivatePost(fakeMsg,recipients)
+	bytes, _ := json.Marshal(fakeMsg)
+	fmt.Println("private message to be sent to node2 and node4:", bytes)
+	err := node1.SharePrivatePost(fakeMsg, recipients)
 	require.NoError(t, err)
 
 	time.Sleep(time.Second * 10)
@@ -81,9 +81,9 @@ func Test_Partage_Network_Simple(t *testing.T) {
 	fake := z.NewFakeMessage(t)
 	handler1, status1 := fake.GetHandler(t)
 	handler2, status2 := fake.GetHandler(t)
-	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0",z.WithMessage(fake, handler1))
+	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0", z.WithMessage(fake, handler1))
 	defer node1.Stop()
-	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0",z.WithMessage(fake, handler2))
+	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2))
 	defer node2.Stop()
 
 	node1.AddPeer(node2.GetAddr())
@@ -235,14 +235,13 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 	t.Run("TCP+TLS transport", getTest(tcpFac()))
 }
 
-
 // Given the following topology:
 //   A -> B -> C
 // If A broadcast a message, then B should receive it AND then send it to C. C
 // should also update its routing table with a relay to A via B. We're setting
 // the ContinueMongering attribute to 0.
 func Test_Partage_Messaging_Broadcast_Rumor_Three_Nodes_No_ContinueMongering(t *testing.T) {
-	
+
 	fake := z.NewFakeMessage(t)
 	handler1, status1 := fake.GetHandler(t)
 	handler2, status2 := fake.GetHandler(t)
@@ -742,7 +741,6 @@ func Test_Partage_Messaging_Broadcast_BigGraph(t *testing.T) {
 	chatMsg := "hi from %s"
 	stopped := false
 
-
 	nodes := make([]z.TestNode, n)
 
 	stopNodes := func() {
@@ -1005,4 +1003,3 @@ func Test_Partage_Messaging_Unicast_Private_Message(t *testing.T) {
 	status2.CheckCalled(t)
 	status3.CheckNotCalled(t)
 }
-

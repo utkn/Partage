@@ -15,29 +15,29 @@ import (
 
 //--------------------------------------------------------------
 // Rumor
-func (r *Rumor) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *transport.SignedPublicKey) error{
+func (r *Rumor) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *transport.SignedPublicKey) error {
 	//Adds a validation check to Rumor (provides integrity and authenticity check!)
 	byteMsg, err := json.Marshal(r.Msg)
-	if err!=nil{
+	if err != nil {
 		return err
 	}
 	// Hash(rumor.Msg||rumor.Origin||rumor.Sequence)
-	hashedContent:=transport.Hash(append(byteMsg,append([]byte(r.Origin),[]byte(strconv.Itoa(int(r.Sequence)))...)...))
+	hashedContent := transport.Hash(append(byteMsg, append([]byte(r.Origin), []byte(strconv.Itoa(int(r.Sequence)))...)...))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, myPrivateKey, crypto.SHA256, hashedContent[:])
 	if err != nil {
 		return err
 	}
 
-	r.Check =&transport.Validation{
-		Signature: signature,
+	r.Check = &transport.Validation{
+		Signature:    signature,
 		SrcPublicKey: *mySignedPublicKey,
 	}
 
 	return nil
 }
 
-func (r *Rumor) Validate(publicKeyCA *rsa.PublicKey) error{
-	if r.Check==nil{
+func (r *Rumor) Validate(publicKeyCA *rsa.PublicKey) error {
+	if r.Check == nil {
 		return fmt.Errorf("rumor has empty validation check")
 	}
 
@@ -47,15 +47,15 @@ func (r *Rumor) Validate(publicKeyCA *rsa.PublicKey) error{
 		return err
 	}
 	hashedSrcPK := transport.Hash(srcPKBytes)
-	if err:=rsa.VerifyPKCS1v15(publicKeyCA,crypto.SHA256,hashedSrcPK[:],r.Check.SrcPublicKey.Signature); err!=nil{
+	if err := rsa.VerifyPKCS1v15(publicKeyCA, crypto.SHA256, hashedSrcPK[:], r.Check.SrcPublicKey.Signature); err != nil {
 		//invalid SignedPublicKey (not signed by trusted CA)
 		return fmt.Errorf("rumor's src public key is not signed by trusted CA")
 	}
 
 	//2- Check if Hash(rumor.Msg||rumor.Origin||rumor.Sequence) was signed by src's private key
-	byteMsg,_:=json.Marshal(r.Msg)
-	hashedContent :=transport.Hash(append(byteMsg,append([]byte(r.Origin),[]byte(strconv.FormatInt(int64(r.Sequence), 10))...)...))
-	if rsa.VerifyPKCS1v15(r.Check.SrcPublicKey.PublicKey,crypto.SHA256,hashedContent[:],r.Check.Signature)!=nil{
+	byteMsg, _ := json.Marshal(r.Msg)
+	hashedContent := transport.Hash(append(byteMsg, append([]byte(r.Origin), []byte(strconv.FormatInt(int64(r.Sequence), 10))...)...))
+	if rsa.VerifyPKCS1v15(r.Check.SrcPublicKey.PublicKey, crypto.SHA256, hashedContent[:], r.Check.Signature) != nil {
 		//invalid signature
 		return fmt.Errorf("rumor is not signed by src private key")
 	}
@@ -79,7 +79,7 @@ func (p Post) Name() string {
 
 // String implements types.Message.
 func (p Post) String() string {
-	return fmt.Sprintf("post{%s} at {%d}", p.Content,p.Timestamp)
+	return fmt.Sprintf("post{%s} at {%d}", p.Content, p.Timestamp)
 }
 
 // HTML implements types.Message.
@@ -158,44 +158,43 @@ func (s SearchPKReplyMessage) HTML() string {
 
 // -----------------------------------------------------------------------------
 // CertificateAuthorityMessage
-func (m *CertificateAuthorityMessage) Decode(bytes []byte) error{
-	return json.Unmarshal(bytes,&m)
+func (m *CertificateAuthorityMessage) Decode(bytes []byte) error {
+	return json.Unmarshal(bytes, &m)
 }
+
 // Registration that comes with the CertificateAuthorityMessage
 func (r *Registration) Decode(bytes []byte) error {
 	return json.Unmarshal(bytes, &r)
 }
 
-
-
 // RecipientsMap map[hash(rsaPublicKeyA)]EncPKA(AESKey) == map[[32]byte][128]byte
-func (r RecipientsMap) Encode() ([]byte,error){
-	window:=32+128
-	encoded:=make([]byte,len(r)*(window))
-	i:=0
-	for k,v:=range r{
-		if len(k)!=32 || len(v)!=128{
-			return nil,errors.New("invalid RecipientsMap")
+func (r RecipientsMap) Encode() ([]byte, error) {
+	window := 32 + 128
+	encoded := make([]byte, len(r)*(window))
+	i := 0
+	for k, v := range r {
+		if len(k) != 32 || len(v) != 128 {
+			return nil, errors.New("invalid RecipientsMap")
 		}
-		copy(encoded[i:i+window],append(k[:],v[:]...))
-		i+=window
+		copy(encoded[i:i+window], append(k[:], v[:]...))
+		i += window
 	}
-	return encoded,nil
+	return encoded, nil
 }
 
-func (r RecipientsMap) Decode(encoded []byte) (error){
-	windowK:=32
-	windowV:=128
-	window:=windowK+windowV
-	if len(encoded)%window!=0{
+func (r RecipientsMap) Decode(encoded []byte) error {
+	windowK := 32
+	windowV := 128
+	window := windowK + windowV
+	if len(encoded)%window != 0 {
 		return errors.New("invalid encoded RecipientsMap")
 	}
 	var k [32]byte
 	var v [128]byte
-	for i:=0;i<=len(encoded)-window;i+=window{
-		copy(k[:],encoded[i:i+windowK])
-		copy(v[:],encoded[i+windowK:i+window])
-		r[k]=v
+	for i := 0; i <= len(encoded)-window; i += window {
+		copy(k[:], encoded[i:i+windowK])
+		copy(v[:], encoded[i+windowK:i+window])
+		r[k] = v
 	}
 	return nil
 }

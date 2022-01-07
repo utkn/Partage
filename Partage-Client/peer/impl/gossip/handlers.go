@@ -13,7 +13,7 @@ func (l *Layer) RegisterHandlers() {
 	l.config.MessageRegistry.RegisterMessageCallback(types.StatusMessage{}, l.StatusMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.AckMessage{}, l.AckMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.PrivatePost{}, l.PrivatePostHandler) //Partage
-	l.config.MessageRegistry.RegisterMessageCallback(types.Post{}, l.PostHandler) //Partage
+	l.config.MessageRegistry.RegisterMessageCallback(types.Post{}, l.PostHandler)               //Partage
 }
 
 func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) error {
@@ -30,16 +30,16 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 		// Only consider the expected rumors.
 		if l.view.IsExpected(rumor.Origin, rumor.Sequence) {
 			// Validate rumor's signature
-			if l.cryptography!=nil{
-				if err:=rumor.Validate(l.cryptography.GetCAPublicKey()); err!=nil{
-					fmt.Println("dropped rumor duo to invalid signature..",err)
+			if l.cryptography != nil {
+				if err := rumor.Validate(l.cryptography.GetCAPublicKey()); err != nil {
+					fmt.Println("dropped rumor duo to invalid signature..", err)
 					continue
-				}else{
+				} else {
 					// Valid..Store rumor's SignedPublicKey in Catalog..(helps to get to know users in the network!)
-					bytesPK,_:=utils.PublicKeyToBytes(rumor.Check.SrcPublicKey.PublicKey)
-					hashPK:=utils.Hash(bytesPK)
-					if _,exists:=l.cryptography.GetUserFromCatalog(hashPK); !exists{
-						l.cryptography.AddUserToCatalog(hashPK,&rumor.Check.SrcPublicKey)
+					bytesPK, _ := utils.PublicKeyToBytes(rumor.Check.SrcPublicKey.PublicKey)
+					hashPK := utils.Hash(bytesPK)
+					if _, exists := l.cryptography.GetUserFromCatalog(hashPK); !exists {
+						l.cryptography.AddUserToCatalog(hashPK, &rumor.Check.SrcPublicKey)
 					}
 				}
 			}
@@ -84,10 +84,10 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	}
 	// Send back the Acknowledgement.
 	utils.PrintDebug("gossip", l.GetAddress(), "is about to acknowledge packet", ackMsg.AckedPacketID, "to", pkt.Header.RelayedBy)
-	
-	if l.cryptography!=nil{
+
+	if l.cryptography != nil {
 		_ = l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
-	}else{
+	} else {
 		_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
 	}
 	return nil
@@ -136,9 +136,9 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			return fmt.Errorf("could not convert the rumor message to a transport message: %w", err)
 		}
 		// Send the missing rumors back and do not wait for ack.
-		if l.cryptography!=nil{
+		if l.cryptography != nil {
 			return l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
-		}else{
+		} else {
 			return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 		}
 	}
@@ -146,9 +146,9 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 	if len(rmtNews) > 0 {
 		myStatusMsg := l.view.AsStatusMsg()
 		trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-		if l.cryptography!=nil{
+		if l.cryptography != nil {
 			_ = l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
-		}else{
+		} else {
 			_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 		}
 	}
@@ -165,12 +165,12 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			}
 			myStatusMsg := l.view.AsStatusMsg()
 			trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
-			if l.cryptography!=nil{
+			if l.cryptography != nil {
 				_ = l.cryptography.Route(l.GetAddress(), dest, dest, trnspMsg)
-			}else{
+			} else {
 				_ = l.network.Route(l.GetAddress(), dest, dest, trnspMsg)
 			}
-			
+
 		}
 		utils.PrintDebug("gossip", l.GetAddress(), "is stopping mongering.")
 	}

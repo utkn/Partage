@@ -45,7 +45,6 @@ type Socket interface {
 
 	// GetOuts must return all the messages sent so far.
 	GetOuts() []Packet
-
 }
 
 // ClosableSocket augments the Socket interface with a close function. We
@@ -212,40 +211,40 @@ func (p ByPacketID) Less(i, j int) bool {
 
 //================PARTAGE
 //---------
-type SignedPublicKey struct{
+type SignedPublicKey struct {
 	PublicKey *rsa.PublicKey
 	Signature []byte
 }
 
-type Validation struct{
-	Signature []byte
+type Validation struct {
+	Signature    []byte
 	SrcPublicKey SignedPublicKey
 }
 
-func (p *Packet) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *SignedPublicKey) error{
+func (p *Packet) AddValidation(myPrivateKey *rsa.PrivateKey, mySignedPublicKey *SignedPublicKey) error {
 	//Adds a validation check to the Packet's header (provides integrity and authenticity check!)
 	byteMsg, err := json.Marshal(p.Msg)
-	if err!=nil{
+	if err != nil {
 		return err
 	}
 	// Hash(packet.Msg||packet.Header.Source)
-	hashedContent:=Hash(append(byteMsg,[]byte(p.Header.Source)...))
+	hashedContent := Hash(append(byteMsg, []byte(p.Header.Source)...))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, myPrivateKey, crypto.SHA256, hashedContent[:])
 	if err != nil {
 		return err
 	}
 
-	p.Header.Check =&Validation{
-		Signature: signature,
+	p.Header.Check = &Validation{
+		Signature:    signature,
 		SrcPublicKey: *mySignedPublicKey,
 	}
 
 	return nil
 }
 
-func (p *Packet) Validate(publicKeyCA *rsa.PublicKey) error{
-	if p.Header.Check==nil{
-		if p.Msg.Type=="searchpkrequest" || p.Msg.Type=="searchpkreply" || p.Msg.Type=="datarequest" || p.Msg.Type=="datareply" ||  p.Msg.Type=="searchrequest" ||  p.Msg.Type=="searchreply"{
+func (p *Packet) Validate(publicKeyCA *rsa.PublicKey) error {
+	if p.Header.Check == nil {
+		if p.Msg.Type == "searchpkrequest" || p.Msg.Type == "searchpkreply" || p.Msg.Type == "datarequest" || p.Msg.Type == "datareply" || p.Msg.Type == "searchrequest" || p.Msg.Type == "searchreply" {
 			return nil
 			//exceptions!
 			//no need to check for integrity or authenticity in searchpkrequest or searchpkreply
@@ -260,15 +259,15 @@ func (p *Packet) Validate(publicKeyCA *rsa.PublicKey) error{
 		return err
 	}
 	hashedSrcPK := Hash(srcPKBytes)
-	if err:=rsa.VerifyPKCS1v15(publicKeyCA,crypto.SHA256,hashedSrcPK[:],p.Header.Check.SrcPublicKey.Signature); err!=nil{
+	if err := rsa.VerifyPKCS1v15(publicKeyCA, crypto.SHA256, hashedSrcPK[:], p.Header.Check.SrcPublicKey.Signature); err != nil {
 		//invalid SignedPublicKey (not signed by trusted CA)
 		return fmt.Errorf("src public key is not signed by trusted CA")
 	}
 
 	//2- Check if Hash(packet.Msg||packet.Header.Source) was signed by src's private key
-	byteMsg,_:=json.Marshal(p.Msg)
-	hashedContent := Hash(append(byteMsg,[]byte(p.Header.Source)...))
-	if rsa.VerifyPKCS1v15(p.Header.Check.SrcPublicKey.PublicKey,crypto.SHA256,hashedContent[:],p.Header.Check.Signature)!=nil{
+	byteMsg, _ := json.Marshal(p.Msg)
+	hashedContent := Hash(append(byteMsg, []byte(p.Header.Source)...))
+	if rsa.VerifyPKCS1v15(p.Header.Check.SrcPublicKey.PublicKey, crypto.SHA256, hashedContent[:], p.Header.Check.Signature) != nil {
 		//invalid signature
 		return fmt.Errorf("message is not signed by src private key")
 	}
@@ -276,7 +275,6 @@ func (p *Packet) Validate(publicKeyCA *rsa.PublicKey) error{
 	//VALID!
 	return nil
 }
-
 
 func (k *SignedPublicKey) Encode() ([]byte, error) {
 	return json.Marshal(k)
@@ -286,6 +284,6 @@ func (k *SignedPublicKey) Decode(bytes []byte) error {
 	return json.Unmarshal(bytes, &k)
 }
 
-func Hash(bytes []byte) [32]byte{
+func Hash(bytes []byte) [32]byte {
 	return sha256.Sum256(bytes)
 }

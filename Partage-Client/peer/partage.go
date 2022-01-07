@@ -5,12 +5,11 @@ import (
 )
 
 type Partage interface {
-
 	SharePost(content string) error
 
-	SharePrivatePost(msg transport.Message, recipients [][32]byte) error 
+	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
 
-	GetHashedPublicKey() [32]byte 
+	GetHashedPublicKey() [32]byte
 
 	BlockUser(publicKeyHash [32]byte)
 

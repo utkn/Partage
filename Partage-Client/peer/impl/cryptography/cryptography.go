@@ -54,11 +54,11 @@ func (l *Layer) GetAddress() string {
 //Send() encapsulates the transport.Message contained in pkt.Msg, into a types.SignedMessage by adding a layer of security and sends it through the TLS socket
 func (l *Layer) Send(dest string, pkt transport.Packet, timeout time.Duration) error {
 	// Add Validation check to packet's header (Signs packet with myPrivateKey!)
-	pkt.AddValidation(l.GetPrivateKey(),l.GetSignedPublicKey())
+	pkt.AddValidation(l.GetPrivateKey(), l.GetSignedPublicKey())
 	return l.network.Send(dest, pkt, timeout)
 }
 
-func (l *Layer) Unicast(dest string, msg transport.Message) error{
+func (l *Layer) Unicast(dest string, msg transport.Message) error {
 	table := l.network.GetRoutingTable()
 	relay, ok := table[dest]
 	// If the destination is a neighbor, it is the relay.
@@ -81,18 +81,19 @@ func (l *Layer) Route(source string, relay string, dest string, msg transport.Me
 		Msg:    &msg,
 	}
 	/*
-	validation,err:=l.GenerateValidation(&msg)
-	if err!=nil{
-		return fmt.Errorf("error generating validation check : %w", err)
-	}
-	//set validation check for packet
-	pkt.Header.Check=validation */
+		validation,err:=l.GenerateValidation(&msg)
+		if err!=nil{
+			return fmt.Errorf("error generating validation check : %w", err)
+		}
+		//set validation check for packet
+		pkt.Header.Check=validation */
 	err := l.Send(relay, pkt, time.Second*5)
 	if err != nil {
 		return fmt.Errorf("could not crypto route through socket: %w", err)
 	}
 	return nil
 }
+
 /*
 func (l *Layer) GenerateValidation(msg *transport.Message) (*transport.Validation,error){
 	byteMsg, err := json.Marshal(msg)
@@ -112,22 +113,21 @@ func (l *Layer) GenerateValidation(msg *transport.Message) (*transport.Validatio
 	},nil
 } */
 
-
 func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
 	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
 }
 
-func (l *Layer) GetUserFromCatalog(hashedPK [32]byte) (*transport.SignedPublicKey,bool){
+func (l *Layer) GetUserFromCatalog(hashedPK [32]byte) (*transport.SignedPublicKey, bool) {
 	l.socket.CatalogLock.RLock()
 	defer l.socket.CatalogLock.RUnlock()
 	signedPK, existsLocally := l.socket.Catalog[hashedPK]
-	return signedPK,existsLocally
+	return signedPK, existsLocally
 }
 
-func (l *Layer) AddUserToCatalog(hashedPK [32]byte, sigPK *transport.SignedPublicKey){
+func (l *Layer) AddUserToCatalog(hashedPK [32]byte, sigPK *transport.SignedPublicKey) {
 	l.socket.CatalogLock.Lock()
 	defer l.socket.CatalogLock.Unlock()
-	l.socket.Catalog[hashedPK]=sigPK
+	l.socket.Catalog[hashedPK] = sigPK
 }
 
 func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rsa.PublicKey {
@@ -185,19 +185,18 @@ func (l *Layer) SearchPublicKey(hashedPK [32]byte, conf *peer.ExpandingRing) *rs
 	return nil
 }
 
-
-func (l *Layer) GetExpandingConf() *peer.ExpandingRing{
+func (l *Layer) GetExpandingConf() *peer.ExpandingRing {
 	return &l.expandingConf
 }
 
-func (l *Layer) GetHashedPublicKey() [32]byte{
+func (l *Layer) GetHashedPublicKey() [32]byte {
 	return l.socket.GetHashedPublicKey()
 }
 
-func (l *Layer) GetSignedPublicKey() (*transport.SignedPublicKey){
+func (l *Layer) GetSignedPublicKey() *transport.SignedPublicKey {
 	return l.socket.GetSignedPublicKey()
 }
 
-func (l *Layer) GetCAPublicKey() *rsa.PublicKey{
+func (l *Layer) GetCAPublicKey() *rsa.PublicKey {
 	return l.socket.GetCAPublicKey()
 }
