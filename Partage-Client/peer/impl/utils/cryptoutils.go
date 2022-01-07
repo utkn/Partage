@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-const dir = "Partage/partage-storage/crypto/"
+const dir = "Partage/Partage-Client/partage-storage/crypto/"
 
 const certificatePath = dir + "cert.pem"
 const keyPath = dir + "key.pem"

@@ -284,7 +284,8 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 	return n.data.SearchFirst(pattern, conf)
 }
 
-//===================PARTAGE
+// Partage Methods
+
 func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
 	//msg should be a marshaled types.Post message..
 	return n.gossip.SendPrivatePost(msg, recipients)
