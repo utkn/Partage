@@ -73,13 +73,12 @@ func (l *Layer) RegisterHandlers() {
 
 // HandleConsensusMessage forwards a consensus message to registered protocols.
 func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
-	l.Lock()
-	defer l.Unlock()
 	consensusMsg, ok := msg.(*protocol.ConsensusMessage)
 	if !ok {
 		return fmt.Errorf("could not parse the received consensus msg")
 	}
 	// Route the consensus message to the appropriate protocols. Let them decide what to do with it.
+	// TODO: consider the case when a new protocol is added while iterating through. Some kind of thread safety mechanism may be needed.
 	for _, p := range l.protocols {
 		// Skip the unrelated protocols.
 		if p.GetProtocolID() != consensusMsg.ProtocolID {
