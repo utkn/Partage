@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
-	"go.dedis.ch/cs438/peer/impl/consensus/protocol/paxos"
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/utils"
@@ -14,12 +13,20 @@ import (
 
 type Layer struct {
 	consensus *consensus.Layer
+	gossip    *gossip.Layer
 	data      *data.Layer
+	Config    *peer.Configuration
+	FeedMap   map[string]Feed
 }
 
-func Construct(config *peer.Configuration, gossip *gossip.Layer, consensus *consensus.Layer) *Layer {
-	consensus.RegisterProtocol("feed", paxos.New(config, gossip, FeedBlockFactory))
-	return nil
+func Construct(config *peer.Configuration, data *data.Layer, consensus *consensus.Layer, gossip *gossip.Layer) *Layer {
+	return &Layer{
+		consensus: consensus,
+		data:      data,
+		gossip:    gossip,
+		Config:    config,
+		FeedMap:   make(map[string]Feed),
+	}
 }
 
 func (l *Layer) GetAddress() string {

@@ -80,7 +80,7 @@ func (s ProposerWaitPromiseState) Next() State {
 	// Pass the created prepare message to the next state.
 	prepareTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&prepareMsg)
 	// Broadcast the prepare message.
-	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.Config, prepareTranspMsg))
+	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.ProtocolID, s.paxos.Config, prepareTranspMsg))
 	// Find the threshold.
 	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	// Collect the promises in the background.
@@ -155,7 +155,7 @@ func (s ProposerWaitAcceptState) Next() State {
 	proposeTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&proposeMsg)
 	// Broadcast the proposal.
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "is broadcasting a propose for ID", s.proposalID, "and value", s.chosenValue)
-	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.Config, proposeTranspMsg))
+	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.ProtocolID, s.paxos.Config, proposeTranspMsg))
 	// Collect accept messages.
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has started waiting for paxos accepts with ID", s.proposalID)
 	var accepts []*types.PaxosAcceptMessage

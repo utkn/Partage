@@ -7,5 +7,6 @@ import (
 // Protocol represents a consensus protocol.
 type Protocol interface {
 	Propose(types.PaxosValue) error
+	GetProtocolID() string
 	HandleConsensusMessage(message ConsensusMessage) error
 }

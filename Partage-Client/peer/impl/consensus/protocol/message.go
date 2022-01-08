@@ -7,8 +7,10 @@ import (
 	"go.dedis.ch/cs438/types"
 )
 
+// ConsensusMessage represents a message that should be handled by the consensus layer.
 type ConsensusMessage struct {
-	InnerMsg transport.Message
+	ProtocolID string
+	InnerMsg   transport.Message
 }
 
 func (c ConsensusMessage) NewEmpty() types.Message {
@@ -24,12 +26,13 @@ func (c ConsensusMessage) String() string {
 }
 
 func (c ConsensusMessage) HTML() string {
-	return "<CONSENSUS MSG HTML>"
+	return "<>"
 }
 
-func WrapInConsensusPacket(config *peer.Configuration, tMsg transport.Message) transport.Message {
+func WrapInConsensusPacket(protocolID string, config *peer.Configuration, tMsg transport.Message) transport.Message {
 	msg := ConsensusMessage{
-		InnerMsg: tMsg,
+		ProtocolID: protocolID,
+		InnerMsg:   tMsg,
 	}
 	t, _ := config.MessageRegistry.MarshalMessage(&msg)
 	return t

@@ -14,6 +14,10 @@ type Feed struct {
 	Contents []FeedContent
 }
 
+func NewFeed() Feed {
+	return Feed{}
+}
+
 func GetFeed(config *peer.Configuration, id string) (Feed, error) {
 	feed := config.BlockchainStorage.GetStore(id)
 	if feed == nil {

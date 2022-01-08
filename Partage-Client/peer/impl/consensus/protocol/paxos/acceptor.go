@@ -44,7 +44,7 @@ func (a *Acceptor) HandlePrepare(msg types.PaxosPrepareMessage) error {
 	a.paxos.Clock.Lock.Unlock()
 	promiseTransportMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&promiseMsg)
 	// Wrap the transport msg in a consensus msg.
-	promiseTransportMsg = protocol.WrapInConsensusPacket(a.paxos.Config, promiseTransportMsg)
+	promiseTransportMsg = protocol.WrapInConsensusPacket(a.paxos.ProtocolID, a.paxos.Config, promiseTransportMsg)
 	// Wrap the consensus msg in a private msg.
 	privateMsg := types.PrivateMessage{
 		Recipients: map[string]struct{}{msg.Source: {}},
@@ -73,7 +73,7 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is sending back an accept for ID", msg.ID)
 	acceptTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&acceptMsg)
 	// Broadcast accept messages.
-	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, acceptTranspMsg))
+	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.ProtocolID, a.paxos.Config, acceptTranspMsg))
 }
 
 func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
@@ -122,7 +122,7 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 		tlcTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&tlcMsgCopy)
 		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "is broadcasting away TLC messages for step", msg.Step)
 		//println(a.gossip.GetAddress(), "is broadcasting TLC for value", tlcMsgCopy.Block.Value.String(), "for step", msg.Step)
-		_ = a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, tlcTranspMsg))
+		_ = a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.ProtocolID, a.paxos.Config, tlcTranspMsg))
 	} else {
 		a.paxos.Clock.Lock.Unlock()
 		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "is bypassing broadcast for step", msg.Step)
@@ -163,5 +163,5 @@ func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 	tlcTranspMessage, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&tlcMessage)
 	utils.PrintDebug("proposer", a.paxos.Gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
 		"for step", msg.Step, "from accepthandler")
-	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, tlcTranspMessage))
+	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.ProtocolID, a.paxos.Config, tlcTranspMessage))
 }

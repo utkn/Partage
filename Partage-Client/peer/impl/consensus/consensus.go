@@ -29,7 +29,7 @@ func Construct(gossip *gossip.Layer, config *peer.Configuration) *Layer {
 		protocols: make(map[string]protocol.Protocol),
 	}
 	// As the default protocol, use Paxos.
-	layer.RegisterProtocol("default", paxos.New(config, gossip, DefaultBlockFactory))
+	layer.RegisterProtocol("default", paxos.New("default", config, gossip, DefaultBlockFactory))
 	return layer
 }
 
@@ -71,7 +71,7 @@ func (l *Layer) RegisterHandlers() {
 	l.Config.MessageRegistry.RegisterMessageCallback(protocol.ConsensusMessage{}, l.HandleConsensusMessage)
 }
 
-// HandleConsensusMessage forwards a consensus message to each and every registered protocol.
+// HandleConsensusMessage forwards a consensus message to registered protocols.
 func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
 	l.Lock()
 	defer l.Unlock()
@@ -79,8 +79,12 @@ func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) 
 	if !ok {
 		return fmt.Errorf("could not parse the received consensus msg")
 	}
-	// Route the consensus message to every registered protocol. Let them decide what to do with it.
+	// Route the consensus message to the appropriate protocols. Let them decide what to do with it.
 	for _, p := range l.protocols {
+		// Skip the unrelated protocols.
+		if p.GetProtocolID() != consensusMsg.ProtocolID {
+			continue
+		}
 		err := p.HandleConsensusMessage(*consensusMsg)
 		if err != nil {
 			return err

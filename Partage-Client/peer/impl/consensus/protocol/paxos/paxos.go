@@ -10,6 +10,7 @@ import (
 
 type Paxos struct {
 	protocol.Protocol
+	ProtocolID     string
 	Clock          *Clock
 	acceptor       *Acceptor
 	Proposer       *StateMachine
@@ -20,8 +21,9 @@ type Paxos struct {
 	Config       *peer.Configuration
 }
 
-func New(config *peer.Configuration, gossip *gossip.Layer, blockFactory BlockFactory) *Paxos {
+func New(protocolID string, config *peer.Configuration, gossip *gossip.Layer, blockFactory BlockFactory) *Paxos {
 	p := Paxos{
+		ProtocolID:     protocolID,
 		Clock:          NewClock(),
 		Proposer:       &StateMachine{},
 		LastProposalID: config.PaxosID,
@@ -36,6 +38,10 @@ func New(config *peer.Configuration, gossip *gossip.Layer, blockFactory BlockFac
 		blockFactory: blockFactory,
 	}
 	return &p
+}
+
+func (p *Paxos) GetProtocolID() string {
+	return p.ProtocolID
 }
 
 func (p *Paxos) Propose(val types.PaxosValue) error {
