@@ -15,7 +15,8 @@ import (
 )
 
 type Layer struct {
-	network                 *network.Layer
+	network *network.Layer
+
 	notification            *utils.AsyncNotificationHandler
 	config                  *peer.Configuration
 	socket                  *tcptls.Socket

@@ -3,13 +3,18 @@ package paxos
 import (
 	"encoding/hex"
 	"fmt"
+	"go.dedis.ch/cs438/peer"
+	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 )
 
+type BlockFactory = func(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock
+
 type Acceptor struct {
-	paxos *Paxos
+	paxos        *Paxos
+	blockFactory BlockFactory
 }
 
 func (a *Acceptor) HandlePrepare(msg types.PaxosPrepareMessage) error {
@@ -38,6 +43,9 @@ func (a *Acceptor) HandlePrepare(msg types.PaxosPrepareMessage) error {
 	}
 	a.paxos.Clock.Lock.Unlock()
 	promiseTransportMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&promiseMsg)
+	// Wrap the transport msg in a consensus msg.
+	promiseTransportMsg = protocol.WrapInConsensusPacket(a.paxos.Config, promiseTransportMsg)
+	// Wrap the consensus msg in a private msg.
 	privateMsg := types.PrivateMessage{
 		Recipients: map[string]struct{}{msg.Source: {}},
 		Msg:        &promiseTransportMsg,
@@ -65,7 +73,7 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is sending back an accept for ID", msg.ID)
 	acceptTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&acceptMsg)
 	// Broadcast accept messages.
-	return a.paxos.Gossip.Broadcast(acceptTranspMsg)
+	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, acceptTranspMsg))
 }
 
 func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
@@ -114,7 +122,7 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 		tlcTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&tlcMsgCopy)
 		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "is broadcasting away TLC messages for step", msg.Step)
 		//println(a.gossip.GetAddress(), "is broadcasting TLC for value", tlcMsgCopy.Block.Value.String(), "for step", msg.Step)
-		_ = a.paxos.Gossip.Broadcast(tlcTranspMsg)
+		_ = a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, tlcTranspMsg))
 	} else {
 		a.paxos.Clock.Lock.Unlock()
 		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "is bypassing broadcast for step", msg.Step)
@@ -146,30 +154,7 @@ func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 	a.paxos.Clock.Lock.Unlock()
 	// If we finally reached a threshold, broadcast a TLC message.
 	// To do that, first construct the blockchain block.
-	prevHash := make([]byte, 32)
-	lastBlockHashBytes := a.paxos.Config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
-	lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
-	lastBlockBuf := a.paxos.Config.Storage.GetBlockchainStore().Get(lastBlockHash)
-	if lastBlockBuf != nil {
-		var lastBlock types.BlockchainBlock
-		_ = lastBlock.Unmarshal(lastBlockBuf)
-		prevHash = lastBlock.Hash
-	}
-	// Create the block hash.
-	blockHash := utils.HashBlock(
-		int(msg.Step),
-		msg.Value.UniqID,
-		msg.Value.Filename,
-		msg.Value.Metahash,
-		prevHash,
-	)
-	// Create the block.
-	block := types.BlockchainBlock{
-		Index:    msg.Step,
-		Hash:     blockHash,
-		Value:    msg.Value,
-		PrevHash: prevHash,
-	}
+	block := a.blockFactory(a.paxos.Config, msg)
 	// Create the TLC message.
 	tlcMessage := types.TLCMessage{
 		Step:  msg.Step,
@@ -178,5 +163,5 @@ func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 	tlcTranspMessage, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&tlcMessage)
 	utils.PrintDebug("proposer", a.paxos.Gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
 		"for step", msg.Step, "from accepthandler")
-	return a.paxos.Gossip.Broadcast(tlcTranspMessage)
+	return a.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(a.paxos.Config, tlcTranspMessage))
 }

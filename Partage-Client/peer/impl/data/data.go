@@ -17,9 +17,10 @@ import (
 )
 
 type Layer struct {
-	gossip                  *gossip.Layer
-	consensus               *consensus.Layer
-	network                 *network.Layer
+	gossip    *gossip.Layer
+	consensus *consensus.Layer
+	network   *network.Layer
+
 	notification            *utils.AsyncNotificationHandler
 	config                  *peer.Configuration
 	catalog                 peer.Catalog

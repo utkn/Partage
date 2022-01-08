@@ -1,8 +1,23 @@
 package social
 
-type Feed struct {
+import (
+	"errors"
+	"go.dedis.ch/cs438/peer"
+)
+
+type FeedContent struct {
+	Loaded    bool
+	ContentID string
 }
 
-func GetFeed() {
+type Feed struct {
+	Contents []FeedContent
+}
 
+func GetFeed(config *peer.Configuration, id string) (Feed, error) {
+	feed := config.BlockchainStorage.GetStore(id)
+	if feed == nil {
+		return Feed{}, errors.New("feed not found")
+	}
+	return Feed{}, nil
 }

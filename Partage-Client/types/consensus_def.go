@@ -69,6 +69,8 @@ type PaxosValue struct {
 
 	Filename string
 	Metahash string
+
+	CustomValue []byte
 }
 
 // String returns a string representation.

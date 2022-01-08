@@ -37,8 +37,8 @@ func (m *StateMachine) Run(initialState State) State {
 	return m.Current
 }
 
-// Accept routes the given message to the current state of the state machine.
-func (m *StateMachine) Accept(message types.Message) bool {
+// Input routes the given message to the current state of the state machine.
+func (m *StateMachine) Input(message types.Message) bool {
 	m.Lock()
 	defer m.Unlock()
 	utils.PrintDebug("statemachine", "Discarding", message.Name(), "as the state machine is not active.")

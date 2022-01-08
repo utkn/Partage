@@ -1,9 +1,11 @@
 package protocol
 
-import "go.dedis.ch/cs438/peer"
+import (
+	"go.dedis.ch/cs438/types"
+)
 
 // Protocol represents a consensus protocol.
 type Protocol interface {
-	Propose(interface{}) error
-	RegisterHandlers(*peer.Configuration) error
+	Propose(types.PaxosValue) error
+	HandleConsensusMessage(message ConsensusMessage) error
 }

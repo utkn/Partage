@@ -77,10 +77,10 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		quit:            quitChannel,
 		// Layers
 		network:      networkLayer,
+		cryptography: cryptographyLayer,
 		gossip:       gossipLayer,
 		consensus:    consensusLayer,
 		data:         dataLayer,
-		cryptography: cryptographyLayer,
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()

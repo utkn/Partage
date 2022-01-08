@@ -2,6 +2,7 @@ package paxos
 
 import (
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -10,6 +11,34 @@ type ProposerBeginState struct {
 	State
 	paxos *Paxos
 	value types.PaxosValue
+}
+
+type ProposerWaitPromiseState struct {
+	State
+	paxos         *Paxos
+	proposalID    uint
+	proposalStep  uint
+	originalValue types.PaxosValue
+	notification  *utils.AsyncNotificationHandler
+}
+
+type ProposerWaitAcceptState struct {
+	State
+	paxos         *Paxos
+	notification  *utils.AsyncNotificationHandler
+	proposalStep  uint
+	proposalID    uint
+	chosenValue   types.PaxosValue
+	originalValue types.PaxosValue
+}
+
+type ProposerDoneState struct {
+	State
+	paxos         *Paxos
+	proposalStep  uint
+	proposalID    uint
+	proposedValue types.PaxosValue
+	originalValue types.PaxosValue
 }
 
 func (s ProposerBeginState) Next() State {
@@ -41,15 +70,6 @@ func (s ProposerBeginState) Name() string {
 	return "ProposerBegin"
 }
 
-type ProposerWaitPromiseState struct {
-	State
-	paxos         *Paxos
-	proposalID    uint
-	proposalStep  uint
-	originalValue types.PaxosValue
-	notification  *utils.AsyncNotificationHandler
-}
-
 func (s ProposerWaitPromiseState) Next() State {
 	// First, broadcast the prepare-message.
 	prepareMsg := types.PaxosPrepareMessage{
@@ -60,7 +80,7 @@ func (s ProposerWaitPromiseState) Next() State {
 	// Pass the created prepare message to the next state.
 	prepareTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&prepareMsg)
 	// Broadcast the prepare message.
-	_ = s.paxos.Gossip.Broadcast(prepareTranspMsg)
+	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.Config, prepareTranspMsg))
 	// Find the threshold.
 	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	// Collect the promises in the background.
@@ -125,16 +145,6 @@ func (s ProposerWaitPromiseState) Name() string {
 	return "ProposerWaitPromise"
 }
 
-type ProposerWaitAcceptState struct {
-	State
-	paxos         *Paxos
-	notification  *utils.AsyncNotificationHandler
-	proposalStep  uint
-	proposalID    uint
-	chosenValue   types.PaxosValue
-	originalValue types.PaxosValue
-}
-
 func (s ProposerWaitAcceptState) Next() State {
 	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	proposeMsg := types.PaxosProposeMessage{
@@ -145,7 +155,7 @@ func (s ProposerWaitAcceptState) Next() State {
 	proposeTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&proposeMsg)
 	// Broadcast the proposal.
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "is broadcasting a propose for ID", s.proposalID, "and value", s.chosenValue)
-	_ = s.paxos.Gossip.Broadcast(proposeTranspMsg)
+	_ = s.paxos.Gossip.Broadcast(protocol.WrapInConsensusPacket(s.paxos.Config, proposeTranspMsg))
 	// Collect accept messages.
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has started waiting for paxos accepts with ID", s.proposalID)
 	var accepts []*types.PaxosAcceptMessage
@@ -191,15 +201,6 @@ func (s ProposerWaitAcceptState) Accept(message types.Message) bool {
 
 func (s ProposerWaitAcceptState) Name() string {
 	return "ProposerWaitAccept"
-}
-
-type ProposerDoneState struct {
-	State
-	paxos         *Paxos
-	proposalStep  uint
-	proposalID    uint
-	proposedValue types.PaxosValue
-	originalValue types.PaxosValue
 }
 
 func (s ProposerDoneState) Next() State {
