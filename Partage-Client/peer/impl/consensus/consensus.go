@@ -15,7 +15,7 @@ import (
 )
 
 type Layer struct {
-	sync.Mutex
+	sync.RWMutex
 	Gossip *gossip.Layer
 	Config *peer.Configuration
 
@@ -31,6 +31,10 @@ func Construct(gossip *gossip.Layer, config *peer.Configuration) *Layer {
 	// As the default protocol, use Paxos.
 	layer.RegisterProtocol("default", paxos.New("default", config, gossip, DefaultBlockFactory))
 	return layer
+}
+
+func (l *Layer) RegisterHandlers() {
+	l.Config.MessageRegistry.RegisterMessageCallback(protocol.ConsensusMessage{}, l.HandleConsensusMessage)
 }
 
 func (l *Layer) GetAddress() string {
@@ -53,12 +57,12 @@ func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) e
 		return fmt.Errorf("consensus is disabled for <= 1 many peers")
 	}
 	// Get the protocol
-	l.Lock()
+	l.RLock()
 	p, ok := l.protocols[protocolID]
 	if !ok {
 		return fmt.Errorf("could not find the consensus protocol with id %s", protocolID)
 	}
-	l.Unlock()
+	l.RUnlock()
 	// Initiate the Paxos consensus protocol.
 	err := p.Propose(value)
 	if err != nil {
@@ -67,18 +71,15 @@ func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) e
 	return nil
 }
 
-func (l *Layer) RegisterHandlers() {
-	l.Config.MessageRegistry.RegisterMessageCallback(protocol.ConsensusMessage{}, l.HandleConsensusMessage)
-}
-
 // HandleConsensusMessage forwards a consensus message to registered protocols.
 func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
+	l.RLock()
+	defer l.RUnlock()
 	consensusMsg, ok := msg.(*protocol.ConsensusMessage)
 	if !ok {
 		return fmt.Errorf("could not parse the received consensus msg")
 	}
 	// Route the consensus message to the appropriate protocols. Let them decide what to do with it.
-	// TODO: consider the case when a new protocol is added while iterating through. Some kind of thread safety mechanism may be needed.
 	for _, p := range l.protocols {
 		// Skip the unrelated protocols.
 		if p.GetProtocolID() != consensusMsg.ProtocolID {
