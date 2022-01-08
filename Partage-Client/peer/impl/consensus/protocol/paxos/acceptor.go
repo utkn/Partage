@@ -1,20 +1,22 @@
 package paxos
 
 import (
-	"encoding/hex"
 	"fmt"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/utils"
-	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 )
 
-type BlockFactory = func(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock
+type BlockGenerator = func(*peer.Configuration, types.PaxosAcceptMessage) types.BlockchainBlock
+type BlockchainUpdater = func(*peer.Configuration, types.BlockchainBlock)
+type ProposalChecker = func(*peer.Configuration, types.PaxosProposeMessage) bool
 
 type Acceptor struct {
-	paxos        *Paxos
-	blockFactory BlockFactory
+	paxos *Paxos
+	BlockGenerator
+	BlockchainUpdater
+	ProposalChecker
 }
 
 func (a *Acceptor) HandlePrepare(msg types.PaxosPrepareMessage) error {
@@ -65,6 +67,12 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 		a.paxos.Clock.Lock.Unlock()
 		return nil
 	}
+	// OR ignore when the proposal checker returns false.
+	if !a.ProposalChecker(a.paxos.Config, msg) {
+		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), a.paxos.Clock, "ignored the proposal, since the checker returned false")
+		a.paxos.Clock.Lock.Unlock()
+		return nil
+	}
 	// Accept the value and save in the clock.
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is accepting by setting its accepted ID to", msg.ID)
 	a.paxos.Clock.Accept(msg.ID, msg.Value)
@@ -98,11 +106,7 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 	newStep := a.paxos.Clock.Step
 	utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "will be appending", len(newBlocks), "new blocks.")
 	for _, newBlock := range newBlocks {
-		newBlockBytes, _ := newBlock.Marshal()
-		a.paxos.Config.Storage.GetBlockchainStore().Set(storage.LastBlockKey, newBlock.Hash)
-		newBlockHash := hex.EncodeToString(newBlock.Hash)
-		a.paxos.Config.Storage.GetBlockchainStore().Set(newBlockHash, newBlockBytes)
-		a.paxos.Config.Storage.GetNamingStore().Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
+		a.BlockchainUpdater(a.paxos.Config, newBlock)
 	}
 	// If we have not added new blocks, then we did not move the clock at all.
 	if len(newBlocks) == 0 {
@@ -154,7 +158,7 @@ func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 	a.paxos.Clock.Lock.Unlock()
 	// If we finally reached a threshold, broadcast a TLC message.
 	// To do that, first construct the blockchain block.
-	block := a.blockFactory(a.paxos.Config, msg)
+	block := a.BlockGenerator(a.paxos.Config, msg)
 	// Create the TLC message.
 	tlcMessage := types.TLCMessage{
 		Step:  msg.Step,

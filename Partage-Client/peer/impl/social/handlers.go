@@ -17,7 +17,10 @@ func (l *Layer) NewUserMessageHandler(msg types.Message, pkt transport.Packet) e
 		l.FeedMap[newUserMsg.UserID] = NewFeed()
 		// For each user in the system, we maintain a separate consensus protocol instance.
 		protocolID := "feed-" + newUserMsg.UserID
-		l.consensus.RegisterProtocol(protocolID, paxos.New(protocolID, l.Config, l.consensus.Gossip, FeedBlockFactory))
+		l.consensus.RegisterProtocol(protocolID, paxos.New(protocolID, l.Config, l.consensus.Gossip,
+			FeedBlockGenerator(newUserMsg.UserID),
+			FeedBlockchainUpdater(newUserMsg.UserID),
+			FeedProposalChecker(newUserMsg.UserID)))
 	}
 	return nil
 }

@@ -29,7 +29,8 @@ func Construct(gossip *gossip.Layer, config *peer.Configuration) *Layer {
 		protocols: make(map[string]protocol.Protocol),
 	}
 	// As the default protocol, use Paxos.
-	layer.RegisterProtocol("default", paxos.New("default", config, gossip, DefaultBlockFactory))
+	layer.RegisterProtocol("default",
+		paxos.New("default", config, gossip, DefaultBlockGenerator, DefaultBlockchainUpdater, DefaultProposalChecker))
 	return layer
 }
 
@@ -47,10 +48,12 @@ func (l *Layer) RegisterProtocol(id string, protocol protocol.Protocol) {
 	l.protocols[id] = protocol
 }
 
+// Propose proposes the given value with the default protocol.
 func (l *Layer) Propose(value types.PaxosValue) error {
 	return l.ProposeWithProtocol("default", value)
 }
 
+// ProposeWithProtocol proposes the given value with the protocol associated with the given protocol id.
 func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) error {
 	// Consensus should not be invoked when there are <= 1 many peers.
 	if l.Config.TotalPeers <= 1 {
@@ -93,7 +96,9 @@ func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) 
 	return nil
 }
 
-func DefaultBlockFactory(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock {
+// -- Paxos functions for the default protocol.
+
+func DefaultBlockGenerator(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock {
 	prevHash := make([]byte, 32)
 	lastBlockHashBytes := config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
 	lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
@@ -118,4 +123,16 @@ func DefaultBlockFactory(config *peer.Configuration, msg types.PaxosAcceptMessag
 		Value:    msg.Value,
 		PrevHash: prevHash,
 	}
+}
+
+func DefaultBlockchainUpdater(config *peer.Configuration, newBlock types.BlockchainBlock) {
+	newBlockBytes, _ := newBlock.Marshal()
+	config.Storage.GetBlockchainStore().Set(storage.LastBlockKey, newBlock.Hash)
+	newBlockHash := hex.EncodeToString(newBlock.Hash)
+	config.Storage.GetBlockchainStore().Set(newBlockHash, newBlockBytes)
+	config.Storage.GetNamingStore().Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
+}
+
+func DefaultProposalChecker(config *peer.Configuration, msg types.PaxosProposeMessage) bool {
+	return true
 }

@@ -21,7 +21,10 @@ type Paxos struct {
 	Config       *peer.Configuration
 }
 
-func New(protocolID string, config *peer.Configuration, gossip *gossip.Layer, blockFactory BlockFactory) *Paxos {
+func New(protocolID string, config *peer.Configuration, gossip *gossip.Layer,
+	blockGenerator BlockGenerator,
+	blockchainUpdater BlockchainUpdater,
+	proposalChecker ProposalChecker) *Paxos {
 	p := Paxos{
 		ProtocolID:     protocolID,
 		Clock:          NewClock(),
@@ -34,8 +37,10 @@ func New(protocolID string, config *peer.Configuration, gossip *gossip.Layer, bl
 	}
 	// Create the acceptor. Acceptor methods will be invoked by the message handlers.
 	p.acceptor = &Acceptor{
-		paxos:        &p,
-		blockFactory: blockFactory,
+		paxos:             &p,
+		BlockGenerator:    blockGenerator,
+		BlockchainUpdater: blockchainUpdater,
+		ProposalChecker:   proposalChecker,
 	}
 	return &p
 }
