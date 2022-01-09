@@ -30,13 +30,12 @@ type TCP struct {
 // CreateSocket implements transport.Transport
 func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	// Load my TLS certificate from memory and my public key signature or generate one (if no certificate is found)
-	certificate, err := utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
+	certificate,err := utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
 	if err != nil {
 		return nil, err
 	}
-
 	// Create tls config with loaded certificate
-	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}, ClientAuth: tls.RequestClientCert, InsecureSkipVerify: true}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}, InsecureSkipVerify: true, ClientAuth: tls.RequestClientCert}
 	// Create the listening TCP/TLS socket.
 	listener, err := tls.Listen("tcp", address, cfg)
 	if err != nil {
@@ -51,7 +50,7 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		ins:           []transport.Packet{},
 		outs:          []transport.Packet{},
 		tlsConfig:     cfg,
-		myCertificate: certificate,
+		myTLSCertificate: certificate,
 		CA:            ca,
 		Catalog:       make(map[[32]byte]*transport.SignedPublicKey), //hashed public key maps to *rsa.PublicKey
 		myPKSignature: pkSignature,
@@ -72,7 +71,7 @@ type Socket struct {
 	ins               []transport.Packet
 	outs              []transport.Packet
 	tlsConfig         *tls.Config
-	myCertificate     *tls.Certificate
+	myTLSCertificate     *tls.Certificate
 	myPKSignature     []byte
 	Catalog           map[[32]byte]*transport.SignedPublicKey
 	CatalogLock       sync.RWMutex
@@ -290,8 +289,8 @@ func (s *Socket) GetOuts() []transport.Packet {
 	return copyPacketList(s.outs)
 }
 
-func (s *Socket) GetCertificate() *tls.Certificate {
-	return s.myCertificate
+func (s *Socket) GetTLSCertificate() *tls.Certificate {
+	return s.myTLSCertificate
 }
 
 func (s *Socket) RemoveConn(tlsConn *tls.Conn) {
@@ -340,7 +339,7 @@ func (s *Socket) UpdateCertificate(cert *x509.Certificate, privKey *rsa.PrivateK
 
 	s.tlsConfig = newTLSConf
 	s.listener = &newListener
-	s.myCertificate = &tlsCert
+	s.myTLSCertificate = &tlsCert
 	s.connPool = newConnPool()
 	s.CA = ca
 	s.myPKSignature = publicKeySignature
@@ -353,7 +352,7 @@ func (s *Socket) GetTLSConfig() *tls.Config {
 }
 
 func (s *Socket) GetPublicKey() *rsa.PublicKey {
-	return &s.myCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
+	return &s.myTLSCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
 }
 
 func (s *Socket) GetSignedPublicKey() *transport.SignedPublicKey {
@@ -380,7 +379,6 @@ func (s *Socket) GetCAPublicKey() *rsa.PublicKey {
 }
 
 // TODO: Save blocked users in persistent storage.
-
 func (s *Socket) isBlocked(publicKeyHash [32]byte) bool {
 	s.blockedUsersMutex.RLock()
 	defer s.blockedUsersMutex.RUnlock()
