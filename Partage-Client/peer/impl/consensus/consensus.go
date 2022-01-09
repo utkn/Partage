@@ -48,6 +48,13 @@ func (l *Layer) RegisterProtocol(id string, protocol protocol.Protocol) {
 	l.protocols[id] = protocol
 }
 
+func (l *Layer) IsRegistered(id string) bool {
+	l.RLock()
+	defer l.RUnlock()
+	_, ok := l.protocols[id]
+	return ok
+}
+
 // Propose proposes the given value with the default protocol.
 func (l *Layer) Propose(value types.PaxosValue) error {
 	return l.ProposeWithProtocol("default", value)
@@ -109,7 +116,7 @@ func DefaultBlockGenerator(config *peer.Configuration, msg types.PaxosAcceptMess
 		prevHash = lastBlock.Hash
 	}
 	// Create the block hash.
-	blockHash := utils.HashBlock(
+	blockHash := utils.HashNameBlock(
 		int(msg.Step),
 		msg.Value.UniqID,
 		msg.Value.Filename,

@@ -52,7 +52,8 @@ func (l *Layer) GetAddress() string {
 	return l.socket.GetAddress()
 }
 
-//Send() encapsulates the transport.Message contained in pkt.Msg, into a types.SignedMessage by adding a layer of security and sends it through the TLS socket
+// Send encapsulates the transport.Message contained in pkt.Msg, into a types.SignedMessage by adding a layer of
+//security and sends it through the TLS socket
 func (l *Layer) Send(dest string, pkt transport.Packet, timeout time.Duration) error {
 	// Add Validation check to packet's header (Signs packet with myPrivateKey!)
 	pkt.AddValidation(l.GetPrivateKey(), l.GetSignedPublicKey())
@@ -74,7 +75,8 @@ func (l *Layer) Unicast(dest string, msg transport.Message) error {
 	return l.Route(l.GetAddress(), relay, dest, msg)
 }
 
-//Only use cryptography.Route() when sending transport.Messages that actually need a cryptographic validation check added to packet's header!
+// Only use cryptography.Route() when sending transport.Messages that actually need a cryptographic validation check
+// added to packet's header!
 func (l *Layer) Route(source string, relay string, dest string, msg transport.Message) error {
 	header := transport.NewHeader(source, l.GetAddress(), dest, 0)
 	pkt := transport.Packet{

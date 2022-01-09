@@ -14,8 +14,11 @@ type ProposalChecker = func(*peer.Configuration, types.PaxosProposeMessage) bool
 
 type Acceptor struct {
 	paxos *Paxos
+	// Generates a block from an accept message.
 	BlockGenerator
+	// Updates the blockchain with a generated block.
 	BlockchainUpdater
+	// Checks whether a given proposal is valid. The proposal is discarded if this returns false.
 	ProposalChecker
 }
 

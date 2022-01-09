@@ -14,8 +14,9 @@ import (
 )
 
 type Layer struct {
-	network         *network.Layer
-	cryptography    *cryptography.Layer
+	network      *network.Layer
+	cryptography *cryptography.Layer
+
 	config          *peer.Configuration
 	rumorLock       sync.Mutex
 	view            *PeerView
@@ -52,7 +53,7 @@ func (l *Layer) GetAddress() string {
 
 func (l *Layer) SendRumorsMsg(msg transport.Message, unresponsiveNeighbors map[string]struct{}) error {
 	// Prepare the message to be sent to a random neighbor.
-	randNeighbor, err := l.network.ChooseRandomNeighbor(unresponsiveNeighbors) //TODO:
+	randNeighbor, err := l.network.ChooseRandomNeighbor(unresponsiveNeighbors)
 	// If we could not find a random neighbor, terminate broadcast.
 	if err != nil {
 		utils.PrintDebug("communication", l.GetAddress(), "is terminating random unicast as there are no possible neighbors.")
@@ -93,6 +94,7 @@ func (l *Layer) SendRumorsMsg(msg transport.Message, unresponsiveNeighbors map[s
 	return nil
 }
 
+// Broadcast broadcasts the given message to the network using rumors. The message will also be handled locally.
 func (l *Layer) Broadcast(msg transport.Message) error {
 	utils.PrintDebug("communication", l.GetAddress(), "is broadcasting", msg.Type)
 	// First, locally process the message.
@@ -113,7 +115,7 @@ func (l *Layer) Broadcast(msg transport.Message) error {
 	return l.BroadcastAway(msg)
 }
 
-// BroadcastAway broadcasts the given message to the network using rumors.
+// BroadcastAway broadcasts the given message to the network using rumors. The message won't be handled locally.
 func (l *Layer) BroadcastAway(msg transport.Message) error {
 	// Wrap the message in a rumor.
 	rumor := types.Rumor{}

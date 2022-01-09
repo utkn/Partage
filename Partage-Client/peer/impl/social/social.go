@@ -2,11 +2,13 @@ package social
 
 import (
 	"encoding/hex"
+	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol/paxos"
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
+	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
@@ -16,17 +18,26 @@ type Layer struct {
 	consensus *consensus.Layer
 	gossip    *gossip.Layer
 	data      *data.Layer
+
 	Config    *peer.Configuration
-	FeedMap   map[string]Feed
+	FeedStore *feed.Store
+	UserID    string
 }
 
-func Construct(config *peer.Configuration, data *data.Layer, consensus *consensus.Layer, gossip *gossip.Layer) *Layer {
+func Construct(config *peer.Configuration,
+	data *data.Layer,
+	consensus *consensus.Layer,
+	gossip *gossip.Layer,
+	hashedPublicKey [32]byte) *Layer {
+	// Convert the byte array into a hex string.
+	userID := hex.EncodeToString(hashedPublicKey[:])
 	return &Layer{
 		consensus: consensus,
 		data:      data,
 		gossip:    gossip,
 		Config:    config,
-		FeedMap:   make(map[string]Feed),
+		FeedStore: feed.LoadStore(),
+		UserID:    userID,
 	}
 }
 
@@ -34,39 +45,70 @@ func (l *Layer) GetAddress() string {
 	return l.consensus.GetAddress()
 }
 
-func (l *Layer) PostContent(content string) {}
-
-func (l *Layer) ReactToPost() {}
-
-func (l *Layer) FollowUser() {}
-
-func FeedBlockchainUpdater(userID string) paxos.BlockchainUpdater {
-	return func(configuration *peer.Configuration, newBlock types.BlockchainBlock) {}
+func (l *Layer) GetUserID() string {
+	return l.UserID
 }
 
+func (l *Layer) Register() error {
+	newUserMsg := NewUserMessage{UserID: l.UserID}
+	trspMsg, _ := l.Config.MessageRegistry.MarshalMessage(&newUserMsg)
+	return l.gossip.Broadcast(trspMsg)
+}
+
+func (l *Layer) ProposeNewPost(info feed.PostInfo) error {
+	val := feed.MakeCustomPaxosValue(info)
+	paxosVal := types.PaxosValue{
+		UniqID:      xid.New().String(),
+		CustomValue: val,
+	}
+	protocolID := feed.FeedIDFromUserID(l.UserID)
+	err := l.consensus.ProposeWithProtocol(protocolID, paxosVal)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// FeedBlockchainUpdater takes a user id and returns a paxos feed blockchain updater.
+func FeedBlockchainUpdater(feedStore *feed.Store, userID string) paxos.BlockchainUpdater {
+	return func(config *peer.Configuration, newBlock types.BlockchainBlock) {
+		// Update the feed, also appending to the appropriate blockchain.
+		feedStore.UpdateFeed(config.BlockchainStorage, userID, newBlock)
+	}
+}
+
+// FeedProposalChecker takes a user id and returns a paxos proposal checker.
 func FeedProposalChecker(userID string) paxos.ProposalChecker {
 	return func(configuration *peer.Configuration, message types.PaxosProposeMessage) bool {
+		// TODO Check remaining credits, timestamp etc.
 		return true
 	}
 }
 
+// FeedBlockGenerator takes a user id and returns a paxos feed block generator.
 func FeedBlockGenerator(userID string) paxos.BlockGenerator {
 	return func(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock {
 		prevHash := make([]byte, 32)
-		lastBlockHashBytes := config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
+		// Get the blockchain store associated with the user's feed.
+		blockchainStore := config.BlockchainStorage.GetStore(feed.FeedIDFromUserID(userID))
+		// Get the last block.
+		lastBlockHashBytes := blockchainStore.Get(storage.LastBlockKey)
 		lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
-		lastBlockBuf := config.Storage.GetBlockchainStore().Get(lastBlockHash)
+		lastBlockBuf := blockchainStore.Get(lastBlockHash)
 		if lastBlockBuf != nil {
 			var lastBlock types.BlockchainBlock
 			_ = lastBlock.Unmarshal(lastBlockBuf)
 			prevHash = lastBlock.Hash
 		}
+		// Extract the post information from the proposed value to hash it.
+		postInfo := feed.ParseCustomPaxosValue(msg.Value.CustomValue)
 		// Create the block hash.
-		blockHash := utils.HashBlock(
+		blockHash := utils.HashFeedBlock(
 			int(msg.Step),
 			msg.Value.UniqID,
-			msg.Value.Filename,
-			msg.Value.Metahash,
+			postInfo.PostType,
+			postInfo.FeedUserID,
+			postInfo.PostContentID,
 			prevHash,
 		)
 		// Create the block.

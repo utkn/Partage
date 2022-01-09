@@ -70,12 +70,23 @@ func DistributeBudget(budget uint, neighbors map[string]struct{}) map[string]uin
 	return budgetMapNonZero
 }
 
-func HashBlock(index int, uniqID string, fileName string, metahash string, prevHash []byte) []byte {
+func HashNameBlock(index int, uniqID string, fileName string, metahash string, prevHash []byte) []byte {
 	h := crypto.SHA256.New()
 	h.Write([]byte(strconv.Itoa(index)))
 	h.Write([]byte(uniqID))
 	h.Write([]byte(fileName))
 	h.Write([]byte(metahash))
+	h.Write(prevHash)
+	hashSlice := h.Sum(nil)
+	return hashSlice
+}
+
+func HashFeedBlock(index int, uniqID string, postType string, userID string, contentID string, prevHash []byte) []byte {
+	h := crypto.SHA256.New()
+	h.Write([]byte(strconv.Itoa(index)))
+	h.Write([]byte(uniqID))
+	h.Write([]byte(postType))
+	h.Write([]byte(contentID))
 	h.Write(prevHash)
 	hashSlice := h.Sum(nil)
 	return hashSlice
