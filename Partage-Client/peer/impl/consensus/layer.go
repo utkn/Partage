@@ -112,9 +112,9 @@ func DefaultBlockGenerator(blockchainStore storage.Store) paxos.BlockGenerator {
 
 func DefaultBlockchainUpdater(blockchainStore storage.Store, namingStore storage.Store) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
-		newBlockBytes, _ := newBlock.Marshal()
 		blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
 		newBlockHash := hex.EncodeToString(newBlock.Hash)
+		newBlockBytes, _ := newBlock.Marshal()
 		blockchainStore.Set(newBlockHash, newBlockBytes)
 		namingStore.Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
 	}

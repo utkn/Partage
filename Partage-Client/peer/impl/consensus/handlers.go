@@ -19,32 +19,28 @@ func (l *Layer) RegisterHandlers() {
 
 // HandleConsensusMessage forwards a consensus message to registered protocols.
 func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
-	l.RLock()
-	defer l.RUnlock()
 	consensusMsg, ok := msg.(*protocol.ConsensusMessage)
 	if !ok {
 		return fmt.Errorf("could not parse the received consensus msg")
 	}
-	// Route the consensus message to the appropriate protocols. Let them decide what to do with it.
-	for _, p := range l.protocols {
-		// Skip the unrelated protocols.
-		if p.GetProtocolID() != consensusMsg.ProtocolID {
-			continue
-		}
-		err := p.HandleConsensusMessage(*consensusMsg)
-		if err != nil {
-			return err
-		}
+	// Route the consensus message to the appropriate protocol. Let them decide what to do with it.
+	if consensusMsg.InnerMsg.Type == "paxosaccept" {
+		println(l.GetAddress(), "HAS RECEIVED AN ACCEPT FROM", pkt.Header.Source)
 	}
-	return nil
+	p, ok := l.protocols[consensusMsg.ProtocolID]
+	if !ok {
+		return fmt.Errorf("consensus layer could not find a protocol with id %s", consensusMsg.ProtocolID)
+	}
+	return p.HandleConsensusMessage(*consensusMsg)
 }
 
 // HandlePaxosProxy listens to usual paxos messages, wraps them into consensus messages and processes them locally.
 func (l *Layer) HandlePaxosProxy(msg types.Message, pkt transport.Packet) error {
-	wrappedMsg := protocol.WrapInConsensusPacket("default", l.Config, *pkt.Msg)
+	wrappedMsg := protocol.WrapInConsensusMessage("default", *pkt.Msg)
+	wrappedTransportMsg, _ := l.Config.MessageRegistry.MarshalMessage(wrappedMsg)
 	wrappedPkt := transport.Packet{
 		Header: pkt.Header,
-		Msg:    &wrappedMsg,
+		Msg:    &wrappedTransportMsg,
 	}
 	return l.Config.MessageRegistry.ProcessPacket(wrappedPkt)
 }

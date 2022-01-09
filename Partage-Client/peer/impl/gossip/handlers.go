@@ -70,7 +70,7 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	}
 	// Relay the rumors message to a different random neighbor if it contains at least one new rumor.
 	if len(rumorsOfInterest) > 0 {
-		_ = l.SendRumorsMsg(pkt.Msg.Copy(), map[string]struct{}{pkt.Header.Source: {}})
+		_ = l.sendRumors(pkt.Msg.Copy(), map[string]struct{}{pkt.Header.Source: {}})
 	}
 	// Send back AckMessage to the source after handling is done.
 	// Create the ack message.

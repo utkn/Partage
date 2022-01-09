@@ -23,10 +23,8 @@ func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.Mult
 
 // FeedProposalChecker takes a user id and returns a paxos proposal checker.
 func FeedProposalChecker(userID string) paxos.ProposalChecker {
-	return func(message types.PaxosProposeMessage) bool {
+	return func(msg types.PaxosProposeMessage) bool {
 		// TODO Check remaining credits, timestamp etc.
-		utils.PrintDebug("social", "Checking post proposal...")
-		_ = feed.ParseCustomPaxosValue(message.Value.CustomValue)
 		return true
 	}
 }

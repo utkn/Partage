@@ -95,21 +95,23 @@ func Test_Partage_Late_Registration(t *testing.T) {
 }
 
 func Test_Partage_Single_Post(t *testing.T) {
-	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(2), z.WithPaxosID(1))
 	defer node1.Stop()
-	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(2), z.WithPaxosID(2))
 	defer node2.Stop()
-	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
-	defer node3.Stop()
+	//node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	//defer node3.Stop()
 
-	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
-	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
-	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+	//node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	//node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	//node3.AddPeer(node2.GetAddr(), node1.GetAddr())
 
 	// Register the nodes.
 	node1.RegisterUser()
 	node2.RegisterUser()
-	node3.RegisterUser()
+	//node3.RegisterUser()
 
 	// The first node is sharing a random text post.
 	node1.SharePostTest(feed.PostInfo{
@@ -122,7 +124,7 @@ func Test_Partage_Single_Post(t *testing.T) {
 
 	require.Len(t, node1.GetSharedPosts(node1.GetUserID()), 1)
 	require.Len(t, node2.GetSharedPosts(node1.GetUserID()), 1)
-	require.Len(t, node3.GetSharedPosts(node1.GetUserID()), 1)
+	//require.Len(t, node3.GetSharedPosts(node1.GetUserID()), 1)
 }
 
 func Test_Partage_Three_Posts(t *testing.T) {
