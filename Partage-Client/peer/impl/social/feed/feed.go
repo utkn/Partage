@@ -10,25 +10,46 @@ import (
 
 // Feed represents a user's feed.
 type Feed struct {
-	sync.Mutex
-	Contents []FeedContent
+	sync.RWMutex
+	contents []FeedContent
 	UserID   string
 	//CurrentCredits int
+}
+
+func NewEmptyFeed(userID string) *Feed {
+	return &Feed{
+		contents: []FeedContent{},
+		UserID:   userID,
+	}
+}
+
+func (f *Feed) GetContents() []FeedContent {
+	f.RLock()
+	defer f.RUnlock()
+	var contents []FeedContent
+	for _, c := range f.contents {
+		contents = append(contents, c)
+	}
+	return contents
 }
 
 // Append appends a new feed content into the feed. The associated blockchain is not modified.
 func (f *Feed) Append(c FeedContent) {
 	f.Lock()
 	defer f.Unlock()
-	f.Contents = append(f.Contents, c)
+	f.contents = append(f.contents, c)
 }
 
 // LoadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
 func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userID string) *Feed {
 	// Get the feed blockchain associated with the given user id.
-	feed := blockchainStorage.GetStore(FeedIDFromUserID(userID))
+	feed := blockchainStorage.GetStore(IDFromUserID(userID))
 	// Construct the feed.
 	lastBlockHashHex := hex.EncodeToString(feed.Get(storage.LastBlockKey))
+	// If the associated blockchain is completely empty, return an empty feed.
+	if lastBlockHashHex == "" {
+		return NewEmptyFeed(userID)
+	}
 	// The first block has its previous hash field set to this value.
 	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
 	var blocks []types.BlockchainBlock
@@ -56,10 +77,10 @@ func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userI
 	// Return the feed.
 	return &Feed{
 		UserID:   userID,
-		Contents: contents,
+		contents: contents,
 	}
 }
 
-func FeedIDFromUserID(userID string) string {
+func IDFromUserID(userID string) string {
 	return "feed-" + userID
 }

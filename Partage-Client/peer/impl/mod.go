@@ -98,8 +98,6 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
 	socialLayer.RegisterHandlers()
-	// Try to register.
-	_ = socialLayer.Register()
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
@@ -339,7 +337,18 @@ func (n *node) GetHashedPublicKey() [32]byte {
 	return [32]byte{}
 }
 
+// GetUserID implements peer.PartageClient
 func (n *node) GetUserID() string {
 	b := n.GetHashedPublicKey()
 	return hex.EncodeToString(b[:])
+}
+
+// GetKnownUsers implements peer.PartageClient
+func (n *node) GetKnownUsers() map[string]struct{} {
+	return n.social.FeedStore.GetRegisteredUsers()
+}
+
+// GetSharedPosts implements peer.PartageClient
+func (n *node) GetSharedPosts(userID string) []feed.FeedContent {
+	return n.social.FeedStore.GetFeed(n.conf.BlockchainStorage, userID).GetContents()
 }

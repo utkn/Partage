@@ -30,7 +30,10 @@ func Construct(gossip *gossip.Layer, config *peer.Configuration) *Layer {
 	}
 	// As the default protocol, use Paxos.
 	layer.RegisterProtocol("default",
-		paxos.New("default", config, gossip, DefaultBlockGenerator, DefaultBlockchainUpdater, DefaultProposalChecker))
+		paxos.New("default", config, gossip,
+			DefaultBlockGenerator(config.Storage.GetBlockchainStore()),
+			DefaultBlockchainUpdater(config.Storage.GetBlockchainStore(), config.Storage.GetNamingStore()),
+			DefaultProposalChecker()))
 	return layer
 }
 
@@ -105,41 +108,47 @@ func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) 
 
 // -- Paxos functions for the default protocol.
 
-func DefaultBlockGenerator(config *peer.Configuration, msg types.PaxosAcceptMessage) types.BlockchainBlock {
-	prevHash := make([]byte, 32)
-	lastBlockHashBytes := config.Storage.GetBlockchainStore().Get(storage.LastBlockKey)
-	lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
-	lastBlockBuf := config.Storage.GetBlockchainStore().Get(lastBlockHash)
-	if lastBlockBuf != nil {
-		var lastBlock types.BlockchainBlock
-		_ = lastBlock.Unmarshal(lastBlockBuf)
-		prevHash = lastBlock.Hash
-	}
-	// Create the block hash.
-	blockHash := utils.HashNameBlock(
-		int(msg.Step),
-		msg.Value.UniqID,
-		msg.Value.Filename,
-		msg.Value.Metahash,
-		prevHash,
-	)
-	// Create the block.
-	return types.BlockchainBlock{
-		Index:    msg.Step,
-		Hash:     blockHash,
-		Value:    msg.Value,
-		PrevHash: prevHash,
+func DefaultBlockGenerator(blockchainStore storage.Store) paxos.BlockGenerator {
+	return func(msg types.PaxosAcceptMessage) types.BlockchainBlock {
+		prevHash := make([]byte, 32)
+		lastBlockHashBytes := blockchainStore.Get(storage.LastBlockKey)
+		lastBlockHash := hex.EncodeToString(lastBlockHashBytes)
+		lastBlockBuf := blockchainStore.Get(lastBlockHash)
+		if lastBlockBuf != nil {
+			var lastBlock types.BlockchainBlock
+			_ = lastBlock.Unmarshal(lastBlockBuf)
+			prevHash = lastBlock.Hash
+		}
+		// Create the block hash.
+		blockHash := utils.HashNameBlock(
+			int(msg.Step),
+			msg.Value.UniqID,
+			msg.Value.Filename,
+			msg.Value.Metahash,
+			prevHash,
+		)
+		// Create the block.
+		return types.BlockchainBlock{
+			Index:    msg.Step,
+			Hash:     blockHash,
+			Value:    msg.Value,
+			PrevHash: prevHash,
+		}
 	}
 }
 
-func DefaultBlockchainUpdater(config *peer.Configuration, newBlock types.BlockchainBlock) {
-	newBlockBytes, _ := newBlock.Marshal()
-	config.Storage.GetBlockchainStore().Set(storage.LastBlockKey, newBlock.Hash)
-	newBlockHash := hex.EncodeToString(newBlock.Hash)
-	config.Storage.GetBlockchainStore().Set(newBlockHash, newBlockBytes)
-	config.Storage.GetNamingStore().Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
+func DefaultBlockchainUpdater(blockchainStore storage.Store, namingStore storage.Store) paxos.BlockchainUpdater {
+	return func(newBlock types.BlockchainBlock) {
+		newBlockBytes, _ := newBlock.Marshal()
+		blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
+		newBlockHash := hex.EncodeToString(newBlock.Hash)
+		blockchainStore.Set(newBlockHash, newBlockBytes)
+		namingStore.Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
+	}
 }
 
-func DefaultProposalChecker(config *peer.Configuration, msg types.PaxosProposeMessage) bool {
-	return true
+func DefaultProposalChecker() paxos.ProposalChecker {
+	return func(msg types.PaxosProposeMessage) bool {
+		return true
+	}
 }

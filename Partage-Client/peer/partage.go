@@ -12,6 +12,8 @@ type PartageClient interface {
 	SharePostTest(info feed.PostInfo) error
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
+	GetKnownUsers() map[string]struct{}
+	GetSharedPosts(userID string) []feed.FeedContent
 	BlockUser(publicKeyHash [32]byte)
 	UnblockUser(publicKeyHash [32]byte)
 }

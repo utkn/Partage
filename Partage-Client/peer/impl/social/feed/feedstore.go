@@ -18,6 +18,7 @@ func LoadStore() *Store {
 	}
 }
 
+// GetFeed loads the feed of the user associated with the given id. The feed is loaded from the blockchain storage.
 func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, userID string) *Feed {
 	s.RLock()
 	feed, ok := s.feedMap[userID]
@@ -32,9 +33,22 @@ func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, userID st
 	return feed
 }
 
+// GetRegisteredUsers returns the set of users that were registered with this feed store.
+func (s *Store) GetRegisteredUsers() map[string]struct{} {
+	s.RLock()
+	defer s.RUnlock()
+	userSet := make(map[string]struct{})
+	for userID, _ := range s.feedMap {
+		userSet[userID] = struct{}{}
+	}
+	return userSet
+}
+
+// UpdateFeed updates the blockchain associated with the given user id with the given new block. The new block is also
+// added to the in-memory storage.
 func (s *Store) UpdateFeed(blockchainStorage storage.MultipurposeStorage, userID string, newBlock types.BlockchainBlock) {
 	// Get the blockchain store associated with the user's feed.
-	blockchainStore := blockchainStorage.GetStore(FeedIDFromUserID(userID))
+	blockchainStore := blockchainStorage.GetStore(IDFromUserID(userID))
 	// Update the last block.
 	blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
 	newBlockHash := hex.EncodeToString(newBlock.Hash)
