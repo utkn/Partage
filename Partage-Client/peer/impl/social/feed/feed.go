@@ -8,9 +8,12 @@ import (
 	"sync"
 )
 
+// Feed represents a user's feed.
 type Feed struct {
 	sync.Mutex
 	Contents []FeedContent
+	UserID   string
+	//CurrentCredits int
 }
 
 // Append appends a new feed content into the feed. The associated blockchain is not modified.
@@ -23,7 +26,7 @@ func (f *Feed) Append(c FeedContent) {
 // LoadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
 func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userID string) *Feed {
 	// Get the feed blockchain associated with the given user id.
-	feed := blockchainStorage.GetStore("feed-" + userID)
+	feed := blockchainStorage.GetStore(FeedIDFromUserID(userID))
 	// Construct the feed.
 	lastBlockHashHex := hex.EncodeToString(feed.Get(storage.LastBlockKey))
 	// The first block has its previous hash field set to this value.
@@ -52,6 +55,7 @@ func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userI
 	}
 	// Return the feed.
 	return &Feed{
+		UserID:   userID,
 		Contents: contents,
 	}
 }

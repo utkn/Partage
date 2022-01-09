@@ -3,6 +3,7 @@ package unit
 import (
 	"encoding/json"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
 	"math/rand"
 	"sort"
@@ -17,6 +18,27 @@ import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
+
+func Test_Partage_Registration(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	node1.SharePostTest(feed.PostInfo{
+		FeedUserID:    node1.GetUserID(),
+		PostType:      "text",
+		PostContentID: "123",
+		Signature:     nil,
+	})
+	time.Sleep(3 * time.Second)
+}
 
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	fake := z.NewFakeMessage(t)

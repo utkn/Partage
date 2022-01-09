@@ -21,6 +21,7 @@ var DEBUG = map[string]bool{
 	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
+	"social":        true,
 }
 
 func PrintDebug(tag string, objs ...interface{}) {

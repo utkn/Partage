@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/social"
@@ -77,8 +78,6 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		hashedPK = cryptographyLayer.GetHashedPublicKey()
 	}
 	socialLayer := social.Construct(&conf, dataLayer, consensusLayer, gossipLayer, hashedPK)
-	// Try to register.
-	_ = socialLayer.Register()
 
 	node := &node{
 		addr: conf.Socket.GetAddress(),
@@ -99,6 +98,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
 	socialLayer.RegisterHandlers()
+	// Try to register.
+	_ = socialLayer.Register()
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
@@ -336,4 +337,9 @@ func (n *node) GetHashedPublicKey() [32]byte {
 		return tlsSock.GetHashedPublicKey()
 	}
 	return [32]byte{}
+}
+
+func (n *node) GetUserID() string {
+	b := n.GetHashedPublicKey()
+	return hex.EncodeToString(b[:])
 }
