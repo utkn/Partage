@@ -379,6 +379,8 @@ func (s *Socket) GetCAPublicKey() *rsa.PublicKey {
 	return nil
 }
 
+// TODO: Save blocked users in persistent storage.
+
 func (s *Socket) isBlocked(publicKeyHash [32]byte) bool {
 	s.blockedUsersMutex.RLock()
 	defer s.blockedUsersMutex.RUnlock()

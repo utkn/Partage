@@ -3,6 +3,7 @@ package unit
 import (
 	"encoding/json"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
 	"math/rand"
 	"sort"
@@ -17,6 +18,146 @@ import (
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
+
+func Test_Partage_Registration(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Wait for a while.
+	time.Sleep(3 * time.Second)
+
+	// The length of the known users should be 3 for all nodes.
+	require.Len(t, node1.GetKnownUsers(), 3)
+	require.Len(t, node2.GetKnownUsers(), 3)
+	require.Len(t, node3.GetKnownUsers(), 3)
+
+	// One by one check that every node knows every other node.
+	nodes := []z.TestNode{node1, node2, node3}
+	for _, owner := range nodes {
+		for _, n := range nodes {
+			_, ok := owner.GetKnownUsers()[n.GetUserID()]
+			require.True(t, ok)
+		}
+	}
+}
+
+func Test_Partage_Late_Registration(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	defer node2.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node1.GetAddr())
+
+	// Register the first two nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+
+	// Wait for a while.
+	time.Sleep(3 * time.Second)
+
+	// Late registration.
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	defer node3.Stop()
+	node3.AddPeer(node2.GetAddr())
+	node3.RegisterUser()
+
+	// Wait for a while.
+	time.Sleep(1 * time.Second)
+
+	// The length of the known users should be 3 for all nodes.
+	require.Len(t, node1.GetKnownUsers(), 3)
+	require.Len(t, node2.GetKnownUsers(), 3)
+	require.Len(t, node3.GetKnownUsers(), 3)
+
+	// One by one check that every node knows every other node.
+	nodes := []z.TestNode{node1, node2, node3}
+	for _, owner := range nodes {
+		for _, n := range nodes {
+			_, ok := owner.GetKnownUsers()[n.GetUserID()]
+			require.True(t, ok)
+		}
+	}
+}
+
+func Test_Partage_Single_Post(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// The first node is sharing a random text post.
+	node1.SharePostTest(feed.PostInfo{
+		FeedUserID:    node1.GetUserID(),
+		PostType:      "text",
+		PostContentID: "123",
+		Signature:     nil,
+	})
+	time.Sleep(1 * time.Second)
+
+	require.Len(t, node1.GetSharedPosts(node1.GetUserID()), 1)
+	require.Len(t, node2.GetSharedPosts(node1.GetUserID()), 1)
+	require.Len(t, node3.GetSharedPosts(node1.GetUserID()), 1)
+}
+
+func Test_Partage_Three_Posts(t *testing.T) {
+	return
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	node1.SharePostTest(feed.PostInfo{
+		FeedUserID:    node1.GetUserID(),
+		PostType:      "text",
+		PostContentID: "1",
+		Signature:     nil,
+	})
+	node1.SharePostTest(feed.PostInfo{
+		FeedUserID:    node1.GetUserID(),
+		PostType:      "text",
+		PostContentID: "2",
+		Signature:     nil,
+	})
+	node1.SharePostTest(feed.PostInfo{
+		FeedUserID:    node1.GetUserID(),
+		PostType:      "text",
+		PostContentID: "3",
+		Signature:     nil,
+	})
+	time.Sleep(3 * time.Second)
+}
 
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	fake := z.NewFakeMessage(t)

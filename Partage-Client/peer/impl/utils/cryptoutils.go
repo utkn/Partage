@@ -371,6 +371,15 @@ func VerifyPublicKeySignature(publicKey *rsa.PublicKey, signature []byte, CAPubl
 	return rsa.VerifyPKCS1v15(CAPublicKey, crypto.SHA256, hashed[:], signature) == nil
 }
 
+func HashPublicKey(pk *rsa.PublicKey) [32]byte {
+	//stringify user's public key
+	bytes, err := PublicKeyToBytes(pk)
+	if err == nil {
+		return Hash(bytes)
+	}
+	return [32]byte{}
+}
+
 func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte, error) {
 	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {

@@ -40,6 +40,26 @@ func (s Storage) GetBlockchainStore() storage.Store {
 	return s.blockchain
 }
 
+// MultipurposeStorage implements an in-memory multipurpose storage.
+// - implements storage.MultipurposeStorage
+type MultipurposeStorage struct {
+	storeMap map[string]*store
+}
+
+func NewPersistentMultipurposeStorage() storage.MultipurposeStorage {
+	return MultipurposeStorage{
+		storeMap: make(map[string]*store),
+	}
+}
+
+func (s MultipurposeStorage) GetStore(id string) storage.Store {
+	_, ok := s.storeMap[id]
+	if !ok {
+		s.storeMap[id] = newStore()
+	}
+	return s.storeMap[id]
+}
+
 func newStore() *store {
 	return &store{
 		data: make(map[string][]byte),

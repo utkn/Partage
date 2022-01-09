@@ -43,7 +43,7 @@ func (l *Layer) SendPost(content string) error {
 	return l.Broadcast(tMsg)
 }
 
-//recipients will be a slice containing the each recipient hashed public key
+// recipients will be a slice containing the each recipient hashed public key
 func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) error {
 	// Generate Symmetric Encryption Key (AES-256)
 	aesKey, err := utils.GenerateAESKey()

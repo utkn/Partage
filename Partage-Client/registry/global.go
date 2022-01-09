@@ -23,6 +23,11 @@ func init() {
 	GlobalRegistry.Add(types.StatusMessage{})
 	GlobalRegistry.Add(types.RumorsMessage{})
 	GlobalRegistry.Add(types.PrivateMessage{})
+	GlobalRegistry.Add(types.PaxosAcceptMessage{})
+	GlobalRegistry.Add(types.PaxosProposeMessage{})
+	GlobalRegistry.Add(types.PaxosPromiseMessage{})
+	GlobalRegistry.Add(types.PaxosPrepareMessage{})
+	GlobalRegistry.Add(types.TLCMessage{})
 }
 
 type globalRegistry struct {

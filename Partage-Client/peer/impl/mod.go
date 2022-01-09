@@ -1,8 +1,11 @@
 package impl
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/social"
+	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
 
 	"regexp"
@@ -30,11 +33,13 @@ type node struct {
 	conf            peer.Configuration
 	quitDistributor *utils.SignalDistributor
 	quit            chan bool
-	gossip          *gossip.Layer
-	data            *data.Layer
-	network         *network.Layer
-	consensus       *consensus.Layer
-	//for tcp connections only
+
+	social    *social.Layer
+	data      *data.Layer
+	consensus *consensus.Layer
+	gossip    *gossip.Layer
+	network   *network.Layer
+	// For tcp connections only
 	cryptography *cryptography.Layer
 }
 
@@ -68,6 +73,11 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	gossipLayer := gossip.Construct(networkLayer, cryptographyLayer, &conf, quitDistributor)
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
 	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
+	var hashedPK [32]byte
+	if isRunningTLS {
+		hashedPK = cryptographyLayer.GetHashedPublicKey()
+	}
+	socialLayer := social.Construct(&conf, dataLayer, consensusLayer, gossipLayer, hashedPK)
 
 	node := &node{
 		addr: conf.Socket.GetAddress(),
@@ -76,16 +86,18 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		quitDistributor: quitDistributor,
 		quit:            quitChannel,
 		// Layers
-		network:      networkLayer,
-		gossip:       gossipLayer,
-		consensus:    consensusLayer,
+		social:       socialLayer,
 		data:         dataLayer,
+		consensus:    consensusLayer,
+		gossip:       gossipLayer,
+		network:      networkLayer,
 		cryptography: cryptographyLayer,
 	}
 	// Register the handlers.
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
+	socialLayer.RegisterHandlers()
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
@@ -93,7 +105,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	// Start the quit signal distributor.
 	go quitDistributor.SingleRun()
 
-	return node //if node is not properly registered (has a valid signed certificate..he won't be able to participate in the network)
+	return node // if node is not properly registered (has a valid signed certificate) he won't be able to participate in the network)
 }
 
 // Start implements peer.Service
@@ -284,13 +296,23 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 	return n.data.SearchFirst(pattern, conf)
 }
 
-// Partage Methods
+// TODO: Test this.
+func (n *node) SharePostTest(info feed.PostInfo) error {
+	return n.social.ProposeNewPost(info)
+}
 
+// RegisterUser implements peer.PartageClient
+func (n *node) RegisterUser() error {
+	return n.social.Register()
+}
+
+// SharePrivatePost implements peer.PartageClient
 func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
 	//msg should be a marshaled types.Post message..
 	return n.gossip.SendPrivatePost(msg, recipients)
 }
 
+// BlockUser implements peer.PartageClient
 func (n *node) BlockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
@@ -298,6 +320,7 @@ func (n *node) BlockUser(publicKeyHash [32]byte) {
 	}
 }
 
+// UnblockUser implements peer.PartageClient
 func (n *node) UnblockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
@@ -305,10 +328,27 @@ func (n *node) UnblockUser(publicKeyHash [32]byte) {
 	}
 }
 
+// GetHashedPublicKey implements peer.PartageClient
 func (n *node) GetHashedPublicKey() [32]byte {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
 		return tlsSock.GetHashedPublicKey()
 	}
 	return [32]byte{}
+}
+
+// GetUserID implements peer.PartageClient
+func (n *node) GetUserID() string {
+	b := n.GetHashedPublicKey()
+	return hex.EncodeToString(b[:])
+}
+
+// GetKnownUsers implements peer.PartageClient
+func (n *node) GetKnownUsers() map[string]struct{} {
+	return n.social.FeedStore.GetRegisteredUsers()
+}
+
+// GetSharedPosts implements peer.PartageClient
+func (n *node) GetSharedPosts(userID string) []feed.FeedContent {
+	return n.social.FeedStore.GetFeed(n.conf.BlockchainStorage, userID).GetContents()
 }

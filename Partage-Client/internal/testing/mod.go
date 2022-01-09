@@ -139,7 +139,8 @@ type configTemplate struct {
 
 	chunkSize uint
 
-	storage storage.Storage
+	storage           storage.Storage
+	blockchainStorage storage.MultipurposeStorage
 
 	dataRequestBackoff peer.Backoff
 
@@ -167,7 +168,8 @@ func newConfigTemplate() configTemplate {
 
 		chunkSize: 8192,
 
-		storage: inmemory.NewPersistency(),
+		storage:           inmemory.NewPersistency(),
+		blockchainStorage: inmemory.NewPersistentMultipurposeStorage(),
 
 		dataRequestBackoff: peer.Backoff{
 			Initial: time.Second * 2,
@@ -262,6 +264,13 @@ func WithStorage(storage storage.Storage) Option {
 	}
 }
 
+// WithBlockchainStorage sets a specific storage
+func WithBlockchainStorage(storage storage.MultipurposeStorage) Option {
+	return func(ct *configTemplate) {
+		ct.blockchainStorage = storage
+	}
+}
+
 // WithTotalPeers sets a specific TotalPeer value.
 func WithTotalPeers(t uint) Option {
 	return func(ct *configTemplate) {
@@ -311,6 +320,7 @@ func NewTestNode(t *testing.T, f peer.Factory, trans transport.Transport,
 	config.ContinueMongering = template.ContinueMongering
 	config.AckTimeout = template.AckTimeout
 	config.Storage = template.storage
+	config.BlockchainStorage = template.blockchainStorage
 	config.ChunkSize = template.chunkSize
 	config.BackoffDataRequest = template.dataRequestBackoff
 	config.TotalPeers = template.totalPeers

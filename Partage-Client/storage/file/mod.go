@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	blob       = "blob"
-	naming     = "naming"
-	blockchain = "blockchain"
+	blob         = "blob"
+	naming       = "naming"
+	blockchain   = "blockchain"
+	multipurpose = "multipurpose"
 )
 
 // NewPersistency return a new initialized file-based storage. Opeartions are
@@ -76,6 +77,38 @@ func (s Storage) GetNamingStore() storage.Store {
 // GetBlockchainStore implements storage.Storage
 func (s Storage) GetBlockchainStore() storage.Store {
 	return s.blockchain
+}
+
+// MultipurposeStorage implements a file-based multi-purpose storage.
+// - implements storage.MultipurposeStorage
+type MultipurposeStorage struct {
+	folderPath string
+	storeMap   map[string]*store
+}
+
+func NewPersistentMultipurposeStorage(folderPath string) (storage.MultipurposeStorage, error) {
+	multiPurposeFolderPath := filepath.Join(folderPath, multipurpose)
+	err := os.MkdirAll(multiPurposeFolderPath, os.ModePerm)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to create root folder: %v", err)
+	}
+	return MultipurposeStorage{
+		folderPath: multiPurposeFolderPath,
+		storeMap:   make(map[string]*store),
+	}, nil
+}
+
+func (s MultipurposeStorage) GetStore(id string) storage.Store {
+	_, ok := s.storeMap[id]
+	if !ok {
+		f, err := newStore(filepath.Join(s.folderPath, id))
+		if err != nil {
+			xerrors.Errorf("failed to create multipurpose store: %v", err)
+			return nil
+		}
+		s.storeMap[id] = f
+	}
+	return s.storeMap[id]
 }
 
 func newStore(folderPath string) (*store, error) {
