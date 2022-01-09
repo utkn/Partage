@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"io"
 	"math/rand"
 
@@ -590,6 +591,18 @@ func GetPaxosPromise(t *testing.T, msg *transport.Message) types.PaxosPromiseMes
 	require.NoError(t, err)
 
 	return paxosPromiseMessage
+}
+
+// GetConsensus returns the ConsensusMessage associated to the transport.Message.
+func GetConsensus(t *testing.T, msg *transport.Message) protocol.ConsensusMessage {
+	require.Equal(t, "consensus", msg.Type)
+
+	var consensusMessage protocol.ConsensusMessage
+
+	err := json.Unmarshal(msg.Payload, &consensusMessage)
+	require.NoError(t, err)
+
+	return consensusMessage
 }
 
 // GetPaxosPropose returns the PaxosPropose associated to the transport.Message.
