@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/social"
+	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
 
 	"regexp"
@@ -76,6 +77,8 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 		hashedPK = cryptographyLayer.GetHashedPublicKey()
 	}
 	socialLayer := social.Construct(&conf, dataLayer, consensusLayer, gossipLayer, hashedPK)
+	// Try to register.
+	_ = socialLayer.Register()
 
 	node := &node{
 		addr: conf.Socket.GetAddress(),
@@ -292,6 +295,11 @@ func (n *node) SearchAll(reg regexp.Regexp, budget uint, timeout time.Duration) 
 // SearchFirst implements peer.DataSharing
 func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (string, error) {
 	return n.data.SearchFirst(pattern, conf)
+}
+
+// TODO: Test this.
+func (n *node) SharePostTest(info feed.PostInfo) error {
+	return n.social.ProposeNewPost(info)
 }
 
 // RegisterUser implements peer.PartageClient

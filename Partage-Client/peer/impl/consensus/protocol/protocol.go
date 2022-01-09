@@ -8,5 +8,5 @@ import (
 type Protocol interface {
 	Propose(types.PaxosValue) error
 	GetProtocolID() string
-	HandleConsensusMessage(message ConsensusMessage) error
+	HandleConsensusMessage(ConsensusMessage) error
 }
