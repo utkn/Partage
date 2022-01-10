@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/social"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
 
 	"regexp"
@@ -297,7 +298,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // UpdateFeed appends the given post info into the peer's feed blockchain permanently.
-func (n *node) UpdateFeed(info feed.ContentMetadata) error {
+func (n *node) UpdateFeed(info content.Metadata) error {
 	return n.social.ProposeNewPost(info)
 }
 
@@ -349,7 +350,7 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 }
 
 // GetFeedContents implements peer.PartageClient
-func (n *node) GetFeedContents(userID string) []feed.ContentMetadata {
+func (n *node) GetFeedContents(userID string) []content.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, userID).GetContents()
 }
 

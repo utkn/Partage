@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
 	"math/rand"
 	"sort"
@@ -124,9 +125,9 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing a random text post.
-	node1.UpdateFeed(feed.ContentMetadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       feed.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "123",
 		Signature:  nil,
 	})
@@ -176,21 +177,21 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing three random text posts.
-	node1.UpdateFeed(feed.ContentMetadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       feed.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "1",
 		Signature:  nil,
 	})
-	node1.UpdateFeed(feed.ContentMetadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       feed.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "2",
 		Signature:  nil,
 	})
-	node1.UpdateFeed(feed.ContentMetadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       feed.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "3",
 		Signature:  nil,
 	})
@@ -246,21 +247,21 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 	for i, n := range nodes {
 		// Try to post in the background.
 		go func(nodeIndex int, node z.TestNode) {
-			node.UpdateFeed(feed.ContentMetadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       feed.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-1", nodeIndex),
 				Signature:  nil,
 			})
-			node.UpdateFeed(feed.ContentMetadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       feed.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-2", nodeIndex),
 				Signature:  nil,
 			})
-			node.UpdateFeed(feed.ContentMetadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       feed.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-3", nodeIndex),
 				Signature:  nil,
 			})
@@ -315,13 +316,13 @@ func Test_Partage_User_State(t *testing.T) {
 	node3.RegisterUser()
 
 	// First, change the username.
-	node1.UpdateFeed(feed.CreateChangeUsernameMetadata(node1.GetUserID(), "Descartes"))
+	node1.UpdateFeed(content.CreateChangeUsernameMetadata(node1.GetUserID(), "Descartes"))
 	time.Sleep(1 * time.Second)
 	require.Equal(t, "Descartes", node1.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node2.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node3.GetUserState(node1.GetUserID()).Username)
 	// Then, follow a user.
-	node1.UpdateFeed(feed.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
+	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
@@ -330,7 +331,7 @@ func Test_Partage_User_State(t *testing.T) {
 	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	// Then, unfollow.
-	node1.UpdateFeed(feed.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
+	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 0)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 0)
@@ -375,21 +376,21 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 
 	// First, request an endorsement.
 	nodes := []z.TestNode{node1, node2, node3}
-	node1.UpdateFeed(feed.CreateEndorsementRequestMetadata(node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorsementRequestMetadata(node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Try self-endorsement. Ideally should not be appended into the blockchain. Even if it does, should not have an effect.
-	node1.UpdateFeed(feed.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Now, let node 2 endorse the node 1.
-	node2.UpdateFeed(feed.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -397,7 +398,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
 	}
 	// Try endorsing through node 2 again. The state should not change.
-	node2.UpdateFeed(feed.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -407,7 +408,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 	// Now, let node 3 endorse the node 1 as well.
 	defaultEndorsementCount := feed.REQUIRED_ENDORSEMENTS
 	feed.REQUIRED_ENDORSEMENTS = 2
-	node3.UpdateFeed(feed.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
+	node3.UpdateFeed(content.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	newCredits := feed.INITIAL_CREDITS + feed.ENDORSEMENT_REWARD
 	// The endorsement handler should be reset and the credits should be updated.

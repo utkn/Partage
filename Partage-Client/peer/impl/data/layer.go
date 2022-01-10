@@ -82,7 +82,6 @@ func (l *Layer) Upload(data io.Reader) (metahash string, err error) {
 	return metahash, err
 }
 
-// Download implements peer.DataSharing
 func (l *Layer) Download(metahash string) ([]byte, error) {
 	metadataBytes, err := l.AcquireData(metahash)
 	if err != nil {

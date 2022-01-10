@@ -8,6 +8,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -53,9 +54,9 @@ func (l *Layer) Register() error {
 	return l.gossip.BroadcastMessage(newUserMsg)
 }
 
-func (l *Layer) ProposeNewPost(info feed.ContentMetadata) error {
+func (l *Layer) ProposeNewPost(info content.Metadata) error {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
-	val := feed.MakeCustomPaxosValue(info)
+	val := content.MakeCustomPaxosValue(info)
 	paxosVal := types.PaxosValue{
 		UniqID:      xid.New().String(),
 		CustomValue: val,

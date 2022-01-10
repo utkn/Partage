@@ -7,6 +7,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol/paxos"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
@@ -46,7 +47,7 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 			prevHash = lastBlock.Hash
 		}
 		// Extract the content metadata from the proposed value to hash it.
-		metadata := feed.ParseCustomPaxosValue(msg.Value.CustomValue)
+		metadata := content.ParseCustomPaxosValue(msg.Value.CustomValue)
 		// Create the block hash.
 		blockHash := utils.HashContentMetadata(
 			int(msg.Step),

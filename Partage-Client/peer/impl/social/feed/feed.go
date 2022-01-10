@@ -3,6 +3,7 @@ package feed
 import (
 	"encoding/hex"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 	"sync"
@@ -12,14 +13,14 @@ import (
 type Feed struct {
 	sync.RWMutex
 	userState *UserState
-	contents  []ContentMetadata
+	contents  []content.Metadata
 	UserID    string
 }
 
 func NewEmptyFeed(userID string) *Feed {
 	return &Feed{
 		userState: NewInitialUserState(userID),
-		contents:  []ContentMetadata{},
+		contents:  []content.Metadata{},
 		UserID:    userID,
 	}
 }
@@ -28,7 +29,7 @@ func (f *Feed) Copy() *Feed {
 	f.RLock()
 	defer f.RUnlock()
 	userState := f.userState.Copy()
-	var contents []ContentMetadata
+	var contents []content.Metadata
 	for _, c := range f.contents {
 		contents = append(contents, c)
 	}
@@ -45,10 +46,10 @@ func (f *Feed) GetUserStateCopy() UserState {
 	return f.userState.Copy()
 }
 
-func (f *Feed) GetContents() []ContentMetadata {
+func (f *Feed) GetContents() []content.Metadata {
 	f.RLock()
 	defer f.RUnlock()
-	var contents []ContentMetadata
+	var contents []content.Metadata
 	for _, c := range f.contents {
 		contents = append(contents, c)
 	}
@@ -56,13 +57,13 @@ func (f *Feed) GetContents() []ContentMetadata {
 }
 
 // Append appends a new feed content into the feed. The associated blockchain is not modified.
-func (f *Feed) Append(c ContentMetadata) {
+func (f *Feed) Append(c content.Metadata) {
 	f.Lock()
 	defer f.Unlock()
 	f.processAndAppend(c)
 }
 
-func (f *Feed) processAndAppend(c ContentMetadata) {
+func (f *Feed) processAndAppend(c content.Metadata) {
 	// Process the metadata by updating the user state.
 	err := f.userState.Update(c)
 	if err != nil {
@@ -73,7 +74,7 @@ func (f *Feed) processAndAppend(c ContentMetadata) {
 }
 
 // UpdateEndorsement updates the endorsement given by a different user.
-func (f *Feed) UpdateEndorsement(endorsement ContentMetadata) {
+func (f *Feed) UpdateEndorsement(endorsement content.Metadata) {
 	f.Lock()
 	defer f.Unlock()
 	endorserID := endorsement.FeedUserID
@@ -116,7 +117,7 @@ func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userI
 	feed := NewEmptyFeed(userID)
 	// Now we have a list of blocks. Append them into the feed one by one.
 	for _, block := range blocks {
-		postInfo := ParseCustomPaxosValue(block.Value.CustomValue)
+		postInfo := content.ParseCustomPaxosValue(block.Value.CustomValue)
 		// No need to acquire the lock because there are no other references to this feed yet.
 		feed.processAndAppend(postInfo)
 	}
