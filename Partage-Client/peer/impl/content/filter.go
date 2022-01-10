@@ -11,10 +11,12 @@ type Filter struct {
 	MaxTime int
 	// MinTime denotes the lowest end of the time range. Setting to 0 disables it.
 	MinTime int
-	// OwnerIDs denotes the list of owner user ids to discover from. Setting to empty list (nil) disables it.
+	// OwnerIDs filters by the owner user ids. Setting to empty list (nil) disables it.
 	OwnerIDs []string
-	// Types denotes the list of types to discover. Setting to empty list (nil) disables it.
+	// Types filters by the list of types. Setting to empty list (nil) disables it.
 	Types []Type
+	// RefContentID filters by the reference id. Used for comments, reactions etc. Setting to "" disables it.
+	RefContentID string
 }
 
 func ParseContentFilter(contentFilterBytes []byte) Filter {
@@ -40,6 +42,10 @@ func (c Filter) Match(metadata Metadata) bool {
 	}
 	// Check against filtered max time.
 	if c.MaxTime > 0 && metadata.Timestamp > c.MaxTime {
+		return false
+	}
+	// Check against referenced id.
+	if c.RefContentID != "" && c.RefContentID != metadata.RefContentID {
 		return false
 	}
 	// Check against allowed owners.

@@ -1,10 +1,9 @@
 package unit
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	content2 "go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
 	"math/rand"
@@ -126,9 +125,9 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing a random text post.
-	node1.UpdateFeed(content2.Metadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       content2.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "123",
 		Signature:  nil,
 	})
@@ -178,21 +177,21 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing three random text posts.
-	node1.UpdateFeed(content2.Metadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       content2.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "1",
 		Signature:  nil,
 	})
-	node1.UpdateFeed(content2.Metadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       content2.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "2",
 		Signature:  nil,
 	})
-	node1.UpdateFeed(content2.Metadata{
+	node1.UpdateFeed(content.Metadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       content2.TEXT,
+		Type:       content.TEXT,
 		ContentID:  "3",
 		Signature:  nil,
 	})
@@ -248,21 +247,21 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 	for i, n := range nodes {
 		// Try to post in the background.
 		go func(nodeIndex int, node z.TestNode) {
-			node.UpdateFeed(content2.Metadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       content2.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-1", nodeIndex),
 				Signature:  nil,
 			})
-			node.UpdateFeed(content2.Metadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       content2.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-2", nodeIndex),
 				Signature:  nil,
 			})
-			node.UpdateFeed(content2.Metadata{
+			node.UpdateFeed(content.Metadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       content2.TEXT,
+				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-3", nodeIndex),
 				Signature:  nil,
 			})
@@ -317,13 +316,13 @@ func Test_Partage_User_State(t *testing.T) {
 	node3.RegisterUser()
 
 	// First, change the username.
-	node1.UpdateFeed(content2.CreateChangeUsernameMetadata(node1.GetUserID(), "Descartes"))
+	node1.UpdateFeed(content.CreateChangeUsernameMetadata(node1.GetUserID(), "Descartes"))
 	time.Sleep(1 * time.Second)
 	require.Equal(t, "Descartes", node1.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node2.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node3.GetUserState(node1.GetUserID()).Username)
 	// Then, follow a user.
-	node1.UpdateFeed(content2.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
+	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
@@ -332,7 +331,7 @@ func Test_Partage_User_State(t *testing.T) {
 	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	// Then, unfollow.
-	node1.UpdateFeed(content2.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
+	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 0)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 0)
@@ -377,21 +376,21 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 
 	// First, request an endorsement.
 	nodes := []z.TestNode{node1, node2, node3}
-	node1.UpdateFeed(content2.CreateEndorsementRequestMetadata(node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorsementRequestMetadata(node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Try self-endorsement. Ideally should not be appended into the blockchain. Even if it does, should not have an effect.
-	node1.UpdateFeed(content2.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Now, let node 2 endorse the node 1.
-	node2.UpdateFeed(content2.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -399,7 +398,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
 	}
 	// Try endorsing through node 2 again. The state should not change.
-	node2.UpdateFeed(content2.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -409,7 +408,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 	// Now, let node 3 endorse the node 1 as well.
 	defaultEndorsementCount := feed.REQUIRED_ENDORSEMENTS
 	feed.REQUIRED_ENDORSEMENTS = 2
-	node3.UpdateFeed(content2.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
+	node3.UpdateFeed(content.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	newCredits := feed.INITIAL_CREDITS + feed.ENDORSEMENT_REWARD
 	// The endorsement handler should be reset and the credits should be updated.
@@ -452,14 +451,14 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	node3.RegisterUser()
 
 	// Share a text post.
-	textBytes := []byte{0, 0, 0, 0}
+	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	contentID, _ := node1.SharePost(bytes.NewReader(textBytes))
+	contentID, _ := node1.ShareTextPost(content.NewTextPost(originalText))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
 	for _, n := range nodes {
 		// First try to discover the posts made by another user.
-		contentIDs, _ := n.DiscoverContent(content2.Filter{
+		contentIDs, _ := n.DiscoverContent(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node2.GetUserID()},
@@ -467,15 +466,15 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 0)
 		// Now, try to discover only UNKNOWN content from node 1.
-		contentIDs, _ = n.DiscoverContent(content2.Filter{
+		contentIDs, _ = n.DiscoverContent(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node1.GetUserID()},
-			Types:    []content2.Type{content2.UNKNOWN},
+			Types:    []content.Type{content.UNKNOWN},
 		})
 		require.Len(t, contentIDs, 0)
 		// Finally, discover the text posts by node 1.
-		contentIDs, _ = n.DiscoverContent(content2.Filter{
+		contentIDs, _ = n.DiscoverContent(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node1.GetUserID()},
@@ -484,7 +483,84 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 		require.Len(t, contentIDs, 1)
 		require.Equal(t, contentID, contentIDs[0])
 		receivedBytes, _ := n.DownloadPost(contentID)
-		require.Equal(t, textBytes, receivedBytes)
+		textPost := content.ParseTextPost(receivedBytes)
+		require.Equal(t, originalText, textPost.Text)
+	}
+}
+
+func Test_Partage_Share_Comment_Post(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Share a text post.
+	originalText := "Lorem ipsum dolor sit amet!!!"
+	originalComment := "Whoa! Nice placeholder you got there, man!"
+	nodes := []z.TestNode{node1, node2, node3}
+	textContentID, _ := node1.ShareTextPost(content.NewTextPost(originalText))
+	time.Sleep(1 * time.Second)
+	// Let each node try to download the file.
+	for _, n := range nodes {
+		contentIDs, _ := n.DiscoverContent(content.Filter{
+			MaxTime:  0,
+			MinTime:  0,
+			OwnerIDs: nil,
+			Types:    nil,
+		})
+		require.Len(t, contentIDs, 1)
+		require.Equal(t, textContentID, contentIDs[0])
+	}
+	// Comment on it.
+	commentContentID, _ := node2.ShareCommentPost(content.NewCommentPost(originalComment), textContentID)
+	time.Sleep(1 * time.Second)
+	// Let each node try to download the comment.
+	for _, n := range nodes {
+		// First try to use wrong reference id.
+		contentIDs, _ := n.DiscoverContent(content.Filter{
+			MaxTime:      0,
+			MinTime:      0,
+			OwnerIDs:     []string{node2.GetUserID()},
+			RefContentID: "123",
+			Types:        nil,
+		})
+		require.Len(t, contentIDs, 0)
+		// Now, use the correct reference id.
+		contentIDs, _ = n.DiscoverContent(content.Filter{
+			MaxTime:      0,
+			MinTime:      0,
+			OwnerIDs:     []string{node2.GetUserID()},
+			RefContentID: textContentID,
+			Types:        nil,
+		})
+		require.Len(t, contentIDs, 1)
+		require.Equal(t, commentContentID, contentIDs[0])
+		receivedBytes, _ := n.DownloadPost(contentIDs[0])
+		commentPost := content.ParseCommentPost(receivedBytes)
+		require.Equal(t, originalComment, commentPost.Text)
 	}
 }
 

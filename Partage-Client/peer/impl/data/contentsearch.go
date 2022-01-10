@@ -66,6 +66,6 @@ func (l *Layer) DownloadContent(contentID string) ([]byte, error) {
 	}
 	metadata := content2.ParseMetadata(metadataBytes)
 	// Then, get the metahash associated with the given post content.
-	metahash, _ := content2.ParseTextPostMetadata(metadata)
+	metahash, _ := content2.ParsePostMetadata(metadata)
 	return l.Download(metahash)
 }

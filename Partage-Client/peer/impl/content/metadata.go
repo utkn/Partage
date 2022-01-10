@@ -1,7 +1,9 @@
 package content
 
 import (
+	"crypto"
 	"encoding/json"
+	"fmt"
 )
 
 // Metadata represents the information about any content on a feed. The information to handle a content are
@@ -10,9 +12,11 @@ type Metadata struct {
 	FeedUserID string
 	Type       Type
 	ContentID  string
-	Timestamp  int
-	Data       []byte
-	Signature  []byte
+	// Used by Comments, Reactions...
+	RefContentID string
+	Timestamp    int
+	Data         []byte
+	Signature    []byte
 }
 
 func ParseMetadata(metadataBytes []byte) Metadata {
@@ -27,4 +31,15 @@ func UnparseMetadata(value Metadata) []byte {
 		return nil
 	}
 	return b
+}
+
+func HashMetadata(index uint, uniqID string, metadata Metadata, prevHash []byte) []byte {
+	h := crypto.SHA256.New()
+	metadataBytes := UnparseMetadata(metadata)
+	h.Write([]byte(fmt.Sprint(index)))
+	h.Write([]byte(uniqID))
+	h.Write(metadataBytes)
+	h.Write(prevHash)
+	hashSlice := h.Sum(nil)
+	return hashSlice
 }

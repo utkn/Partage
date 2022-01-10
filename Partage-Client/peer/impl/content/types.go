@@ -120,6 +120,22 @@ func CreateTextMetadata(userID string, metahash string) Metadata {
 	}
 }
 
+// CreateCommentMetadata ...
+// refContentID is the content id of the post that the comment is made for.
+func CreateCommentMetadata(userID string, refContentID string, metahash string) Metadata {
+	// Create a random content id.
+	contentID := xid.New().String()
+	return Metadata{
+		FeedUserID:   userID,
+		Type:         COMMENT,
+		ContentID:    contentID,
+		RefContentID: refContentID,
+		Timestamp:    utils.Time(),
+		Data:         []byte(metahash),
+		Signature:    nil,
+	}
+}
+
 // ParseUsername extracts the username string from a USERNAME metadata object.
 func ParseUsername(metadata Metadata) (string, error) {
 	if metadata.Type != USERNAME {
@@ -144,9 +160,9 @@ func ParseEndorsedUserID(metadata Metadata) (string, error) {
 	return hex.EncodeToString(metadata.Data), nil
 }
 
-// ParseTextPostMetadata extracts the metahash for the text object from a TEXT metadata object.
-func ParseTextPostMetadata(metadata Metadata) (string, error) {
-	if metadata.Type != TEXT {
+// ParsePostMetadata extracts the metahash for the post object from a TEXT or COMMENT metadata object.
+func ParsePostMetadata(metadata Metadata) (string, error) {
+	if metadata.Type != TEXT && metadata.Type != COMMENT {
 		return "", fmt.Errorf("cannot extract the metahash from non-text metadata")
 	}
 	return string(metadata.Data), nil

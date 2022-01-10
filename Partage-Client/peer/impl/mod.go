@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	content2 "go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"io"
@@ -297,7 +297,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
-func (n *node) UpdateFeed(metadata content2.Metadata) error {
+func (n *node) UpdateFeed(metadata content.Metadata) error {
 	return n.social.ProposeNewPost(metadata)
 }
 
@@ -349,7 +349,7 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 }
 
 // GetFeedContents implements peer.PartageClient
-func (n *node) GetFeedContents(userID string) []content2.Metadata {
+func (n *node) GetFeedContents(userID string) []content.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
 }
 
@@ -358,19 +358,30 @@ func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
 }
 
-// SharePost implements peer.PartageClient.
-func (n *node) SharePost(data io.Reader) (string, error) {
+// ShareTextPost implements peer.PartageClient.
+func (n *node) ShareTextPost(data io.Reader) (string, error) {
 	// First, upload the text.
 	metahash, err := n.data.Upload(data)
 	if err != nil {
 		return "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content2.CreateTextMetadata(n.social.GetUserID(), metahash)
+	metadata := content.CreateTextMetadata(n.social.GetUserID(), metahash)
 	return metadata.ContentID, n.UpdateFeed(metadata)
 }
 
-func (n *node) DiscoverContent(filter content2.Filter) ([]string, error) {
+func (n *node) ShareCommentPost(data io.Reader, refContentID string) (string, error) {
+	// First, upload the comment.
+	metahash, err := n.data.Upload(data)
+	if err != nil {
+		return "", err
+	}
+	// Then, update the feed with the new metadata.
+	metadata := content.CreateCommentMetadata(n.social.GetUserID(), refContentID, metahash)
+	return metadata.ContentID, n.UpdateFeed(metadata)
+}
+
+func (n *node) DiscoverContent(filter content.Filter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
 }
 

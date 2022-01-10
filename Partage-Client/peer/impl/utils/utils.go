@@ -87,16 +87,3 @@ func HashNameBlock(index int, uniqID string, fileName string, metahash string, p
 	hashSlice := h.Sum(nil)
 	return hashSlice
 }
-
-func HashContentMetadata(index int, uniqID string, contentType string, userID string, contentID string,
-	prevHash []byte) []byte {
-	h := crypto.SHA256.New()
-	h.Write([]byte(strconv.Itoa(index)))
-	h.Write([]byte(uniqID))
-	h.Write([]byte(contentType))
-	h.Write([]byte(userID))
-	h.Write([]byte(contentID))
-	h.Write(prevHash)
-	hashSlice := h.Sum(nil)
-	return hashSlice
-}

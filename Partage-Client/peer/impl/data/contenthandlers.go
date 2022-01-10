@@ -59,7 +59,7 @@ func (l *Layer) SearchPostContentRequestMessageHandler(msg types.Message, pkt tr
 	matchedMetadatas := content.GetMatchedContentMetadatas(l.config.BlockchainStorage.GetStore("metadata"), contentFilter)
 	for _, metadata := range matchedMetadatas {
 		// Extract the metahash from the post content metadata.
-		metahash, _ := content.ParseTextPostMetadata(metadata)
+		metahash, _ := content.ParsePostMetadata(metadata)
 		_, chunkHashes, err := utils.GetLocalChunks(l.config.Storage.GetDataBlobStore(), metahash, peer.MetafileSep)
 		// Skip if we couldn't get the chunks, which means metafile is not in the store.
 		if err != nil {

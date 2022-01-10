@@ -49,14 +49,7 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 		// Extract the content metadata from the proposed value to hash it.
 		metadata := content.ParseMetadata(msg.Value.CustomValue)
 		// Create the block hash.
-		blockHash := utils.HashContentMetadata(
-			int(msg.Step),
-			msg.Value.UniqID,
-			metadata.Type.String(),
-			metadata.FeedUserID,
-			metadata.ContentID,
-			prevHash,
-		)
+		blockHash := content.HashMetadata(msg.Step, msg.Value.UniqID, metadata, prevHash)
 		// Create the block.
 		return types.BlockchainBlock{
 			Index:    msg.Step,
