@@ -3,6 +3,7 @@ package content
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer/impl/utils"
 )
 
@@ -107,10 +108,12 @@ func CreateEndorsementRequestMetadata(userID string) Metadata {
 }
 
 func CreateTextMetadata(userID string, metahash string) Metadata {
+	// Create a random content id.
+	contentID := xid.New().String()
 	return Metadata{
 		FeedUserID: userID,
-		Type:       ENDORSEMENT_REQUEST,
-		ContentID:  "",
+		Type:       TEXT,
+		ContentID:  contentID,
 		Timestamp:  utils.Time(),
 		Data:       []byte(metahash),
 		Signature:  nil,

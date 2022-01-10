@@ -9,20 +9,19 @@ import (
 type Metadata struct {
 	FeedUserID string
 	Type       ContentType
-	// TODO: Unused except for tests. Remove it.
-	ContentID string
-	Timestamp int
-	Data      []byte
-	Signature []byte
+	ContentID  string
+	Timestamp  int
+	Data       []byte
+	Signature  []byte
 }
 
-func ParseCustomPaxosValue(customValueBytes []byte) Metadata {
+func ParseMetadata(metadataBytes []byte) Metadata {
 	var data Metadata
-	_ = json.Unmarshal(customValueBytes, &data)
+	_ = json.Unmarshal(metadataBytes, &data)
 	return data
 }
 
-func MakeCustomPaxosValue(value Metadata) []byte {
+func UnparseMetadata(value Metadata) []byte {
 	b, err := json.Marshal(&value)
 	if err != nil {
 		return nil

@@ -14,11 +14,11 @@ import (
 )
 
 // FeedBlockchainUpdater takes a user id and returns a paxos feed blockchain updater.
-func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, userID string) paxos.BlockchainUpdater {
+func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
 		utils.PrintDebug("social", "Updating local feed...")
 		// Update the feed, also appending to the appropriate blockchain.
-		feedStore.UpdateFeed(blockchainStorage, userID, newBlock)
+		feedStore.UpdateFeed(blockchainStorage, metadataStore, userID, newBlock)
 	}
 }
 
@@ -47,7 +47,7 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 			prevHash = lastBlock.Hash
 		}
 		// Extract the content metadata from the proposed value to hash it.
-		metadata := content.ParseCustomPaxosValue(msg.Value.CustomValue)
+		metadata := content.ParseMetadata(msg.Value.CustomValue)
 		// Create the block hash.
 		blockHash := utils.HashContentMetadata(
 			int(msg.Step),
@@ -71,6 +71,6 @@ func NewFeedConsensusProtocol(userID string, config *peer.Configuration, gossip 
 	protocolID := feed.IDFromUserID(userID)
 	return paxos.New(protocolID, config, gossip,
 		FeedBlockGenerator(userID, config.BlockchainStorage),
-		FeedBlockchainUpdater(feedStore, config.BlockchainStorage, userID),
+		FeedBlockchainUpdater(feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata"), userID),
 		FeedProposalChecker(userID))
 }

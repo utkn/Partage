@@ -12,16 +12,18 @@ import (
 // Feed represents a user's feed.
 type Feed struct {
 	sync.RWMutex
-	userState *UserState
-	contents  []content.Metadata
-	UserID    string
+	UserID        string
+	userState     *UserState
+	contents      []content.Metadata
+	metadataStore storage.Store
 }
 
-func NewEmptyFeed(userID string) *Feed {
+func NewEmptyFeed(userID string, metadataStore storage.Store) *Feed {
 	return &Feed{
-		userState: NewInitialUserState(userID),
-		contents:  []content.Metadata{},
-		UserID:    userID,
+		UserID:        userID,
+		userState:     NewInitialUserState(userID),
+		contents:      []content.Metadata{},
+		metadataStore: metadataStore,
 	}
 }
 
@@ -34,9 +36,11 @@ func (f *Feed) Copy() *Feed {
 		contents = append(contents, c)
 	}
 	return &Feed{
+		UserID:    f.UserID,
 		userState: &userState,
 		contents:  contents,
-		UserID:    f.UserID,
+		// The store cannot be copied!
+		metadataStore: f.metadataStore,
 	}
 }
 
@@ -71,6 +75,9 @@ func (f *Feed) processAndAppend(c content.Metadata) {
 	}
 	// Append the metadata.
 	f.contents = append(f.contents, c)
+	// Save the metadata into the metadata storage.
+	metadataBytes := content.UnparseMetadata(c)
+	f.metadataStore.Set(c.ContentID, metadataBytes)
 }
 
 // UpdateEndorsement updates the endorsement given by a different user.
@@ -86,14 +93,14 @@ func (f *Feed) UpdateEndorsement(endorsement content.Metadata) {
 }
 
 // LoadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
-func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userID string) *Feed {
+func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) *Feed {
 	// Get the feed blockchain associated with the given user id.
 	feedBlockchain := blockchainStorage.GetStore(IDFromUserID(userID))
 	// Construct the feed blockchain.
 	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
 	// If the associated blockchain is completely empty, return an empty feedBlockchain.
 	if lastBlockHashHex == "" {
-		return NewEmptyFeed(userID)
+		return NewEmptyFeed(userID, metadataStore)
 	}
 	// The first block has its previous hash field set to this value.
 	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
@@ -114,10 +121,10 @@ func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, userI
 		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
 	}
 	// Create the feed.
-	feed := NewEmptyFeed(userID)
+	feed := NewEmptyFeed(userID, metadataStore)
 	// Now we have a list of blocks. Append them into the feed one by one.
 	for _, block := range blocks {
-		postInfo := content.ParseCustomPaxosValue(block.Value.CustomValue)
+		postInfo := content.ParseMetadata(block.Value.CustomValue)
 		// No need to acquire the lock because there are no other references to this feed yet.
 		feed.processAndAppend(postInfo)
 	}

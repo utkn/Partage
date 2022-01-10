@@ -3,6 +3,7 @@ package unit
 import (
 	"encoding/json"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
@@ -419,6 +420,55 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 	}
 	// Rollback the required endorsement count.
 	feed.REQUIRED_ENDORSEMENTS = defaultEndorsementCount
+}
+
+func Test_Partage_Share_Text_Post(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Share a text post.
+	textBytes := []byte{0, 0, 0, 0}
+	nodes := []z.TestNode{node1, node2, node3}
+	contentID, _ := node1.ShareTextPost(string(textBytes))
+	time.Sleep(1 * time.Second)
+	// Let each node try to download the file.
+	for _, n := range nodes {
+		contentIDs, _ := n.SearchContent(contentfilter.ContentFilter{
+			MaxTime:  0,
+			MinTime:  0,
+			OwnerIDs: nil,
+			Types:    nil,
+		})
+		require.Len(t, contentIDs, 1)
+		require.Equal(t, contentID, contentIDs[0])
+		receivedBytes, _ := n.DownloadPost(contentID)
+		require.Equal(t, textBytes, receivedBytes)
+	}
 }
 
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {

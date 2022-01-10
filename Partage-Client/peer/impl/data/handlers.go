@@ -9,8 +9,11 @@ import (
 )
 
 func (l *Layer) RegisterHandlers() {
+	l.config.MessageRegistry.RegisterMessageCallback(SearchContentReplyMessage{}, l.SearchPostContentReplyMessageHandler)
+	l.config.MessageRegistry.RegisterMessageCallback(SearchContentRequestMessage{}, l.SearchPostContentRequestMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.DataReplyMessage{}, l.DataReplyMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.DataRequestMessage{}, l.DataRequestMessageHandler)
+	// The following handlers are left for backwards compatibility.
 	l.config.MessageRegistry.RegisterMessageCallback(types.SearchReplyMessage{}, l.SearchReplyMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.SearchRequestMessage{}, l.SearchRequestMessageHandler)
 }

@@ -16,7 +16,7 @@ var DEBUG = map[string]bool{
 	"heartbeat":     false,
 	"messaging":     false,
 	"gossip":        false,
-	"data":          false,
+	"data":          true,
 	"acceptor":      false,
 	"proposer":      false,
 	"tlc":           false,

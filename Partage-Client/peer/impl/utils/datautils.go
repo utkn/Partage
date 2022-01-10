@@ -24,8 +24,8 @@ func HashChunk(chunk []byte) ([]byte, string) {
 func Chunkify(chunkSize uint, metafileSep string, reader io.Reader) (map[string][]byte, string, error) {
 	buffer := make([]byte, chunkSize)
 	chunks := make(map[string][]byte)
-	metafileKeyBytes := []byte{}
-	hashList := []string{}
+	var metafileKeyBytes []byte
+	var hashList []string
 	for {
 		n, err := reader.Read(buffer)
 		if err != io.EOF && err != nil {
@@ -71,8 +71,8 @@ func GetLocalChunks(blobStore storage.Store, metahash string, metafilesep string
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get local chunks: %w", err)
 	}
-	chunks := [][]byte{}
-	chunkHashBytes := [][]byte{}
+	var chunks [][]byte
+	var chunkHashBytes [][]byte
 	for _, chunkHash := range chunkHashes {
 		chunk := blobStore.Get(chunkHash)
 		chunks = append(chunks, chunk)
@@ -103,7 +103,7 @@ func IsFullMatchLocally(blobStore storage.Store, metahash string, metafilesep st
 }
 
 func GetMatchedNames(namingStore storage.Store, pattern string) []string {
-	allMatches := []string{}
+	var allMatches []string
 	namingStore.ForEach(
 		func(name string, mh []byte) bool {
 			match, _ := regexp.MatchString(pattern, name)

@@ -56,7 +56,7 @@ func (l *Layer) Register() error {
 
 func (l *Layer) ProposeNewPost(info content.Metadata) error {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
-	val := content.MakeCustomPaxosValue(info)
+	val := content.UnparseMetadata(info)
 	paxosVal := types.PaxosValue{
 		UniqID:      xid.New().String(),
 		CustomValue: val,
