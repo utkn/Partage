@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
@@ -454,11 +455,11 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	// Share a text post.
 	textBytes := []byte{0, 0, 0, 0}
 	nodes := []z.TestNode{node1, node2, node3}
-	contentID, _ := node1.ShareTextPost(string(textBytes))
+	contentID, _ := node1.SharePost(bytes.NewReader(textBytes))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
 	for _, n := range nodes {
-		contentIDs, _ := n.SearchContent(contentfilter.ContentFilter{
+		contentIDs, _ := n.DiscoverContent(contentfilter.ContentFilter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: nil,

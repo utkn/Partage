@@ -9,8 +9,6 @@ import (
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
-	"strings"
-
 	"regexp"
 	"time"
 
@@ -361,10 +359,10 @@ func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
 }
 
-// ShareTextPost implements peer.PartageClient.
-func (n *node) ShareTextPost(text string) (string, error) {
+// SharePost implements peer.PartageClient.
+func (n *node) SharePost(data io.Reader) (string, error) {
 	// First, upload the text.
-	metahash, err := n.data.Upload(strings.NewReader(text))
+	metahash, err := n.data.Upload(data)
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +371,7 @@ func (n *node) ShareTextPost(text string) (string, error) {
 	return metadata.ContentID, n.UpdateFeed(metadata)
 }
 
-func (n *node) SearchContent(filter contentfilter.ContentFilter) ([]string, error) {
+func (n *node) DiscoverContent(filter contentfilter.ContentFilter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
 }
 
