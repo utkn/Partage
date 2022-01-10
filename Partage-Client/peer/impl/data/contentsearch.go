@@ -1,8 +1,10 @@
 package data
 
 import (
+	"fmt"
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"time"
 )
@@ -55,4 +57,16 @@ func (l *Layer) SearchAllPostContent(filter contentfilter.ContentFilter, budget 
 		allMatches = append(allMatches, m)
 	}
 	return allMatches, nil
+}
+
+func (l *Layer) DownloadContent(contentID string) ([]byte, error) {
+	// First, get the metadata with the given content id.
+	metadataBytes := l.config.BlockchainStorage.GetStore("metadata").Get(contentID)
+	if metadataBytes == nil {
+		return nil, fmt.Errorf("unknown content id")
+	}
+	metadata := content.ParseMetadata(metadataBytes)
+	// Then, get the metahash associated with the given post content.
+	metahash, _ := content.ParseTextPostMetadata(metadata)
+	return l.Download(metahash)
 }

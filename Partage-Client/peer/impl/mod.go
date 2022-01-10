@@ -376,13 +376,5 @@ func (n *node) DiscoverContent(filter contentfilter.ContentFilter) ([]string, er
 }
 
 func (n *node) DownloadPost(contentID string) ([]byte, error) {
-	// First, get the metadata with the given content id.
-	metadataBytes := n.conf.BlockchainStorage.GetStore("metadata").Get(contentID)
-	if metadataBytes == nil {
-		return nil, fmt.Errorf("unknown content id")
-	}
-	metadata := content.ParseMetadata(metadataBytes)
-	// Then, get the metahash associated with the given post content.
-	metahash, _ := content.ParseTextPostMetadata(metadata)
-	return n.data.Download(metahash)
+	return n.data.DownloadContent(contentID)
 }
