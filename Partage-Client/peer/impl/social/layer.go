@@ -8,6 +8,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -50,13 +51,12 @@ func (l *Layer) GetUserID() string {
 func (l *Layer) Register() error {
 	utils.PrintDebug("social", l.GetAddress(), "has initiated registration with id", l.UserID)
 	newUserMsg := NewUserMessage{UserID: l.UserID}
-	trspMsg, _ := l.Config.MessageRegistry.MarshalMessage(&newUserMsg)
-	return l.gossip.Broadcast(trspMsg)
+	return l.gossip.BroadcastMessage(newUserMsg)
 }
 
-func (l *Layer) ProposeNewPost(info feed.PostInfo) error {
-	utils.PrintDebug("social", l.UserID, "is proposing a new post")
-	val := feed.MakeCustomPaxosValue(info)
+func (l *Layer) ProposeNewPost(info content.Metadata) error {
+	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
+	val := content.UnparseMetadata(info)
 	paxosVal := types.PaxosValue{
 		UniqID:      xid.New().String(),
 		CustomValue: val,

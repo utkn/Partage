@@ -4,10 +4,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
 	"go.dedis.ch/cs438/peer/impl/social"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
-
 	"regexp"
 	"time"
 
@@ -66,7 +67,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 
 	gossipLayer := gossip.Construct(networkLayer, cryptographyLayer, &conf, quitDistributor)
 	consensusLayer := consensus.Construct(gossipLayer, &conf)
-	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, &conf)
+	dataLayer := data.Construct(gossipLayer, consensusLayer, networkLayer, cryptographyLayer, &conf)
 	var hashedPK [32]byte
 	if isRunningTLS {
 		hashedPK = cryptographyLayer.GetHashedPublicKey()
@@ -290,9 +291,9 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 	return n.data.SearchFirst(pattern, conf)
 }
 
-// TODO: Test this.
-func (n *node) SharePostTest(info feed.PostInfo) error {
-	return n.social.ProposeNewPost(info)
+// UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
+func (n *node) UpdateFeed(metadata content.Metadata) error {
+	return n.social.ProposeNewPost(metadata)
 }
 
 // RegisterUser implements peer.PartageClient
@@ -342,7 +343,40 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 	return n.social.FeedStore.GetRegisteredUsers()
 }
 
-// GetSharedPosts implements peer.PartageClient
-func (n *node) GetSharedPosts(userID string) []feed.FeedContent {
-	return n.social.FeedStore.GetFeed(n.conf.BlockchainStorage, userID).GetContents()
+// GetFeedContents implements peer.PartageClient
+func (n *node) GetFeedContents(userID string) []content.Metadata {
+	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
+}
+
+// GetUserState implements peer.PartageClient
+func (n *node) GetUserState(userID string) feed.UserState {
+	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
+}
+
+// SharePost implements peer.PartageClient.
+func (n *node) SharePost(data io.Reader) (string, error) {
+	// First, upload the text.
+	metahash, err := n.data.Upload(data)
+	if err != nil {
+		return "", err
+	}
+	// Then, update the feed with the new metadata.
+	metadata := content.CreateTextMetadata(n.social.GetUserID(), metahash)
+	return metadata.ContentID, n.UpdateFeed(metadata)
+}
+
+func (n *node) DiscoverContent(filter contentfilter.ContentFilter) ([]string, error) {
+	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
+}
+
+func (n *node) DownloadPost(contentID string) ([]byte, error) {
+	// First, get the metadata with the given content id.
+	metadataBytes := n.conf.BlockchainStorage.GetStore("metadata").Get(contentID)
+	if metadataBytes == nil {
+		return nil, fmt.Errorf("unknown content id")
+	}
+	metadata := content.ParseMetadata(metadataBytes)
+	// Then, get the metahash associated with the given post content.
+	metahash, _ := content.ParseTextPostMetadata(metadata)
+	return n.data.Download(metahash)
 }

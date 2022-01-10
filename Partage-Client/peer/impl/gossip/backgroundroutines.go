@@ -47,12 +47,10 @@ func Heartbeat(n *Layer, interval time.Duration) {
 		default:
 			utils.PrintDebug("heartbeat", n.GetAddress(), "has started heartbeat")
 			emptyMsg := types.EmptyMessage{}
-			transpMsg, err := n.config.MessageRegistry.MarshalMessage(&emptyMsg)
+			err := n.BroadcastMessage(emptyMsg)
 			if err != nil {
-				fmt.Println("error during heartbeat:", err)
-				break
+				fmt.Println("Error during heartbeat", err)
 			}
-			n.Broadcast(transpMsg)
 			time.Sleep(interval)
 		}
 	}

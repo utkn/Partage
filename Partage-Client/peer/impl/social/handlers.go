@@ -20,7 +20,7 @@ func (l *Layer) NewUserMessageHandler(msg types.Message, pkt transport.Packet) e
 		utils.PrintDebug("social", l.GetAddress(), "is registering", newUserMsg.UserID)
 		l.consensus.RegisterProtocol(protocolID, NewFeedConsensusProtocol(newUserMsg.UserID, l.Config, l.gossip, l.FeedStore))
 		// Save the user id into the feed store as well.
-		l.FeedStore.GetFeed(l.Config.BlockchainStorage, newUserMsg.UserID)
+		l.FeedStore.GetFeed(l.Config.BlockchainStorage, l.Config.BlockchainStorage.GetStore("metadata"), newUserMsg.UserID)
 	}
 	return nil
 }

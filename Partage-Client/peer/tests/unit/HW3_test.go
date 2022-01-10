@@ -184,7 +184,8 @@ func Test_HW3_Paxos_Acceptor_Prepare_Correct(t *testing.T) {
 	require.Len(t, private.Recipients, 1)
 	require.Contains(t, private.Recipients, proposer.GetAddress())
 
-	promise := z.GetPaxosPromise(t, private.Msg)
+	c := z.GetConsensus(t, private.Msg)
+	promise := z.GetPaxosPromise(t, &c.InnerMsg)
 
 	require.Equal(t, uint(0), promise.AcceptedID)
 	require.Nil(t, promise.AcceptedValue)
@@ -399,11 +400,11 @@ func Test_HW3_Paxos_Acceptor_Prepare_Already_Promised(t *testing.T) {
 		}
 
 		private := z.GetPrivate(t, rumor.Rumors[0].Msg)
-		if private.Msg.Type != "paxospromise" {
+		c := z.GetConsensus(t, private.Msg)
+		if c.InnerMsg.Type != "paxospromise" {
 			continue
 		}
-
-		promise := z.GetPaxosPromise(t, private.Msg)
+		promise := z.GetPaxosPromise(t, &c.InnerMsg)
 		if promise.AcceptedValue == nil {
 			continue
 		}
@@ -470,8 +471,8 @@ func Test_HW3_Paxos_Acceptor_Propose_Correct(t *testing.T) {
 
 	rumor := z.GetRumor(t, acceptorOuts[0].Msg)
 	require.Len(t, rumor.Rumors, 1)
-
-	accept := z.GetPaxosAccept(t, rumor.Rumors[0].Msg)
+	c := z.GetConsensus(t, rumor.Rumors[0].Msg)
+	accept := z.GetPaxosAccept(t, &c.InnerMsg)
 
 	require.Equal(t, uint(0), accept.ID)
 	require.Equal(t, uint(0), accept.Step)
@@ -518,7 +519,8 @@ func Test_HW3_Paxos_Proposer_Prepare_Promise_Wrong_Step(t *testing.T) {
 	rumor := z.GetRumor(t, packet.Msg)
 	require.Len(t, rumor.Rumors, 1)
 
-	prepare := z.GetPaxosPrepare(t, rumor.Rumors[0].Msg)
+	c := z.GetConsensus(t, rumor.Rumors[0].Msg)
+	prepare := z.GetPaxosPrepare(t, &c.InnerMsg)
 	require.Equal(t, paxosID, prepare.ID)
 	require.Equal(t, uint(0), prepare.Step)
 
@@ -598,7 +600,8 @@ func Test_HW3_Paxos_Proposer_Prepare_Propose_Correct(t *testing.T) {
 	rumor := z.GetRumor(t, packet.Msg)
 	require.Len(t, rumor.Rumors, 1)
 
-	prepare := z.GetPaxosPrepare(t, rumor.Rumors[0].Msg)
+	c := z.GetConsensus(t, rumor.Rumors[0].Msg)
+	prepare := z.GetPaxosPrepare(t, &c.InnerMsg)
 	require.Equal(t, paxosID, prepare.ID)
 	require.Equal(t, uint(0), prepare.Step)
 
@@ -990,7 +993,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node1.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node2.GetAddr(), pkt.Destination)
 
-	prepare := z.GetPaxosPrepare(t, msg)
+	c := z.GetConsensus(t, msg)
+	prepare := z.GetPaxosPrepare(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), prepare.ID)
 	require.Equal(t, uint(0), prepare.Step)
@@ -1010,7 +1014,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Len(t, private.Recipients, 1)
 	require.Contains(t, private.Recipients, node1.GetAddr())
 
-	promise := z.GetPaxosPromise(t, private.Msg)
+	c = z.GetConsensus(t, private.Msg)
+	promise := z.GetPaxosPromise(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), promise.ID)
 	require.Equal(t, uint(0), promise.Step)
@@ -1027,7 +1032,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node1.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node2.GetAddr(), pkt.Destination)
 
-	propose := z.GetPaxosPropose(t, msg)
+	c = z.GetConsensus(t, msg)
+	propose := z.GetPaxosPropose(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), propose.ID)
 	require.Equal(t, uint(0), propose.Step)
@@ -1043,7 +1049,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node1.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node2.GetAddr(), pkt.Destination)
 
-	accept := z.GetPaxosAccept(t, msg)
+	c = z.GetConsensus(t, msg)
+	accept := z.GetPaxosAccept(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), accept.ID)
 	require.Equal(t, uint(0), accept.Step)
@@ -1059,7 +1066,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node1.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node2.GetAddr(), pkt.Destination)
 
-	tlc := z.GetTLC(t, msg)
+	c = z.GetConsensus(t, msg)
+	tlc := z.GetTLC(t, &c.InnerMsg)
 
 	require.Equal(t, uint(0), tlc.Step)
 	require.Equal(t, uint(0), tlc.Block.Index)
@@ -1089,7 +1097,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Len(t, private.Recipients, 1)
 	require.Contains(t, private.Recipients, node1.GetAddr())
 
-	promise = z.GetPaxosPromise(t, private.Msg)
+	c = z.GetConsensus(t, private.Msg)
+	promise = z.GetPaxosPromise(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), promise.ID)
 	require.Equal(t, uint(0), promise.Step)
@@ -1106,7 +1115,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node2.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node1.GetAddr(), pkt.Destination)
 
-	accept = z.GetPaxosAccept(t, msg)
+	c = z.GetConsensus(t, msg)
+	accept = z.GetPaxosAccept(t, &c.InnerMsg)
 
 	require.Equal(t, uint(1), accept.ID)
 	require.Equal(t, uint(0), accept.Step)
@@ -1122,7 +1132,8 @@ func Test_HW3_Tag_Paxos_Simple_Consensus(t *testing.T) {
 	require.Equal(t, node2.GetAddr(), pkt.RelayedBy)
 	require.Equal(t, node1.GetAddr(), pkt.Destination)
 
-	tlc = z.GetTLC(t, msg)
+	c = z.GetConsensus(t, msg)
+	tlc = z.GetTLC(t, &c.InnerMsg)
 
 	require.Equal(t, uint(0), tlc.Step)
 	require.Equal(t, uint(0), tlc.Block.Index)
@@ -1227,7 +1238,8 @@ func Test_HW3_Tag_Paxos_No_Consensus(t *testing.T) {
 
 	msg, _ := getRumor(t, outs, 1)
 	require.NotNil(t, msg)
-	require.Equal(t, "paxosprepare", msg.Type)
+	c := z.GetConsensus(t, msg)
+	require.Equal(t, "paxosprepare", c.InnerMsg.Type)
 
 	// > the second rumor sent must be the private rumor from A to A
 
@@ -1235,13 +1247,15 @@ func Test_HW3_Tag_Paxos_No_Consensus(t *testing.T) {
 	require.NotNil(t, msg)
 
 	private := z.GetPrivate(t, msg)
-	require.Equal(t, "paxospromise", private.Msg.Type)
+	c = z.GetConsensus(t, private.Msg)
+	require.Equal(t, "paxospromise", c.InnerMsg.Type)
 
 	// > the third rumor sent must be the second attempt with a paxos prepare
 
 	msg, _ = getRumor(t, outs, 3)
 	require.NotNil(t, msg)
-	require.Equal(t, "paxosprepare", msg.Type)
+	c = z.GetConsensus(t, msg)
+	require.Equal(t, "paxosprepare", c.InnerMsg.Type)
 
 	// > the fourth rumor sent must be the private rumor from A to A, in reply
 	// to the second attempt
@@ -1250,7 +1264,8 @@ func Test_HW3_Tag_Paxos_No_Consensus(t *testing.T) {
 	require.NotNil(t, msg)
 
 	private = z.GetPrivate(t, msg)
-	require.Equal(t, "paxospromise", private.Msg.Type)
+	c = z.GetConsensus(t, private.Msg)
+	require.Equal(t, "paxospromise", c.InnerMsg.Type)
 }
 
 // 3-16
@@ -1562,9 +1577,13 @@ func getTLCMessagesFromRumors(t *testing.T, outs []transport.Packet, addr string
 	for _, msg := range outs {
 		if msg.Msg.Type == "rumor" {
 			rumor := z.GetRumor(t, msg.Msg)
-			if len(rumor.Rumors) == 1 && rumor.Rumors[0].Msg.Type == "tlc" {
+			if len(rumor.Rumors) == 0 || rumor.Rumors[0].Msg.Type != "consensus" {
+				continue
+			}
+			c := z.GetConsensus(t, rumor.Rumors[0].Msg)
+			if len(rumor.Rumors) == 1 && c.InnerMsg.Type == "tlc" {
 				if rumor.Rumors[0].Origin == addr {
-					tlc := z.GetTLC(t, rumor.Rumors[0].Msg)
+					tlc := z.GetTLC(t, &c.InnerMsg)
 					result = append(result, tlc)
 				}
 			}
@@ -1583,9 +1602,13 @@ func getProposeMessagesFromRumors(t *testing.T, outs []transport.Packet, addr st
 	for _, msg := range outs {
 		if msg.Msg.Type == "rumor" {
 			rumor := z.GetRumor(t, msg.Msg)
-			if len(rumor.Rumors) == 1 && rumor.Rumors[0].Msg.Type == "paxospropose" {
+			if len(rumor.Rumors) == 0 || rumor.Rumors[0].Msg.Type != "consensus" {
+				continue
+			}
+			c := z.GetConsensus(t, rumor.Rumors[0].Msg)
+			if len(rumor.Rumors) == 1 && c.InnerMsg.Type == "paxospropose" {
 				if rumor.Rumors[0].Origin == addr {
-					propose := z.GetPaxosPropose(t, rumor.Rumors[0].Msg)
+					propose := z.GetPaxosPropose(t, &c.InnerMsg)
 					result = append(result, propose)
 				}
 			}

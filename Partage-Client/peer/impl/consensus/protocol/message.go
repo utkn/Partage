@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/registry"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
@@ -29,13 +28,11 @@ func (c ConsensusMessage) HTML() string {
 	return "<>"
 }
 
-func WrapInConsensusPacket(protocolID string, config *peer.Configuration, tMsg transport.Message) transport.Message {
-	msg := ConsensusMessage{
+func WrapInConsensusMessage(protocolID string, tMsg transport.Message) ConsensusMessage {
+	return ConsensusMessage{
 		ProtocolID: protocolID,
 		InnerMsg:   tMsg,
 	}
-	t, _ := config.MessageRegistry.MarshalMessage(&msg)
-	return t
 }
 
 func UnwrapConsensusMessage(consensusMsg ConsensusMessage) types.Message {
