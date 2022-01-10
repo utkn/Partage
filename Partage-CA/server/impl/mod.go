@@ -260,7 +260,6 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 		fmt.Println("[ERROR] storing public key in persistent-memory...", err)
 		return
 	}
-	//s.usersCatalog[clientPublicKeyHash] = struct{}{}
 	// Record e-mail as taken
 	err = AppendToFile([]byte(clientEmail+"\n"),s.fpEmails)
 	if err != nil {
@@ -268,7 +267,6 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 		fmt.Println("[ERROR] storing e-mail in persistent-memory...", err)
 		return
 	}
-	//s.emailsCatalog[clientEmail] = struct{}{}
 	s.catalogMutex.Unlock()
 
 	// Prepare registration message to send (SignedCertificate,PublicKeySignature)
@@ -320,9 +318,12 @@ func initTLSSocket(address string) (net.Listener, *x509.Certificate, *rsa.Privat
 }
 
 func (s *certificateAuthority) SendVerificationCode(email string) (string,error){
-	//challenge:=strconv.Itoa(GenerateChallenge()) //TODO: !
-	challenge:=strconv.Itoa(12348765)
-
+	var challenge string
+	if server.TESTING{
+		challenge=strconv.Itoa(12348765)
+	}else{
+		challenge=strconv.Itoa(GenerateChallenge())	
+	}
 	msg := []byte("From: "+server.SmtpUsername+"\r\n" +
         "To: "+email+"\r\n" +
         "Subject: Partage Verification Code\r\n\r\n" +
