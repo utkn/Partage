@@ -107,14 +107,14 @@ func CreateEndorsementRequestMetadata(userID string) Metadata {
 	}
 }
 
-func CreateTextMetadata(userID string, metahash string) Metadata {
+func CreateTextMetadata(userID string, timestamp int64, metahash string) Metadata {
 	// Create a random content id.
 	contentID := xid.New().String()
 	return Metadata{
-		FeedUserID: userID,
 		Type:       TEXT,
 		ContentID:  contentID,
-		Timestamp:  utils.Time(),
+		FeedUserID: userID,
+		Timestamp:  timestamp,
 		Data:       []byte(metahash),
 		Signature:  nil,
 	}
@@ -122,15 +122,15 @@ func CreateTextMetadata(userID string, metahash string) Metadata {
 
 // CreateCommentMetadata ...
 // refContentID is the content id of the post that the comment is made for.
-func CreateCommentMetadata(userID string, refContentID string, metahash string) Metadata {
+func CreateCommentMetadata(userID string, timestamp int64, refContentID string, metahash string) Metadata {
 	// Create a random content id.
 	contentID := xid.New().String()
 	return Metadata{
-		FeedUserID:   userID,
 		Type:         COMMENT,
 		ContentID:    contentID,
+		FeedUserID:   userID,
 		RefContentID: refContentID,
-		Timestamp:    utils.Time(),
+		Timestamp:    timestamp,
 		Data:         []byte(metahash),
 		Signature:    nil,
 	}

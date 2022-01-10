@@ -8,9 +8,9 @@ import (
 // Filter represents a filter that can be used to search content through the network.
 type Filter struct {
 	// MaxTime denotes the highest end of the time range. Setting to 0 disables it.
-	MaxTime int
+	MaxTime int64
 	// MinTime denotes the lowest end of the time range. Setting to 0 disables it.
-	MinTime int
+	MinTime int64
 	// OwnerIDs filters by the owner user ids. Setting to empty list (nil) disables it.
 	OwnerIDs []string
 	// Types filters by the list of types. Setting to empty list (nil) disables it.

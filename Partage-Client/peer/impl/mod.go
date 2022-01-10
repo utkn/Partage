@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -359,25 +360,25 @@ func (n *node) GetUserState(userID string) feed.UserState {
 }
 
 // ShareTextPost implements peer.PartageClient.
-func (n *node) ShareTextPost(data io.Reader) (string, error) {
+func (n *node) ShareTextPost(post content.TextPost) (string, error) {
 	// First, upload the text.
-	metahash, err := n.data.Upload(data)
+	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))
 	if err != nil {
 		return "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateTextMetadata(n.social.GetUserID(), metahash)
+	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
 	return metadata.ContentID, n.UpdateFeed(metadata)
 }
 
-func (n *node) ShareCommentPost(data io.Reader, refContentID string) (string, error) {
+func (n *node) ShareCommentPost(post content.CommentPost) (string, error) {
 	// First, upload the comment.
-	metahash, err := n.data.Upload(data)
+	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseCommentPost(post)))
 	if err != nil {
 		return "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateCommentMetadata(n.social.GetUserID(), refContentID, metahash)
+	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
 	return metadata.ContentID, n.UpdateFeed(metadata)
 }
 

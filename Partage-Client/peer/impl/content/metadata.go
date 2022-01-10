@@ -14,7 +14,7 @@ type Metadata struct {
 	ContentID  string
 	// Used by Comments, Reactions...
 	RefContentID string
-	Timestamp    int
+	Timestamp    int64
 	Data         []byte
 	Signature    []byte
 }

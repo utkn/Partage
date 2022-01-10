@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var DEBUG = map[string]bool{
@@ -32,8 +33,8 @@ func PrintDebug(tag string, objs ...interface{}) {
 	}
 }
 
-func Time() int {
-	return 0
+func Time() int64 {
+	return time.Now().UTC().Unix()
 }
 
 func ChooseRandom(options map[string]struct{}, exclusion map[string]struct{}) (string, error) {

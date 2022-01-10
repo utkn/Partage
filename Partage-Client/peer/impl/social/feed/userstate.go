@@ -7,7 +7,7 @@ import (
 
 type Endorsement struct {
 	UserID            string
-	LastRequestedTime int
+	LastRequestedTime int64
 	GivenEndorsements int
 	EndorsedUsers     map[string]struct{}
 }
@@ -34,7 +34,7 @@ func (e *Endorsement) Copy() Endorsement {
 	}
 }
 
-func (e *Endorsement) Request(time int) {
+func (e *Endorsement) Request(time int64) {
 	e.LastRequestedTime = time
 }
 
@@ -45,7 +45,7 @@ func (e *Endorsement) Reset() {
 }
 
 // Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
-func (e *Endorsement) Update(currTime int, endorserID string) bool {
+func (e *Endorsement) Update(currTime int64, endorserID string) bool {
 	// If there is no current endorsement request going on, do nothing.
 	if e.LastRequestedTime < 0 {
 		return false

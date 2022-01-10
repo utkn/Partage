@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
+	"go.dedis.ch/cs438/peer/impl/utils"
 	"io"
 	"math/rand"
 	"sort"
@@ -453,7 +454,7 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	contentID, _ := node1.ShareTextPost(content.NewTextPost(originalText))
+	contentID, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
 	for _, n := range nodes {
@@ -521,7 +522,7 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	originalComment := "Whoa! Nice placeholder you got there, man!"
 	nodes := []z.TestNode{node1, node2, node3}
-	textContentID, _ := node1.ShareTextPost(content.NewTextPost(originalText))
+	textContentID, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
 	for _, n := range nodes {
@@ -535,7 +536,7 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 		require.Equal(t, textContentID, contentIDs[0])
 	}
 	// Comment on it.
-	commentContentID, _ := node2.ShareCommentPost(content.NewCommentPost(originalComment), textContentID)
+	commentContentID, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the comment.
 	for _, n := range nodes {
