@@ -9,7 +9,7 @@ type PartageClient interface {
 	RegisterUser() error
 	SharePost(content string) error
 	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
-	SharePostTest(info feed.PostInfo) error
+	UpdateFeed(info feed.PostInfo) error
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}

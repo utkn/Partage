@@ -297,7 +297,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // TODO: Test this.
-func (n *node) SharePostTest(info feed.PostInfo) error {
+func (n *node) UpdateFeed(info feed.PostInfo) error {
 	return n.social.ProposeNewPost(info)
 }
 

@@ -26,7 +26,8 @@ func (a *Acceptor) HandlePrepare(msg types.PaxosPrepareMessage) error {
 	a.paxos.Clock.Lock.Lock()
 	// Ignore when receivedStep != clock.Step || receivedID <= clock.MaxID
 	if a.paxos.Clock.ShouldIgnorePrepare(msg.Step, int(msg.ID)) {
-		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), a.paxos.Clock.String(), "ignored the prepare.")
+		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "with clock", a.paxos.Clock,
+			"ignored the prepare with step =", msg.Step, "id =", msg.ID)
 		a.paxos.Clock.Lock.Unlock()
 		return nil
 	}
@@ -83,7 +84,6 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is sending back an accept for ID", msg.ID)
 	acceptTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&acceptMsg)
 	// Broadcast accept messages.
-	println(a.paxos.Gossip.GetAddress(), "IS BROADCASTING THE ACCEPTULLAH!")
 	return a.paxos.Gossip.BroadcastMessage(protocol.WrapInConsensusMessage(a.paxos.ProtocolID, acceptTranspMsg))
 }
 

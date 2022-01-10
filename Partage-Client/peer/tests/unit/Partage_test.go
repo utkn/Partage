@@ -94,27 +94,37 @@ func Test_Partage_Late_Registration(t *testing.T) {
 	}
 }
 
-func Test_Partage_Single_Post(t *testing.T) {
-	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(2), z.WithPaxosID(1))
+func Test_Partage_Single_Post_Single_Node(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node1.Stop()
-	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(2), z.WithPaxosID(2))
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node2.Stop()
-	//node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
-	//defer node3.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
 
-	node1.AddPeer(node2.GetAddr())
-	node2.AddPeer(node1.GetAddr())
-	//node1.AddPeer(node2.GetAddr(), node3.GetAddr())
-	//node2.AddPeer(node1.GetAddr(), node3.GetAddr())
-	//node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
 
 	// Register the nodes.
 	node1.RegisterUser()
 	node2.RegisterUser()
-	//node3.RegisterUser()
+	node3.RegisterUser()
 
 	// The first node is sharing a random text post.
-	node1.SharePostTest(feed.PostInfo{
+	node1.UpdateFeed(feed.PostInfo{
 		FeedUserID:    node1.GetUserID(),
 		PostType:      "text",
 		PostContentID: "123",
@@ -122,43 +132,157 @@ func Test_Partage_Single_Post(t *testing.T) {
 	})
 	time.Sleep(1 * time.Second)
 
-	require.Len(t, node1.GetSharedPosts(node1.GetUserID()), 1)
-	require.Len(t, node2.GetSharedPosts(node1.GetUserID()), 1)
-	//require.Len(t, node3.GetSharedPosts(node1.GetUserID()), 1)
+	// Get the posts known by all three nodes.
+	n1Posts := node1.GetSharedPosts(node1.GetUserID())
+	n2Posts := node2.GetSharedPosts(node1.GetUserID())
+	n3Posts := node3.GetSharedPosts(node1.GetUserID())
+
+	// Make sure that the feeds are identical.
+	require.Len(t, n1Posts, 1)
+	require.Len(t, n2Posts, 1)
+	require.Len(t, n3Posts, 1)
+	require.Equal(t, "123", n1Posts[0].PostContentID)
+	require.Equal(t, "123", n2Posts[0].PostContentID)
+	require.Equal(t, "123", n3Posts[0].PostContentID)
 }
 
-func Test_Partage_Three_Posts(t *testing.T) {
-	return
-	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(1))
+func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node1.Stop()
-	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(2))
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node2.Stop()
-	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node3.Stop()
 
 	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
 	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
 	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
 
-	node1.SharePostTest(feed.PostInfo{
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// The first node is sharing three random text posts.
+	node1.UpdateFeed(feed.PostInfo{
 		FeedUserID:    node1.GetUserID(),
 		PostType:      "text",
 		PostContentID: "1",
 		Signature:     nil,
 	})
-	node1.SharePostTest(feed.PostInfo{
+	node1.UpdateFeed(feed.PostInfo{
 		FeedUserID:    node1.GetUserID(),
 		PostType:      "text",
 		PostContentID: "2",
 		Signature:     nil,
 	})
-	node1.SharePostTest(feed.PostInfo{
+	node1.UpdateFeed(feed.PostInfo{
 		FeedUserID:    node1.GetUserID(),
 		PostType:      "text",
 		PostContentID: "3",
 		Signature:     nil,
 	})
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
+
+	// Get the posts known by all three nodes.
+	n1Posts := node1.GetSharedPosts(node1.GetUserID())
+	n2Posts := node2.GetSharedPosts(node1.GetUserID())
+	n3Posts := node3.GetSharedPosts(node1.GetUserID())
+
+	// Make sure that the feeds are identical.
+	require.Len(t, n1Posts, 3)
+	require.Len(t, n2Posts, 3)
+	require.Len(t, n3Posts, 3)
+	for i := 1; i <= 3; i++ {
+		require.Equal(t, fmt.Sprint(i), n1Posts[i-1].PostContentID)
+		require.Equal(t, fmt.Sprint(i), n2Posts[i-1].PostContentID)
+		require.Equal(t, fmt.Sprint(i), n3Posts[i-1].PostContentID)
+	}
+}
+
+func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	nodes := []z.TestNode{node1, node2, node3}
+	// Each node is sharing three random text posts.
+	for i, n := range nodes {
+		// Try to post in the background.
+		go func(nodeIndex int, node z.TestNode) {
+			node.UpdateFeed(feed.PostInfo{
+				FeedUserID:    node1.GetUserID(),
+				PostType:      "text",
+				PostContentID: fmt.Sprintf("%d-1", nodeIndex),
+				Signature:     nil,
+			})
+			node.UpdateFeed(feed.PostInfo{
+				FeedUserID:    node1.GetUserID(),
+				PostType:      "text",
+				PostContentID: fmt.Sprintf("%d-2", nodeIndex),
+				Signature:     nil,
+			})
+			node.UpdateFeed(feed.PostInfo{
+				FeedUserID:    node1.GetUserID(),
+				PostType:      "text",
+				PostContentID: fmt.Sprintf("%d-3", nodeIndex),
+				Signature:     nil,
+			})
+		}(i, n)
+	}
+	// Wait for all the nodes to finalize.
+	time.Sleep(5 * time.Second)
+	// Get the posts known by all three nodes for every node.
+	for nodeIndex, n := range nodes {
+		n1Posts := n.GetSharedPosts(n.GetUserID())
+		n2Posts := node2.GetSharedPosts(n.GetUserID())
+		n3Posts := node3.GetSharedPosts(n.GetUserID())
+		// Make sure that the saved feeds for n are identical at every node.
+		require.Len(t, n1Posts, 3)
+		require.Len(t, n2Posts, 3)
+		require.Len(t, n3Posts, 3)
+		for i := 1; i <= 3; i++ {
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n1Posts[i-1].PostContentID)
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n2Posts[i-1].PostContentID)
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n3Posts[i-1].PostContentID)
+		}
+	}
 }
 
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {

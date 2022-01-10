@@ -9,6 +9,7 @@ import (
 )
 
 // Broadcast broadcasts the given transport message to the network using rumors. The message will also be handled locally.
+// Kept as public for backward compatibility.
 func (l *Layer) Broadcast(msg transport.Message) error {
 	// First, locally process the message.
 	localHeader := transport.NewHeader(l.GetAddress(), l.GetAddress(), l.GetAddress(), 0)
@@ -16,7 +17,7 @@ func (l *Layer) Broadcast(msg transport.Message) error {
 		Header: &localHeader,
 		Msg:    &msg,
 	}
-	// Locally handle the message in the background -- simulate a message receipt.
+	// Locally handle the message in the background, simulating a message receipt.
 	go func() {
 		err := l.config.MessageRegistry.ProcessPacket(localPkt.Copy())
 		if err != nil {
@@ -32,6 +33,8 @@ func (l *Layer) broadcastAway(msg transport.Message) error {
 	rumor := types.Rumor{}
 	rumor.Msg = &msg
 	rumor.Origin = l.GetAddress()
+	// Beginning of critical section (atomic update of sequence numbers).
+	l.rumorLock.Lock()
 	rumor.Sequence = l.view.GetSequence(l.GetAddress()) + 1
 	if l.cryptography != nil {
 		if err := rumor.AddValidation(l.cryptography.GetPrivateKey(), l.cryptography.GetSignedPublicKey()); err != nil {
@@ -39,20 +42,21 @@ func (l *Layer) broadcastAway(msg transport.Message) error {
 			return err
 		}
 	}
+	l.view.SaveRumor(rumor)
+	// End of critical section.
+	l.rumorLock.Unlock()
 	// Wrap the rumor in a rumors message.
 	rumorsMsg := types.RumorsMessage{}
 	rumorsMsg.Rumors = append(rumorsMsg.Rumors, rumor)
-	// Convert the rumors message into a transport message.
-	rumorsTranspMsg, err := l.config.MessageRegistry.MarshalMessage(&rumorsMsg)
+	utils.PrintDebug("communication", l.GetAddress(), "is sending a rumors msg with", msg.Type)
+	return l.sendRumors(rumorsMsg, make(map[string]struct{}))
+}
+
+func (l *Layer) sendRumors(msg types.RumorsMessage, unresponsiveNeighbors map[string]struct{}) error {
+	rumorsTranspMsg, err := l.config.MessageRegistry.MarshalMessage(&msg)
 	if err != nil {
 		return fmt.Errorf("could not marshal rumors message into a transport message: %w", err)
 	}
-	l.view.SaveRumor(rumor)
-	utils.PrintDebug("communication", l.GetAddress(), "is sending a rumors msg with", msg.Type)
-	return l.sendRumors(rumorsTranspMsg, make(map[string]struct{}))
-}
-
-func (l *Layer) sendRumors(msg transport.Message, unresponsiveNeighbors map[string]struct{}) error {
 	// Prepare the message to be sent to a random neighbor.
 	randNeighbor, err := l.network.ChooseRandomNeighbor(unresponsiveNeighbors)
 	// If we could not find a random neighbor, terminate broadcast.
@@ -64,10 +68,10 @@ func (l *Layer) sendRumors(msg transport.Message, unresponsiveNeighbors map[stri
 	header := transport.NewHeader(l.GetAddress(), l.GetAddress(), randNeighbor, 0)
 	pkt := transport.Packet{
 		Header: &header,
-		Msg:    &msg,
+		Msg:    &rumorsTranspMsg,
 	}
 	// Then, send it to the random peer selected without using the routing table.
-	utils.PrintDebug("network", l.GetAddress(), "is sending", randNeighbor, "a", pkt.Msg.Type)
+	utils.PrintDebug("network", l.GetAddress(), "is sending", randNeighbor, "a rumor with embedded", msg.Rumors[0].Msg.Type)
 	if l.cryptography != nil {
 		//send it via the cryptography layer (signed header)
 		err = l.cryptography.Send(randNeighbor, pkt.Copy(), time.Second*5)

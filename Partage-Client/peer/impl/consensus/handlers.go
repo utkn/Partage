@@ -20,14 +20,13 @@ func (l *Layer) RegisterHandlers() {
 // HandleConsensusMessage forwards a consensus message to registered protocols.
 func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
 	consensusMsg, ok := msg.(*protocol.ConsensusMessage)
+	// Route the consensus message to the appropriate protocol. Let them decide what to do with it.
 	if !ok {
 		return fmt.Errorf("could not parse the received consensus msg")
 	}
-	// Route the consensus message to the appropriate protocol. Let them decide what to do with it.
-	if consensusMsg.InnerMsg.Type == "paxosaccept" {
-		println(l.GetAddress(), "HAS RECEIVED AN ACCEPT FROM", pkt.Header.Source)
-	}
+	l.RLock()
 	p, ok := l.protocols[consensusMsg.ProtocolID]
+	l.RUnlock()
 	if !ok {
 		return fmt.Errorf("consensus layer could not find a protocol with id %s", consensusMsg.ProtocolID)
 	}
