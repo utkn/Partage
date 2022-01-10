@@ -482,18 +482,22 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	net1 := tcpFac()
 	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0", z.WithMessage(fake, handler1), z.WithAntiEntropy(time.Millisecond*50))
 	defer node1.Stop()
+	//node1.RegisterUser()
 
 	net2 := tcpFac()
 	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2), z.WithAntiEntropy(time.Millisecond*50))
 	defer node2.Stop()
+	//node2.RegisterUser()
 
 	net3 := tcpFac()
 	node3 := z.NewTestNode(t, peerFac, net3, "127.0.0.1:0", z.WithMessage(fake, handler3), z.WithAntiEntropy(time.Millisecond*50))
 	defer node3.Stop()
+	//node3.RegisterUser()
 
 	net4 := tcpFac()
 	node4 := z.NewTestNode(t, peerFac, net4, "127.0.0.1:0", z.WithMessage(fake, handler4), z.WithAntiEntropy(time.Millisecond*50))
 	defer node4.Stop()
+	//node4.RegisterUser()
 
 	node1.AddPeer(node2.GetAddr())
 	node1.AddPeer(node3.GetAddr())

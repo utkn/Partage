@@ -7,8 +7,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509/pkix"
 	"fmt"
 	"io"
+	"strconv"
 
 	"crypto/tls"
 	"crypto/x509"
@@ -16,18 +18,21 @@ import (
 	"errors"
 
 	"math/big"
+	mathRand "math/rand"
 	"os"
 	"strings"
 	"time"
 )
 
-const dir = "Partage/Partage-Client/partage-storage/crypto/"
+const TESTING = true //TODO: change!!
 
-const certificatePath = dir + "cert.pem"
-const keyPath = dir + "key.pem"
-const signaturePath = dir + "publickey.signature"
-
-const CACertificatePath = dir + "CA/cert.pem"
+const dir = "Partage/Partage-Client/partage-storage/"
+const cryptoDir =dir+"crypto/"
+const certificatePath = cryptoDir + "cert.pem"
+const keyPath = cryptoDir + "key.pem"
+const signaturePath = cryptoDir + "publickey.signature"
+const emailPath = dir+"my.email"
+const CACertificatePath = cryptoDir + "CA/cert.pem"
 
 func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 	if fromPersistentMem {
@@ -56,7 +61,7 @@ func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &cert, nil
+			return &cert,nil
 		}
 		return &cert, nil
 
@@ -163,20 +168,6 @@ func loadCertificate(path string) (*x509.Certificate, error) {
 	return PemToCertificate(data)
 }
 
-/*
-//this
-func loadKey(path string) (*rsa.PrivateKey, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, errors.New("inexistent key file at " + path)
-	}
-	privKey, err := x509.ParsePKCS1PrivateKey(data)
-	if err != nil {
-		return nil, err
-	}
-	return privKey.(*rsa.PrivateKey), nil
-}
-*/
 func publicKeyToPem(publicKey *rsa.PublicKey) ([]byte, error) {
 	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
@@ -267,22 +258,42 @@ func generateKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, 1024)
 }
 
+func loadEmailFromFile() string{
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	data, err := os.ReadFile(rt+emailPath)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
 //used to generate a signed certificate (if signingAuthority==nil, certificate is self-signed)
 //returns new certificate as ASN.1 DER data (can be parsed to x509.Certificate object with x509.ParseCertificate(der []byte) function)
 func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Certificate) (*x509.Certificate, error) {
+	// Load e-mail from file!
+	var email string
+	if TESTING{
+		mathRand.Seed(time.Now().Unix())
+		email="abdefg"+strconv.Itoa(mathRand.Intn(99999999))+"@gmail.com" //testing purposes	
+	}else{
+		email=loadEmailFromFile() 
+	}
+	
 	//each certificate needs a unique serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return nil, err
 	}
-
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(1 * 365 * 24 * time.Hour), //TODO: time validity of the certificate (currently valid for 1 year)
+		NotAfter:              time.Now().Add(1 * 365 * 24 * time.Hour), //(currently valid for 1 year)
 		IsCA:                  true,
 		BasicConstraintsValid: true,
+		Subject: pkix.Name{
+			Organization: []string{email},
+		},
 	}
 
 	//create certificate from the template

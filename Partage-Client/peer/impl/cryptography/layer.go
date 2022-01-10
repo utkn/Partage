@@ -29,7 +29,7 @@ func Construct(network *network.Layer, config *peer.Configuration) *Layer {
 	if !ok {
 		panic("node must have a tcp socket in order to use tls")
 	}
-	_, ok = socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+	_, ok = socket.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey)
 	if !ok {
 		panic("node must have a RSA based TLS Certificate")
 	}
@@ -117,7 +117,7 @@ func (l *Layer) GenerateValidation(msg *transport.Message) (*transport.Validatio
 } */
 
 func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
-	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+	return l.socket.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey)
 }
 
 func (l *Layer) GetUserFromCatalog(hashedPK [32]byte) (*transport.SignedPublicKey, bool) {

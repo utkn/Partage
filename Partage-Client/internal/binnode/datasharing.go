@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"time"
-
 	"go.dedis.ch/cs438/gui/httpnode/types"
 	"go.dedis.ch/cs438/peer"
 	"golang.org/x/xerrors"

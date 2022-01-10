@@ -18,6 +18,12 @@ const serverAddr = "127.0.0.1:1234" //Certificate Authority Server address
 
 // Since we are using Certificates in order to authenticate users, the users authentication is directly related to the TLS Socket
 func (tlsSock *Socket) RegisterUser() error {
+	//check if Certificate in use is self-signed, if so..
+	fmt.Println("DEBUG: registering new user...")
+	if res, _ := utils.TLSIsSelfSigned(tlsSock.GetTLSCertificate()); !res {
+		fmt.Println("user already registered")
+		return nil
+	}
 	bufSize := 65000
 	buf := make([]byte, bufSize)
 	var msg types.CertificateAuthorityMessage
@@ -38,7 +44,8 @@ func (tlsSock *Socket) RegisterUser() error {
 		}
 		return err
 	}
-	deadline := time.Now().Add(10 * time.Second) // Waits for CA-server response for..10 seconds
+
+	deadline := time.Now().Add(15 * time.Second) // Waits for CA-server response for..15 seconds
 	err = conn.SetReadDeadline(deadline)
 	if err != nil {
 		fmt.Println("[ERROR] setting read timeout with CA server...", err)
@@ -46,7 +53,7 @@ func (tlsSock *Socket) RegisterUser() error {
 	}
 	size, err := conn.Read(buf)
 	if err != nil {
-		fmt.Println("CA server didn't respond...", err)
+		fmt.Println("CA server didn't respond...try again later!", err)
 		return err
 	}
 	err = msg.Decode(buf[:size])
@@ -69,7 +76,65 @@ func (tlsSock *Socket) RegisterUser() error {
 			}
 		}
 	}
+	//PROCESS CA response
+	if msg.Type == "ERROR" {
+		fmt.Println("[ERROR] " + string(msg.Payload))
+		return errors.New(string(msg.Payload))
+	}else if msg.Type == "WARNING"{
+		fmt.Println(string(msg.Payload))
+		var input string
+		if utils.TESTING{
+			time.Sleep(time.Second*2)
+			input="12348765"
+		}else{
+			fmt.Print("[VERIFICATION CODE]: ")
+			//Read from stdin
+			fmt.Scanln(&input)
+		}
+		fmt.Println("Sending "+input+" code!")
+		codeMsg:=&types.CertificateAuthorityMessage{
+			Type: "CODE",
+			Payload: []byte(input),
+		}
+		bytes,_:=codeMsg.Encode()
+		conn.Write(bytes)
+	} else {
+		fmt.Println("[ERROR] unknown type of CA message:", msg.Type)
+		return errors.New("unknown type of CA msg")
+	}
 
+	deadline = time.Now().Add(15 * time.Second) // Waits for CA-server response for..15 seconds
+	err = conn.SetReadDeadline(deadline)
+	if err != nil {
+		fmt.Println("[ERROR] setting read timeout with CA server...", err)
+		return err
+	}
+	//WAIT FOR CA RESPONSE
+	size, err = conn.Read(buf)
+	if err != nil {
+		fmt.Println("CA server didn't respond...try again later!", err)
+		return err
+	}
+	err = msg.Decode(buf[:size])
+	if err != nil { //unmarshaling error
+		//try to read the rest of the packet
+		//Note..the pkts holding a certificate are too large so we're not able to read it in one Read() call, this is how we can go arround that problem
+		cum := append([]byte{}, buf[:size]...)
+		for {
+			size, err := conn.Read(buf)
+			if err != nil {
+				fmt.Println("[ERROR] reading from CA server...", err)
+				return err
+			}
+			cum = append(cum, buf[:size]...)
+			err = msg.Decode(cum)
+			if err != nil {
+				continue
+			} else {
+				break
+			}
+		}
+	}	
 	//PROCESS CA response
 	if msg.Type == "ERROR" {
 		fmt.Println("[ERROR] " + string(msg.Payload))
@@ -107,11 +172,12 @@ func (tlsSock *Socket) RegisterUser() error {
 		}
 
 		// Update all certificate-dependent attributes with this newly-signed certificate
-		tlsSock.UpdateCertificate(newCert, tlsSock.GetCertificate().PrivateKey.(*rsa.PrivateKey), details.PublicKeySignature)
+		tlsSock.UpdateCertificate(newCert, tlsSock.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey), details.PublicKeySignature)
 	} else {
 		fmt.Println("[ERROR] unknown type of CA message:", msg.Type)
 		return errors.New("unknown type of CA msg")
 	}
 
+	fmt.Println("DEBUG: successfully registered user!")
 	return nil
 }
