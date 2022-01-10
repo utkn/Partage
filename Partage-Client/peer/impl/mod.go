@@ -56,9 +56,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	if isRunningTLS {
 		//check if Certificate in use is self-signed, if so..
 		if res, _ := utils.TLSIsSelfSigned(tlsSock.GetCertificate()); res {
-			fmt.Println("DEBUG: registering new user...")
+			utils.PrintDebug("tls", "registering new user...")
 			if err := tlsSock.RegisterUser(); err == nil {
-				fmt.Println("DEBUG: successfully registered user!")
+				utils.PrintDebug("tls", "successfully registered user!")
 			}
 		}
 	}
@@ -124,7 +124,7 @@ func (n *node) Start() error {
 						continue
 					}
 					//socket closed..stopping node..
-					fmt.Println("OUT 0")
+					utils.PrintDebug("tls", "OUT 0")
 					return
 				} else {
 					//create go routine to handle this connection (recv)
@@ -137,7 +137,7 @@ func (n *node) Start() error {
 			// Wait for new packets...
 			for pkt := range pktQueue {
 				if pkt == nil {
-					fmt.Println("OUT 1")
+					utils.PrintDebug("tls", "OUT 1")
 					return
 				}
 				cpkt := pkt.Copy()
