@@ -82,12 +82,15 @@ func (tlsSock *Socket) RegisterUser() error {
 		return errors.New(string(msg.Payload))
 	}else if msg.Type == "WARNING"{
 		fmt.Println(string(msg.Payload))
-		//fmt.Print("[VERIFICATION CODE]: ")
-		// Read from stdin TODO: 
-		//var input string
-		//fmt.Scanln(&input)
-		time.Sleep(time.Second*2)
-		input:="12348765"
+		var input string
+		if utils.TESTING{
+			time.Sleep(time.Second*2)
+			input="12348765"
+		}else{
+			fmt.Print("[VERIFICATION CODE]: ")
+			//Read from stdin
+			fmt.Scanln(&input)
+		}
 		fmt.Println("Sending "+input+" code!")
 		codeMsg:=&types.CertificateAuthorityMessage{
 			Type: "CODE",
