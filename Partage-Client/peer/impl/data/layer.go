@@ -5,6 +5,7 @@ import (
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
+	"go.dedis.ch/cs438/peer/impl/cryptography"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/network"
 	"go.dedis.ch/cs438/peer/impl/utils"
@@ -17,9 +18,10 @@ import (
 )
 
 type Layer struct {
-	gossip    *gossip.Layer
-	consensus *consensus.Layer
-	network   *network.Layer
+	gossip       *gossip.Layer
+	consensus    *consensus.Layer
+	network      *network.Layer
+	cryptography *cryptography.Layer
 
 	notification            *utils.AsyncNotificationHandler
 	config                  *peer.Configuration
@@ -29,11 +31,13 @@ type Layer struct {
 }
 
 func Construct(gossip *gossip.Layer, consensus *consensus.Layer, network *network.Layer,
+	crypto *cryptography.Layer,
 	config *peer.Configuration) *Layer {
 	return &Layer{
 		gossip:                  gossip,
 		consensus:               consensus,
 		network:                 network,
+		cryptography:            crypto,
 		notification:            utils.NewAsyncNotificationHandler(),
 		config:                  config,
 		catalog:                 make(peer.Catalog),
@@ -82,14 +86,13 @@ func (l *Layer) Upload(data io.Reader) (metahash string, err error) {
 	return metahash, err
 }
 
-// Download implements peer.DataSharing
 func (l *Layer) Download(metahash string) ([]byte, error) {
-	metadataBytes, err := l.AcquireData(metahash)
+	metafileBytes, err := l.AcquireData(metahash)
 	if err != nil {
-		return nil, fmt.Errorf("could not acquire the metadata: %w", err)
+		return nil, fmt.Errorf("could not acquire the metafile: %w", err)
 	}
-	recoveredData := []byte{}
-	chunkHashes := strings.Split(string(metadataBytes), peer.MetafileSep)
+	var recoveredData []byte
+	chunkHashes := strings.Split(string(metafileBytes), peer.MetafileSep)
 	for _, chunkHash := range chunkHashes {
 		chunk, err := l.AcquireData(chunkHash)
 		if err != nil {
@@ -241,7 +244,7 @@ func (l *Layer) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (str
 	matchedNames := utils.GetMatchedNames(l.config.Storage.GetNamingStore(), pattern.String())
 	for _, matchedName := range matchedNames {
 		metahash := string(l.config.Storage.GetNamingStore().Get(matchedName))
-		if utils.IsFullMatchLocally(l.config.Storage.GetDataBlobStore(), metahash) {
+		if utils.IsFullMatchLocally(l.config.Storage.GetDataBlobStore(), metahash, peer.MetafileSep) {
 			return matchedName, nil
 		}
 	}
@@ -268,7 +271,7 @@ func (l *Layer) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (str
 			utils.PrintDebug("data", l.GetAddress(), "is unicasting a search request to", neighbor, "in search first.")
 			err := l.network.Unicast(neighbor, transpMsg)
 			if err != nil {
-				utils.PrintDebug("data", "Could not unicast the search request")
+				utils.PrintDebug("data", "could not unicast the search request:", err.Error())
 				continue
 			}
 		}

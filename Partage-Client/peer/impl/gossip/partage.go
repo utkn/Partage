@@ -35,12 +35,7 @@ func (l *Layer) SendPost(content string) error {
 			SrcPublicKey: *l.cryptography.GetSignedPublicKey(),
 		},
 	}
-	tMsg, err := l.config.MessageRegistry.MarshalMessage(&post)
-	if err != nil {
-		return err
-	}
-
-	return l.Broadcast(tMsg)
+	return l.BroadcastMessage(post)
 }
 
 // recipients will be a slice containing the each recipient hashed public key
@@ -86,7 +81,6 @@ func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) er
 		Recipients: bytes,
 		Msg:        encryptedMsg,
 	}
-	toSendMsg, err := l.config.MessageRegistry.MarshalMessage(&privatePost)
 	/*
 		data, err := json.Marshal(&privatePost)
 		if err != nil {
@@ -98,7 +92,7 @@ func (l *Layer) SendPrivatePost(msg transport.Message, recipients [][32]byte) er
 		} */
 	fmt.Println(l.GetAddress(), " Broadcasted privatePost to", len(users), "recipients!")
 
-	return l.Broadcast(toSendMsg) //share
+	return l.BroadcastMessage(privatePost) //share
 }
 
 //--------HANDLERS

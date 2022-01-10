@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"fmt"
+	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
@@ -23,16 +24,22 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 		return fmt.Errorf("could not parse rumors message")
 	}
 	// Find the rumors of interest (i.e., expected rumors)
-	rumorsOfInterest := []types.Rumor{}
+	var rumorsOfInterest []types.Rumor
 	// Concurrent executions of this procedure will cause problems. We mark this as a critical section.
 	l.rumorLock.Lock()
+	// Go through the received rumors and identify the ones that should be handled. Also add them to the view, updating
+	// the sequence number.
 	for _, rumor := range rumorsMsg.Rumors {
+		if rumor.Msg.Type == "consensus" {
+			var c protocol.ConsensusMessage
+			l.config.MessageRegistry.UnmarshalMessage(rumor.Msg, &c)
+		}
 		// Only consider the expected rumors.
 		if l.view.IsExpected(rumor.Origin, rumor.Sequence) {
 			// Validate rumor's signature
 			if l.cryptography != nil {
 				if err := rumor.Validate(l.cryptography.GetCAPublicKey()); err != nil {
-					fmt.Println("dropped rumor duo to invalid signature..", err)
+					fmt.Println("dropped rumor due to invalid signature..", err)
 					continue
 				} else {
 					// Valid..Store rumor's SignedPublicKey in Catalog..(helps to get to know users in the network!)
@@ -70,7 +77,10 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	}
 	// Relay the rumors message to a different random neighbor if it contains at least one new rumor.
 	if len(rumorsOfInterest) > 0 {
-		_ = l.SendRumorsMsg(pkt.Msg.Copy(), map[string]struct{}{pkt.Header.Source: {}})
+		err := l.sendRumors(*rumorsMsg, map[string]struct{}{pkt.Header.Source: {}})
+		if err != nil {
+			return err
+		}
 	}
 	// Send back AckMessage to the source after handling is done.
 	// Create the ack message.
@@ -86,11 +96,9 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	utils.PrintDebug("gossip", l.GetAddress(), "is about to acknowledge packet", ackMsg.AckedPacketID, "to", pkt.Header.RelayedBy)
 
 	if l.cryptography != nil {
-		_ = l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
-	} else {
-		_ = l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
+		return l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
 	}
-	return nil
+	return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, ackTranspMsg)
 }
 
 func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) error {

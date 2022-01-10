@@ -9,7 +9,6 @@ import (
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
-	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 	"sync"
 )
@@ -35,10 +34,6 @@ func Construct(gossip *gossip.Layer, config *peer.Configuration) *Layer {
 			DefaultBlockchainUpdater(config.Storage.GetBlockchainStore(), config.Storage.GetNamingStore()),
 			DefaultProposalChecker()))
 	return layer
-}
-
-func (l *Layer) RegisterHandlers() {
-	l.Config.MessageRegistry.RegisterMessageCallback(protocol.ConsensusMessage{}, l.HandleConsensusMessage)
 }
 
 func (l *Layer) GetAddress() string {
@@ -84,28 +79,6 @@ func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) e
 	return nil
 }
 
-// HandleConsensusMessage forwards a consensus message to registered protocols.
-func (l *Layer) HandleConsensusMessage(msg types.Message, pkt transport.Packet) error {
-	l.RLock()
-	defer l.RUnlock()
-	consensusMsg, ok := msg.(*protocol.ConsensusMessage)
-	if !ok {
-		return fmt.Errorf("could not parse the received consensus msg")
-	}
-	// Route the consensus message to the appropriate protocols. Let them decide what to do with it.
-	for _, p := range l.protocols {
-		// Skip the unrelated protocols.
-		if p.GetProtocolID() != consensusMsg.ProtocolID {
-			continue
-		}
-		err := p.HandleConsensusMessage(*consensusMsg)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // -- Paxos functions for the default protocol.
 
 func DefaultBlockGenerator(blockchainStore storage.Store) paxos.BlockGenerator {
@@ -139,9 +112,9 @@ func DefaultBlockGenerator(blockchainStore storage.Store) paxos.BlockGenerator {
 
 func DefaultBlockchainUpdater(blockchainStore storage.Store, namingStore storage.Store) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
-		newBlockBytes, _ := newBlock.Marshal()
 		blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
 		newBlockHash := hex.EncodeToString(newBlock.Hash)
+		newBlockBytes, _ := newBlock.Marshal()
 		blockchainStore.Set(newBlockHash, newBlockBytes)
 		namingStore.Set(newBlock.Value.Filename, []byte(newBlock.Value.Metahash))
 	}

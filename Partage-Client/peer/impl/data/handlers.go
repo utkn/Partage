@@ -2,14 +2,18 @@ package data
 
 import (
 	"fmt"
+	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
 )
 
 func (l *Layer) RegisterHandlers() {
+	l.config.MessageRegistry.RegisterMessageCallback(SearchContentReplyMessage{}, l.SearchPostContentReplyMessageHandler)
+	l.config.MessageRegistry.RegisterMessageCallback(SearchContentRequestMessage{}, l.SearchPostContentRequestMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.DataReplyMessage{}, l.DataReplyMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.DataRequestMessage{}, l.DataRequestMessageHandler)
+	// The following handlers are left for backwards compatibility.
 	l.config.MessageRegistry.RegisterMessageCallback(types.SearchReplyMessage{}, l.SearchReplyMessageHandler)
 	l.config.MessageRegistry.RegisterMessageCallback(types.SearchRequestMessage{}, l.SearchRequestMessageHandler)
 }
@@ -94,7 +98,7 @@ func (l *Layer) SearchRequestMessageHandler(msg types.Message, pkt transport.Pac
 	matchedNames := utils.GetMatchedNames(l.config.Storage.GetNamingStore(), searchRequestMsg.Pattern)
 	for _, matchedName := range matchedNames {
 		metahash := string(l.config.Storage.GetNamingStore().Get(matchedName))
-		_, chunkHashes, err := utils.GetLocalChunks(l.config.Storage.GetDataBlobStore(), metahash)
+		_, chunkHashes, err := utils.GetLocalChunks(l.config.Storage.GetDataBlobStore(), metahash, peer.MetafileSep)
 		// Skip if we couldn't get the chunks, which means metafile is not in the store.
 		if err != nil {
 			continue

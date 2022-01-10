@@ -41,8 +41,8 @@ func (m *StateMachine) Run(initialState State) State {
 func (m *StateMachine) Input(message types.Message) bool {
 	m.Lock()
 	defer m.Unlock()
-	utils.PrintDebug("statemachine", "Discarding", message.Name(), "as the state machine is not active.")
 	if m.Current == nil {
+		utils.PrintDebug("statemachine", "Discarding", message.Name(), "as the state machine is not active.")
 		return false
 	}
 	utils.PrintDebug("statemachine", "Routing", message.Name(), "to", m.Current.Name())

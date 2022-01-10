@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"encoding/hex"
 	"fmt"
-	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/storage"
 	"io"
 	"regexp"
@@ -25,8 +24,8 @@ func HashChunk(chunk []byte) ([]byte, string) {
 func Chunkify(chunkSize uint, metafileSep string, reader io.Reader) (map[string][]byte, string, error) {
 	buffer := make([]byte, chunkSize)
 	chunks := make(map[string][]byte)
-	metafileKeyBytes := []byte{}
-	hashList := []string{}
+	var metafileKeyBytes []byte
+	var hashList []string
 	for {
 		n, err := reader.Read(buffer)
 		if err != io.EOF && err != nil {
@@ -56,24 +55,24 @@ func Chunkify(chunkSize uint, metafileSep string, reader io.Reader) (map[string]
 }
 
 // GetChunkHashses returns the chunk hashes associated with the metafile of the given metahash.
-func GetChunkHashses(blobStore storage.Store, metahash string) ([]string, error) {
+func GetChunkHashses(blobStore storage.Store, metahash string, metafilesep string) ([]string, error) {
 	metafileBytes := blobStore.Get(metahash)
 	if metafileBytes == nil {
 		return nil, fmt.Errorf("could not extract chunks hashes since the metafile is not in the store")
 	}
 	metafile := string(metafileBytes)
-	return strings.Split(metafile, peer.MetafileSep), nil
+	return strings.Split(metafile, metafilesep), nil
 }
 
 // GetLocalChunks returns the list of local chunks with the given metahash. If a chunk specified in the metafile is
 // not in the store, the corresponding chunk in the returned list will be nil.
-func GetLocalChunks(blobStore storage.Store, metahash string) ([][]byte, [][]byte, error) {
-	chunkHashes, err := GetChunkHashses(blobStore, metahash)
+func GetLocalChunks(blobStore storage.Store, metahash string, metafilesep string) ([][]byte, [][]byte, error) {
+	chunkHashes, err := GetChunkHashses(blobStore, metahash, metafilesep)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get local chunks: %w", err)
 	}
-	chunks := [][]byte{}
-	chunkHashBytes := [][]byte{}
+	var chunks [][]byte
+	var chunkHashBytes [][]byte
 	for _, chunkHash := range chunkHashes {
 		chunk := blobStore.Get(chunkHash)
 		chunks = append(chunks, chunk)
@@ -95,8 +94,8 @@ func IsFullMatch(chunks [][]byte) bool {
 	return true
 }
 
-func IsFullMatchLocally(blobStore storage.Store, metahash string) bool {
-	chunks, _, err := GetLocalChunks(blobStore, metahash)
+func IsFullMatchLocally(blobStore storage.Store, metahash string, metafilesep string) bool {
+	chunks, _, err := GetLocalChunks(blobStore, metahash, metafilesep)
 	if err != nil {
 		return false
 	}
@@ -104,7 +103,7 @@ func IsFullMatchLocally(blobStore storage.Store, metahash string) bool {
 }
 
 func GetMatchedNames(namingStore storage.Store, pattern string) []string {
-	allMatches := []string{}
+	var allMatches []string
 	namingStore.ForEach(
 		func(name string, mh []byte) bool {
 			match, _ := regexp.MatchString(pattern, name)
