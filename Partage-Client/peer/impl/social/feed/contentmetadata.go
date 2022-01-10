@@ -2,13 +2,14 @@ package feed
 
 import "encoding/json"
 
-// ContentMetadata represents the information about a post on a feed. The post contents are stored as data blocks addressed
+// ContentMetadata represents the information about a post on a feed. The contents are stored as data blocks addressed
 // by their content id.
 type ContentMetadata struct {
 	FeedUserID string
-	Type       string
+	Type       ContentType
 	ContentID  string
 	Timestamp  int
+	Data       []byte
 	Signature  []byte
 }
 

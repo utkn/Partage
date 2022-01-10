@@ -33,6 +33,12 @@ func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, userID st
 	return feed
 }
 
+// GetFeedCopy loads the feed of the user associated with the given id. The feed is loaded from the blockchain storage.
+// The returned feed is a copied instance.
+func (s *Store) GetFeedCopy(blockchainStorage storage.MultipurposeStorage, userID string) *Feed {
+	return s.GetFeed(blockchainStorage, userID).Copy()
+}
+
 // GetRegisteredUsers returns the set of users that were registered with this feed store.
 func (s *Store) GetRegisteredUsers() map[string]struct{} {
 	s.RLock()
@@ -55,8 +61,18 @@ func (s *Store) UpdateFeed(blockchainStorage storage.MultipurposeStorage, userID
 	newBlockBytes, _ := newBlock.Marshal()
 	// Append the block into the blockchain.
 	blockchainStore.Set(newBlockHash, newBlockBytes)
-	// Extract the post info.
-	postInfo := ParseCustomPaxosValue(newBlock.Value.CustomValue)
+	// Extract the content metadata.
+	metadata := ParseCustomPaxosValue(newBlock.Value.CustomValue)
 	// Append into the in-memory as well.
-	s.GetFeed(blockchainStorage, userID).Append(LoadFeedContentFromPostInfo(postInfo, false))
+	s.GetFeed(blockchainStorage, userID).Append(metadata)
+	// Now, if we have an endorsement block, then we need to update the associated user state manually.
+	if metadata.Type == ENDORSEMENT {
+		// Extract the endorsed user.
+		endorsedID, err := ExtractEndorsedUserID(metadata)
+		if err != nil {
+			return
+		}
+		// Update the endorsed user's state.
+		s.GetFeed(blockchainStorage, endorsedID).UpdateEndorsement(metadata)
+	}
 }

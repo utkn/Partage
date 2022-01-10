@@ -13,7 +13,8 @@ type PartageClient interface {
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}
-	GetSharedPosts(userID string) []feed.FeedContent
+	GetFeedContents(userID string) []feed.ContentMetadata
+	GetUserState(userID string) feed.UserState
 	BlockUser(publicKeyHash [32]byte)
 	UnblockUser(publicKeyHash [32]byte)
 }

@@ -348,7 +348,12 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 	return n.social.FeedStore.GetRegisteredUsers()
 }
 
-// GetSharedPosts implements peer.PartageClient
-func (n *node) GetSharedPosts(userID string) []feed.FeedContent {
-	return n.social.FeedStore.GetFeed(n.conf.BlockchainStorage, userID).GetContents()
+// GetFeedContents implements peer.PartageClient
+func (n *node) GetFeedContents(userID string) []feed.ContentMetadata {
+	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, userID).GetContents()
+}
+
+// GetUserState implements peer.PartageClient
+func (n *node) GetUserState(userID string) feed.UserState {
+	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, userID).GetUserStateCopy()
 }

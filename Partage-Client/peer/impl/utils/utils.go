@@ -31,6 +31,10 @@ func PrintDebug(tag string, objs ...interface{}) {
 	}
 }
 
+func Time() int {
+	return 0
+}
+
 func ChooseRandom(options map[string]struct{}, exclusion map[string]struct{}) (string, error) {
 	for opt := range options {
 		if exclusion == nil {
@@ -83,11 +87,13 @@ func HashNameBlock(index int, uniqID string, fileName string, metahash string, p
 	return hashSlice
 }
 
-func HashFeedBlock(index int, uniqID string, postType string, userID string, contentID string, prevHash []byte) []byte {
+func HashContentMetadata(index int, uniqID string, contentType string, userID string, contentID string,
+	prevHash []byte) []byte {
 	h := crypto.SHA256.New()
 	h.Write([]byte(strconv.Itoa(index)))
 	h.Write([]byte(uniqID))
-	h.Write([]byte(postType))
+	h.Write([]byte(contentType))
+	h.Write([]byte(userID))
 	h.Write([]byte(contentID))
 	h.Write(prevHash)
 	hashSlice := h.Sum(nil)

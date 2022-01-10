@@ -241,7 +241,7 @@ func (l *Layer) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (str
 	matchedNames := utils.GetMatchedNames(l.config.Storage.GetNamingStore(), pattern.String())
 	for _, matchedName := range matchedNames {
 		metahash := string(l.config.Storage.GetNamingStore().Get(matchedName))
-		if utils.IsFullMatchLocally(l.config.Storage.GetDataBlobStore(), metahash) {
+		if utils.IsFullMatchLocally(l.config.Storage.GetDataBlobStore(), metahash, peer.MetafileSep) {
 			return matchedName, nil
 		}
 	}

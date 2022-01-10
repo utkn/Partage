@@ -126,16 +126,16 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	// The first node is sharing a random text post.
 	node1.UpdateFeed(feed.ContentMetadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       "text",
+		Type:       feed.TEXT,
 		ContentID:  "123",
 		Signature:  nil,
 	})
 	time.Sleep(1 * time.Second)
 
 	// Get the posts known by all three nodes.
-	n1Posts := node1.GetSharedPosts(node1.GetUserID())
-	n2Posts := node2.GetSharedPosts(node1.GetUserID())
-	n3Posts := node3.GetSharedPosts(node1.GetUserID())
+	n1Posts := node1.GetFeedContents(node1.GetUserID())
+	n2Posts := node2.GetFeedContents(node1.GetUserID())
+	n3Posts := node3.GetFeedContents(node1.GetUserID())
 
 	// Make sure that the feeds are identical.
 	require.Len(t, n1Posts, 1)
@@ -178,28 +178,28 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	// The first node is sharing three random text posts.
 	node1.UpdateFeed(feed.ContentMetadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       "text",
+		Type:       feed.TEXT,
 		ContentID:  "1",
 		Signature:  nil,
 	})
 	node1.UpdateFeed(feed.ContentMetadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       "text",
+		Type:       feed.TEXT,
 		ContentID:  "2",
 		Signature:  nil,
 	})
 	node1.UpdateFeed(feed.ContentMetadata{
 		FeedUserID: node1.GetUserID(),
-		Type:       "text",
+		Type:       feed.TEXT,
 		ContentID:  "3",
 		Signature:  nil,
 	})
 	time.Sleep(1 * time.Second)
 
 	// Get the posts known by all three nodes.
-	n1Posts := node1.GetSharedPosts(node1.GetUserID())
-	n2Posts := node2.GetSharedPosts(node1.GetUserID())
-	n3Posts := node3.GetSharedPosts(node1.GetUserID())
+	n1Posts := node1.GetFeedContents(node1.GetUserID())
+	n2Posts := node2.GetFeedContents(node1.GetUserID())
+	n3Posts := node3.GetFeedContents(node1.GetUserID())
 
 	// Make sure that the feeds are identical.
 	require.Len(t, n1Posts, 3)
@@ -248,19 +248,19 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 		go func(nodeIndex int, node z.TestNode) {
 			node.UpdateFeed(feed.ContentMetadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       "text",
+				Type:       feed.TEXT,
 				ContentID:  fmt.Sprintf("%d-1", nodeIndex),
 				Signature:  nil,
 			})
 			node.UpdateFeed(feed.ContentMetadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       "text",
+				Type:       feed.TEXT,
 				ContentID:  fmt.Sprintf("%d-2", nodeIndex),
 				Signature:  nil,
 			})
 			node.UpdateFeed(feed.ContentMetadata{
 				FeedUserID: node1.GetUserID(),
-				Type:       "text",
+				Type:       feed.TEXT,
 				ContentID:  fmt.Sprintf("%d-3", nodeIndex),
 				Signature:  nil,
 			})
@@ -270,9 +270,9 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 	time.Sleep(5 * time.Second)
 	// Get the posts known by all three nodes for every node.
 	for nodeIndex, n := range nodes {
-		n1Posts := n.GetSharedPosts(n.GetUserID())
-		n2Posts := node2.GetSharedPosts(n.GetUserID())
-		n3Posts := node3.GetSharedPosts(n.GetUserID())
+		n1Posts := n.GetFeedContents(n.GetUserID())
+		n2Posts := node2.GetFeedContents(n.GetUserID())
+		n3Posts := node3.GetFeedContents(n.GetUserID())
 		// Make sure that the saved feeds for n are identical at every node.
 		require.Len(t, n1Posts, 3)
 		require.Len(t, n2Posts, 3)
@@ -282,6 +282,138 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n2Posts[i-1].ContentID)
 			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n3Posts[i-1].ContentID)
 		}
+	}
+}
+
+func Test_Partage_User_State(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// First, change the username.
+	node1.UpdateFeed(feed.CreateChangeUsernameMetadata(node1.GetUserID(), "Descartes"))
+	time.Sleep(1 * time.Second)
+	require.Equal(t, "Descartes", node1.GetUserState(node1.GetUserID()).Username)
+	require.Equal(t, "Descartes", node2.GetUserState(node1.GetUserID()).Username)
+	require.Equal(t, "Descartes", node3.GetUserState(node1.GetUserID()).Username)
+	// Then, follow a user.
+	node1.UpdateFeed(feed.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
+	time.Sleep(1 * time.Second)
+	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
+	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
+	require.Len(t, node3.GetUserState(node1.GetUserID()).Followed, 1)
+	require.True(t, node1.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	// Then, unfollow.
+	node1.UpdateFeed(feed.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
+	time.Sleep(1 * time.Second)
+	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 0)
+	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 0)
+	require.Len(t, node3.GetUserState(node1.GetUserID()).Followed, 0)
+	require.False(t, node1.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	require.False(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	require.False(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	// User credits should not be changed.
+	require.Equal(t, feed.INITIAL_CREDITS, node1.GetUserState(node1.GetUserID()).CurrentCredits)
+	require.Equal(t, feed.INITIAL_CREDITS, node2.GetUserState(node1.GetUserID()).CurrentCredits)
+	require.Equal(t, feed.INITIAL_CREDITS, node3.GetUserState(node1.GetUserID()).CurrentCredits)
+}
+
+func Test_Partage_User_State_Endorsement(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// First, request an endorsement.
+	nodes := []z.TestNode{node1, node2, node3}
+	node1.UpdateFeed(feed.CreateEndorsementRequestMetadata(node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
+		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
+	}
+	// Try self-endorsement. Ideally should not be appended into the blockchain. Even if it does, should not have an effect.
+	node1.UpdateFeed(feed.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
+		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
+	}
+	// Now, let node 2 endorse the node 1.
+	node2.UpdateFeed(feed.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
+		require.Equal(t, 1, n.GetUserState(node1.GetUserID()).GivenEndorsements)
+		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
+	}
+	// Try endorsing through node 2 again. The state should not change.
+	node2.UpdateFeed(feed.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
+		require.Equal(t, 1, n.GetUserState(node1.GetUserID()).GivenEndorsements)
+		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
+	}
+	// Now, let node 3 endorse the node 1 as well.
+	feed.REQUIRED_ENDORSEMENTS = 2
+	node3.UpdateFeed(feed.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	newCredits := feed.INITIAL_CREDITS + feed.ENDORSEMENT_REWARD
+	// The endorsement handler should be reset and the credits should be updated.
+	for _, n := range nodes {
+		require.Equal(t, newCredits, n.GetUserState(node1.GetUserID()).CurrentCredits)
+		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
+		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 0)
 	}
 }
 

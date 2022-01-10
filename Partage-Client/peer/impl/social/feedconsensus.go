@@ -45,15 +45,15 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 			_ = lastBlock.Unmarshal(lastBlockBuf)
 			prevHash = lastBlock.Hash
 		}
-		// Extract the post information from the proposed value to hash it.
-		postInfo := feed.ParseCustomPaxosValue(msg.Value.CustomValue)
+		// Extract the content metadata from the proposed value to hash it.
+		metadata := feed.ParseCustomPaxosValue(msg.Value.CustomValue)
 		// Create the block hash.
-		blockHash := utils.HashFeedBlock(
+		blockHash := utils.HashContentMetadata(
 			int(msg.Step),
 			msg.Value.UniqID,
-			postInfo.Type,
-			postInfo.FeedUserID,
-			postInfo.ContentID,
+			metadata.Type.String(),
+			metadata.FeedUserID,
+			metadata.ContentID,
 			prevHash,
 		)
 		// Create the block.

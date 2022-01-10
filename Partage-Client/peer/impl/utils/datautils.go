@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"encoding/hex"
 	"fmt"
-	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/storage"
 	"io"
 	"regexp"
@@ -56,19 +55,19 @@ func Chunkify(chunkSize uint, metafileSep string, reader io.Reader) (map[string]
 }
 
 // GetChunkHashses returns the chunk hashes associated with the metafile of the given metahash.
-func GetChunkHashses(blobStore storage.Store, metahash string) ([]string, error) {
+func GetChunkHashses(blobStore storage.Store, metahash string, metafilesep string) ([]string, error) {
 	metafileBytes := blobStore.Get(metahash)
 	if metafileBytes == nil {
 		return nil, fmt.Errorf("could not extract chunks hashes since the metafile is not in the store")
 	}
 	metafile := string(metafileBytes)
-	return strings.Split(metafile, peer.MetafileSep), nil
+	return strings.Split(metafile, metafilesep), nil
 }
 
 // GetLocalChunks returns the list of local chunks with the given metahash. If a chunk specified in the metafile is
 // not in the store, the corresponding chunk in the returned list will be nil.
-func GetLocalChunks(blobStore storage.Store, metahash string) ([][]byte, [][]byte, error) {
-	chunkHashes, err := GetChunkHashses(blobStore, metahash)
+func GetLocalChunks(blobStore storage.Store, metahash string, metafilesep string) ([][]byte, [][]byte, error) {
+	chunkHashes, err := GetChunkHashses(blobStore, metahash, metafilesep)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get local chunks: %w", err)
 	}
@@ -95,8 +94,8 @@ func IsFullMatch(chunks [][]byte) bool {
 	return true
 }
 
-func IsFullMatchLocally(blobStore storage.Store, metahash string) bool {
-	chunks, _, err := GetLocalChunks(blobStore, metahash)
+func IsFullMatchLocally(blobStore storage.Store, metahash string, metafilesep string) bool {
+	chunks, _, err := GetLocalChunks(blobStore, metahash, metafilesep)
 	if err != nil {
 		return false
 	}
