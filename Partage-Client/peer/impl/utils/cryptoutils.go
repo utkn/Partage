@@ -24,6 +24,8 @@ import (
 	"time"
 )
 
+const TESTING = true //TODO: change!!
+
 const dir = "Partage/Partage-Client/partage-storage/"
 const cryptoDir =dir+"crypto/"
 const certificatePath = cryptoDir + "cert.pem"
@@ -269,9 +271,14 @@ func loadEmailFromFile() string{
 //returns new certificate as ASN.1 DER data (can be parsed to x509.Certificate object with x509.ParseCertificate(der []byte) function)
 func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Certificate) (*x509.Certificate, error) {
 	// Load e-mail from file!
-	//email:=loadEmailFromFile() //TODO:!!!!!!!!
-	mathRand.Seed(time.Now().Unix())
-	email:="abdefg"+strconv.Itoa(mathRand.Intn(99999999))+"@gmail.com" //testing purposes
+	var email string
+	if TESTING{
+		mathRand.Seed(time.Now().Unix())
+		email="abdefg"+strconv.Itoa(mathRand.Intn(99999999))+"@gmail.com" //testing purposes	
+	}else{
+		email=loadEmailFromFile() 
+	}
+	
 	//each certificate needs a unique serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
