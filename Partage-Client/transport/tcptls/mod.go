@@ -58,6 +58,7 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		pktQueue:      make(chan *transport.Packet, 1024),
 		connPool:      newConnPool(),
 		blockedUsers:  make(map[[32]byte]struct{}),
+		blockedIPs: make(map[string][32]byte), //to reject rumors by origin!
 	}, nil
 }
 
@@ -81,6 +82,8 @@ type Socket struct {
 	CA                *x509.Certificate
 	blockedUsers      map[[32]byte]struct{}
 	blockedUsersMutex sync.RWMutex
+	blockedIPs	map[string][32]byte
+	blockedIPsMutex sync.RWMutex
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -226,7 +229,7 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn, connSaved bool) {
 		// Check for banned users packets and drop the ones that are for me! (still relay packets from blocked users)
 		if pkt.Header.Destination == s.GetAddress() && pkt.Header.Check != nil {
 			pkBytes, _ := utils.PublicKeyToBytes(pkt.Header.Check.SrcPublicKey.PublicKey)
-			if s.isBlocked(utils.Hash(pkBytes)) {
+			if s.IsBlocked(utils.Hash(pkBytes)) {
 				fmt.Println("avoided packet from blocked user")
 				continue
 			}
@@ -381,7 +384,7 @@ func (s *Socket) GetCAPublicKey() *rsa.PublicKey {
 
 // TODO: Save blocked users in persistent storage.
 
-func (s *Socket) isBlocked(publicKeyHash [32]byte) bool {
+func (s *Socket) IsBlocked(publicKeyHash [32]byte) bool {
 	s.blockedUsersMutex.RLock()
 	defer s.blockedUsersMutex.RUnlock()
 	_, exists := s.blockedUsers[publicKeyHash]
@@ -392,11 +395,37 @@ func (s *Socket) Block(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
 	defer s.blockedUsersMutex.Unlock()
 	s.blockedUsers[publicKeyHash] = struct{}{}
-
 }
 
 func (s *Socket) Unblock(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
-	defer s.blockedUsersMutex.Unlock()
 	delete(s.blockedUsers, publicKeyHash)
+	s.blockedUsersMutex.Unlock()
+	//remove blocked ip associated with user's pk
+	s.blockedIPsMutex.Lock()
+	for k,v:=range(s.blockedIPs){
+		if v==publicKeyHash{
+			delete(s.blockedIPs,k)
+		}
+	}
+	s.blockedIPsMutex.Unlock()
+}
+
+func (s *Socket) IsBlockedIP(addr string) bool{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	_,exists:=s.blockedIPs[addr]
+	return exists
+}
+
+func (s *Socket) HasBlockedIPs() bool{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	return len(s.blockedIPs)>0
+}
+
+func (s *Socket) AddBlockedIP(addr string,publicKeyHash [32]byte) {
+	s.blockedIPsMutex.Lock()
+	defer s.blockedIPsMutex.Unlock()
+	s.blockedIPs[addr]=publicKeyHash
 }

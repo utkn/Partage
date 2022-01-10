@@ -48,6 +48,14 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 					if _, exists := l.cryptography.GetUserFromCatalog(hashPK); !exists {
 						l.cryptography.AddUserToCatalog(hashPK, &rumor.Check.SrcPublicKey)
 					}
+
+					//store blocked user's ips..
+					if l.cryptography.IsBlocked(hashPK) && !l.cryptography.IsBlockedIP(rumor.Origin){
+						//store blocked user ip adr
+						l.cryptography.AddBlockedIP(rumor.Origin,hashPK)
+						//drop view
+						l.view.DropViewFrom(rumor.Origin)
+					}
 				}
 			}
 			utils.PrintDebug("gossip", l.GetAddress(), "will process a rumor from", rumor.Origin, "with sequence", rumor.Sequence)
@@ -148,6 +156,14 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			return l.cryptography.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 		} else {
 			return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
+		}
+	}
+	// Remove blocked user's IPs from rmtNews 
+	if l.cryptography.HasBlockedIPs(){
+		for k:=range(rmtNews){
+			if l.cryptography.IsBlockedIP(k){
+				delete(rmtNews,k) // remove blocked users entries to avoid requesting for it
+			}
 		}
 	}
 	// Request my missing rumors from the remote peer after I make sure that he is up to date.

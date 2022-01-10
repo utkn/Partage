@@ -29,6 +29,12 @@ func (v *PeerView) getSequence(peerAddr string) uint {
 	return uint(len(rumorList))
 }
 
+func (v *PeerView) DropViewFrom(addr string){
+	v.rumorMapLock.Lock()
+	defer v.rumorMapLock.Unlock()
+	delete(v.rumorMap,addr)
+}
+
 func (v *PeerView) IsExpected(peerAddr string, givenSequence uint) bool {
 	v.rumorMapLock.Lock()
 	defer v.rumorMapLock.Unlock()
