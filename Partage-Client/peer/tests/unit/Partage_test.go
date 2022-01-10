@@ -405,6 +405,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
 	}
 	// Now, let node 3 endorse the node 1 as well.
+	defaultEndorsementCount := feed.REQUIRED_ENDORSEMENTS
 	feed.REQUIRED_ENDORSEMENTS = 2
 	node3.UpdateFeed(feed.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
@@ -415,6 +416,8 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 0)
 	}
+	// Rollback the required endorsement count.
+	feed.REQUIRED_ENDORSEMENTS = defaultEndorsementCount
 }
 
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {

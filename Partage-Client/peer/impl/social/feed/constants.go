@@ -6,11 +6,12 @@ import (
 	"go.dedis.ch/cs438/peer/impl/utils"
 )
 
-var INITIAL_CREDITS = 100
+var INITIAL_CREDITS = 10
 var DEFAULT_USERNAME = "Rambo"
 var REQUIRED_ENDORSEMENTS = 5
 var ENDORSEMENT_INTERVAL = 60 * 60
 var ENDORSEMENT_REWARD = 100
+var ENDORSEMENT_REQUEST_CREDIT_LIMIT = 20
 
 type ContentType int
 

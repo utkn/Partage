@@ -41,7 +41,7 @@ func (e *Endorsement) Reset() {
 	e.EndorsedUsers = make(map[string]struct{}, REQUIRED_ENDORSEMENTS)
 }
 
-// Update updates the endorsement counter and returns whether enough endorsements were achieved.
+// Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
 func (e *Endorsement) Update(currTime int, endorserID string) bool {
 	// If there is no current endorsement request going on, do nothing.
 	if e.LastRequestedTime < 0 {
@@ -131,7 +131,8 @@ func (s *UserState) Update(metadata ContentMetadata) error {
 	}
 	// Handle endorsement request stuff. The given endorsements will be handled outside, since they reside in different
 	// blockchains.
-	if metadata.Type == ENDORSEMENT_REQUEST {
+	// Only process an endorsement request if the user's credit is lower than the set amount.
+	if metadata.Type == ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
 		s.Endorsement.Request(metadata.Timestamp)
 	}
 	return nil
