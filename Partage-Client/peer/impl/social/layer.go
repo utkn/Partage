@@ -53,7 +53,7 @@ func (l *Layer) Register() error {
 	return l.gossip.BroadcastMessage(newUserMsg)
 }
 
-func (l *Layer) ProposeNewPost(info feed.PostInfo) error {
+func (l *Layer) ProposeNewPost(info feed.ContentMetadata) error {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
 	val := feed.MakeCustomPaxosValue(info)
 	paxosVal := types.PaxosValue{

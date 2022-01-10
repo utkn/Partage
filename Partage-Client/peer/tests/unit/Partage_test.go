@@ -124,11 +124,11 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing a random text post.
-	node1.UpdateFeed(feed.PostInfo{
-		FeedUserID:    node1.GetUserID(),
-		PostType:      "text",
-		PostContentID: "123",
-		Signature:     nil,
+	node1.UpdateFeed(feed.ContentMetadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       "text",
+		ContentID:  "123",
+		Signature:  nil,
 	})
 	time.Sleep(1 * time.Second)
 
@@ -141,9 +141,9 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	require.Len(t, n1Posts, 1)
 	require.Len(t, n2Posts, 1)
 	require.Len(t, n3Posts, 1)
-	require.Equal(t, "123", n1Posts[0].PostContentID)
-	require.Equal(t, "123", n2Posts[0].PostContentID)
-	require.Equal(t, "123", n3Posts[0].PostContentID)
+	require.Equal(t, "123", n1Posts[0].ContentID)
+	require.Equal(t, "123", n2Posts[0].ContentID)
+	require.Equal(t, "123", n3Posts[0].ContentID)
 }
 
 func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
@@ -176,23 +176,23 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing three random text posts.
-	node1.UpdateFeed(feed.PostInfo{
-		FeedUserID:    node1.GetUserID(),
-		PostType:      "text",
-		PostContentID: "1",
-		Signature:     nil,
+	node1.UpdateFeed(feed.ContentMetadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       "text",
+		ContentID:  "1",
+		Signature:  nil,
 	})
-	node1.UpdateFeed(feed.PostInfo{
-		FeedUserID:    node1.GetUserID(),
-		PostType:      "text",
-		PostContentID: "2",
-		Signature:     nil,
+	node1.UpdateFeed(feed.ContentMetadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       "text",
+		ContentID:  "2",
+		Signature:  nil,
 	})
-	node1.UpdateFeed(feed.PostInfo{
-		FeedUserID:    node1.GetUserID(),
-		PostType:      "text",
-		PostContentID: "3",
-		Signature:     nil,
+	node1.UpdateFeed(feed.ContentMetadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       "text",
+		ContentID:  "3",
+		Signature:  nil,
 	})
 	time.Sleep(1 * time.Second)
 
@@ -206,9 +206,9 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	require.Len(t, n2Posts, 3)
 	require.Len(t, n3Posts, 3)
 	for i := 1; i <= 3; i++ {
-		require.Equal(t, fmt.Sprint(i), n1Posts[i-1].PostContentID)
-		require.Equal(t, fmt.Sprint(i), n2Posts[i-1].PostContentID)
-		require.Equal(t, fmt.Sprint(i), n3Posts[i-1].PostContentID)
+		require.Equal(t, fmt.Sprint(i), n1Posts[i-1].ContentID)
+		require.Equal(t, fmt.Sprint(i), n2Posts[i-1].ContentID)
+		require.Equal(t, fmt.Sprint(i), n3Posts[i-1].ContentID)
 	}
 }
 
@@ -246,23 +246,23 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 	for i, n := range nodes {
 		// Try to post in the background.
 		go func(nodeIndex int, node z.TestNode) {
-			node.UpdateFeed(feed.PostInfo{
-				FeedUserID:    node1.GetUserID(),
-				PostType:      "text",
-				PostContentID: fmt.Sprintf("%d-1", nodeIndex),
-				Signature:     nil,
+			node.UpdateFeed(feed.ContentMetadata{
+				FeedUserID: node1.GetUserID(),
+				Type:       "text",
+				ContentID:  fmt.Sprintf("%d-1", nodeIndex),
+				Signature:  nil,
 			})
-			node.UpdateFeed(feed.PostInfo{
-				FeedUserID:    node1.GetUserID(),
-				PostType:      "text",
-				PostContentID: fmt.Sprintf("%d-2", nodeIndex),
-				Signature:     nil,
+			node.UpdateFeed(feed.ContentMetadata{
+				FeedUserID: node1.GetUserID(),
+				Type:       "text",
+				ContentID:  fmt.Sprintf("%d-2", nodeIndex),
+				Signature:  nil,
 			})
-			node.UpdateFeed(feed.PostInfo{
-				FeedUserID:    node1.GetUserID(),
-				PostType:      "text",
-				PostContentID: fmt.Sprintf("%d-3", nodeIndex),
-				Signature:     nil,
+			node.UpdateFeed(feed.ContentMetadata{
+				FeedUserID: node1.GetUserID(),
+				Type:       "text",
+				ContentID:  fmt.Sprintf("%d-3", nodeIndex),
+				Signature:  nil,
 			})
 		}(i, n)
 	}
@@ -278,9 +278,9 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 		require.Len(t, n2Posts, 3)
 		require.Len(t, n3Posts, 3)
 		for i := 1; i <= 3; i++ {
-			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n1Posts[i-1].PostContentID)
-			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n2Posts[i-1].PostContentID)
-			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n3Posts[i-1].PostContentID)
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n1Posts[i-1].ContentID)
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n2Posts[i-1].ContentID)
+			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n3Posts[i-1].ContentID)
 		}
 	}
 }

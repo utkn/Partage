@@ -1,13 +1,13 @@
 package feed
 
 type FeedContent struct {
-	PostInfo
+	ContentMetadata
 	Downloaded bool
 }
 
-func LoadFeedContentFromPostInfo(info PostInfo, autoDownload bool) FeedContent {
+func LoadFeedContentFromPostInfo(info ContentMetadata, autoDownload bool) FeedContent {
 	return FeedContent{
-		PostInfo:   info,
-		Downloaded: false,
+		ContentMetadata: info,
+		Downloaded:      false,
 	}
 }

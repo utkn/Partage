@@ -39,7 +39,7 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 			// Validate rumor's signature
 			if l.cryptography != nil {
 				if err := rumor.Validate(l.cryptography.GetCAPublicKey()); err != nil {
-					fmt.Println("dropped rumor duo to invalid signature..", err)
+					fmt.Println("dropped rumor due to invalid signature..", err)
 					continue
 				} else {
 					// Valid..Store rumor's SignedPublicKey in Catalog..(helps to get to know users in the network!)

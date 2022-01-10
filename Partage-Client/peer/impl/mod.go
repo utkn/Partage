@@ -296,8 +296,8 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 	return n.data.SearchFirst(pattern, conf)
 }
 
-// TODO: Test this.
-func (n *node) UpdateFeed(info feed.PostInfo) error {
+// UpdateFeed appends the given post info into the peer's feed blockchain permanently.
+func (n *node) UpdateFeed(info feed.ContentMetadata) error {
 	return n.social.ProposeNewPost(info)
 }
 

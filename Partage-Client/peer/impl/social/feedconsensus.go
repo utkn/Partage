@@ -51,9 +51,9 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 		blockHash := utils.HashFeedBlock(
 			int(msg.Step),
 			msg.Value.UniqID,
-			postInfo.PostType,
+			postInfo.Type,
 			postInfo.FeedUserID,
-			postInfo.PostContentID,
+			postInfo.ContentID,
 			prevHash,
 		)
 		// Create the block.
