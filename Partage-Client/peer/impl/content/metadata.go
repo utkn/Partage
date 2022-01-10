@@ -8,7 +8,7 @@ import (
 // stored in the Data field.
 type Metadata struct {
 	FeedUserID string
-	Type       ContentType
+	Type       Type
 	ContentID  string
 	Timestamp  int
 	Data       []byte

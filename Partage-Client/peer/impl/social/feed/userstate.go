@@ -2,7 +2,7 @@ package feed
 
 import (
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
+	content2 "go.dedis.ch/cs438/peer/impl/content"
 )
 
 type Endorsement struct {
@@ -82,7 +82,7 @@ type UserState struct {
 	Endorsement
 }
 
-type StateProcessor = func(UserState, content.Metadata) UserState
+type StateProcessor = func(UserState, content2.Metadata) UserState
 
 func NewInitialUserState(userID string) *UserState {
 	return &UserState{
@@ -106,27 +106,27 @@ func (s *UserState) Copy() UserState {
 	}
 }
 
-func (s *UserState) Update(metadata content.Metadata) error {
+func (s *UserState) Update(metadata content2.Metadata) error {
 	// Apply the cost.
 	s.CurrentCredits -= metadata.Type.Cost()
 	// Update the username.
-	if metadata.Type == content.USERNAME {
-		username, err := content.ParseUsername(metadata)
+	if metadata.Type == content2.USERNAME {
+		username, err := content2.ParseUsername(metadata)
 		if err != nil {
 			return err
 		}
 		s.Username = username
 	}
 	// Update the follow list.
-	if metadata.Type == content.FOLLOW {
-		targetUser, err := content.ParseFollowedUser(metadata)
+	if metadata.Type == content2.FOLLOW {
+		targetUser, err := content2.ParseFollowedUser(metadata)
 		if err != nil {
 			return err
 		}
 		s.Followed[targetUser] = struct{}{}
 	}
-	if metadata.Type == content.UNFOLLOW {
-		targetUser, err := content.ParseFollowedUser(metadata)
+	if metadata.Type == content2.UNFOLLOW {
+		targetUser, err := content2.ParseFollowedUser(metadata)
 		if err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func (s *UserState) Update(metadata content.Metadata) error {
 	// Handle endorsement request stuff. The given endorsements will be handled outside, since they reside in different
 	// blockchains.
 	// Only process an endorsement request if the user's credit is lower than the set amount.
-	if metadata.Type == content.ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
+	if metadata.Type == content2.ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
 		s.Endorsement.Request(metadata.Timestamp)
 	}
 	return nil

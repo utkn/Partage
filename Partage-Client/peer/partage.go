@@ -1,9 +1,8 @@
 package peer
 
 import (
-	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/transport"
 	"io"
 )
@@ -15,7 +14,7 @@ type PartageClient interface {
 	// DownloadPost fetches the post with the given content id from the network.
 	DownloadPost(contentID string) ([]byte, error)
 	// DiscoverContent returns the matched content ids.
-	DiscoverContent(filter contentfilter.ContentFilter) ([]string, error)
+	DiscoverContent(filter content.Filter) ([]string, error)
 	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
 	UpdateFeed(info content.Metadata) error
 	GetHashedPublicKey() [32]byte

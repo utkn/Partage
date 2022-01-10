@@ -4,10 +4,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
+	content2 "go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
 	"regexp"
 	"time"
@@ -298,7 +297,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
-func (n *node) UpdateFeed(metadata content.Metadata) error {
+func (n *node) UpdateFeed(metadata content2.Metadata) error {
 	return n.social.ProposeNewPost(metadata)
 }
 
@@ -350,7 +349,7 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 }
 
 // GetFeedContents implements peer.PartageClient
-func (n *node) GetFeedContents(userID string) []content.Metadata {
+func (n *node) GetFeedContents(userID string) []content2.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
 }
 
@@ -367,11 +366,11 @@ func (n *node) SharePost(data io.Reader) (string, error) {
 		return "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateTextMetadata(n.social.GetUserID(), metahash)
+	metadata := content2.CreateTextMetadata(n.social.GetUserID(), metahash)
 	return metadata.ContentID, n.UpdateFeed(metadata)
 }
 
-func (n *node) DiscoverContent(filter contentfilter.ContentFilter) ([]string, error) {
+func (n *node) DiscoverContent(filter content2.Filter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
 }
 

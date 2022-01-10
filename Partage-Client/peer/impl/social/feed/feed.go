@@ -3,7 +3,7 @@ package feed
 import (
 	"encoding/hex"
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 	"sync"

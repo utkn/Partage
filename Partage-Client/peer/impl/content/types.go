@@ -7,10 +7,10 @@ import (
 	"go.dedis.ch/cs438/peer/impl/utils"
 )
 
-type ContentType int
+type Type int
 
 const (
-	UNKNOWN ContentType = iota
+	UNKNOWN Type = iota
 	TEXT
 	COMMENT
 	REACTION
@@ -21,7 +21,7 @@ const (
 	ENDORSEMENT_REQUEST
 )
 
-func (c ContentType) String() string {
+func (c Type) String() string {
 	switch c {
 	case UNKNOWN:
 		return "unknown"
@@ -45,7 +45,7 @@ func (c ContentType) String() string {
 	return "undefined"
 }
 
-func (c ContentType) Cost() int {
+func (c Type) Cost() int {
 	switch c {
 	case TEXT:
 		return 5

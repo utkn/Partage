@@ -2,7 +2,7 @@ package feed
 
 import (
 	"encoding/hex"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
+	content2 "go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 	"sync"
@@ -63,13 +63,13 @@ func (s *Store) UpdateFeed(blockchainStorage storage.MultipurposeStorage, metada
 	// Append the block into the blockchain.
 	blockchainStore.Set(newBlockHash, newBlockBytes)
 	// Extract the content metadata.
-	metadata := content.ParseMetadata(newBlock.Value.CustomValue)
+	metadata := content2.ParseMetadata(newBlock.Value.CustomValue)
 	// Append into the in-memory as well.
 	s.GetFeed(blockchainStorage, metadataStore, userID).Append(metadata)
 	// Now, if we have an endorsement block, then we need to update the associated user state manually.
-	if metadata.Type == content.ENDORSEMENT {
+	if metadata.Type == content2.ENDORSEMENT {
 		// Extract the endorsed user.
-		endorsedID, err := content.ParseEndorsedUserID(metadata)
+		endorsedID, err := content2.ParseEndorsedUserID(metadata)
 		if err != nil {
 			return
 		}
