@@ -1,5 +1,9 @@
 package server
 
+//CHANGE
+const TESTING = true
+
+
 //Persistent Storage
 const StorageDir = "Partage-CA/storage/"
 //CA's crypto details
@@ -20,7 +24,6 @@ type Server interface {
 }
 
 //SMS credentials
-
 const SmtpUsername = "partage.register@gmail.com"
 const SmtpPassword = "bilebtjkrcpstopa"
 const SmtpHost = "smtp.gmail.com"
