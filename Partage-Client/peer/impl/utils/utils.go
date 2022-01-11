@@ -19,13 +19,13 @@ var DEBUG = map[string]bool{
 	"messaging":     false,
 	"gossip":        false,
 	"data":          false,
-	"acceptor":      true,
+	"acceptor":      false,
 	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
 	"social":        false,
 	"statemachine":  false,
-	"tls":           true,
+	"tls":           false,
 }
 
 func PrintDebug(tag string, objs ...interface{}) {

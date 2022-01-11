@@ -29,7 +29,7 @@ func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, metadataS
 	s.RUnlock()
 	if !ok {
 		s.Lock()
-		// Load the feed from the blockchain.
+		// Load the feed from the blockchain into the in-memory storage.
 		s.loadFeedFromBlockchain(blockchainStorage, metadataStore, userID)
 		feed = s.feedMap[userID]
 		s.Unlock()
@@ -60,12 +60,13 @@ func (s *Store) GetRegisteredUsers() map[string]struct{} {
 }
 
 // loadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
+// Warning: Not thread-safe.
 func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) {
 	// Get the feed blockchain associated with the given user id.
 	feedBlockchain := blockchainStorage.GetStore(IDFromUserID(userID))
 	// Construct the feed blockchain.
 	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
-	// If the associated blockchain is completely empty, return an empty feedBlockchain.
+	// If the associated blockchain is completely empty, save an empty feed blockchain.
 	if lastBlockHashHex == "" {
 		s.feedMap[userID] = NewEmptyFeed(userID, metadataStore)
 		return
@@ -88,34 +89,32 @@ func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeSto
 		// Go back.
 		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
 	}
-	// Create the feed.
-	feed := NewEmptyFeed(userID, metadataStore)
-	// Now we have a list of blocks.
+	// Now we have a list of blocks. Add them one by one.
 	for _, block := range blocks {
-		metadata := content.ParseMetadata(block.Value.CustomValue)
-		// No need to acquire the lock because there are no other references to this feed yet.
-		s.processAndAppend(feed, blockchainStorage, metadataStore, userID, metadata, hex.EncodeToString(block.Hash))
+		s.AppendToFeed(blockchainStorage, metadataStore, userID, block)
 	}
-	// Save the feed.
-	s.feedMap[userID] = feed
 }
 
-// processAndAppend processes the given metadata and appends it into the given feed.
-// Warning: Not threadsafe, lock should be acquired before calling the method.
-func (s *Store) processAndAppend(f *Feed, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string, c content.Metadata, blockHash string) {
+// AppendToFeed updates the feed associated with the given user id with the given new block.
+func (s *Store) AppendToFeed(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string, newBlock types.BlockchainBlock) {
+	// Extract the content metadata.
+	c := content.ParseMetadata(newBlock.Value.CustomValue)
+	// --- Append into the in-memory as well.
+	// Get the associated feed.
+	f := s.GetFeed(blockchainStorage, metadataStore, userID)
 	// First, save the metadata into the metadata storage.
 	if c.ContentID != "" {
 		metadataBytes := content.UnparseMetadata(c)
 		f.metadataStore.Set(c.ContentID, metadataBytes)
 	}
-	// Append into the feed.
-	f.Append(c, blockHash)
-	// Update the feed's user state.
-	err := f.userState.Update(c)
+	blockHash := hex.EncodeToString(newBlock.Hash)
+	// Append into the actual feed & update the user state.
+	err := f.Append(c, blockHash)
 	if err != nil {
-		fmt.Printf("error while updating user state %s\n", err)
+		fmt.Println(err)
+		return
 	}
-	// If we have an endorsement block, then we need to update the associated user state manually.
+	// If we have an endorsement block, then we need to update the endorsed user's state explicitly.
 	if c.Type == content.ENDORSEMENT {
 		// Extract the endorsed user.
 		endorsedID, err := content.ParseEndorsedUserID(c)
@@ -151,8 +150,8 @@ func (s *Store) processAndAppend(f *Feed, blockchainStorage storage.Multipurpose
 			fmt.Println(err)
 			return
 		}
-		// Undo the user state.
-		err = f.userState.Undo(referredMetadata)
+		// Try to undo the feed.
+		err = f.Undo(referredMetadata)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -161,30 +160,5 @@ func (s *Store) processAndAppend(f *Feed, blockchainStorage storage.Multipurpose
 		if referredMetadata.Type == content.REACTION {
 			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, c.FeedUserID)
 		}
-		// Undo the text or comment.
-		if referredMetadata.Type == content.TEXT || referredMetadata.Type == content.COMMENT {
-			f.HideContent(referredMetadata.ContentID)
-		}
 	}
-}
-
-// UpdateFeed updates the blockchain associated with the given user id with the given new block. The new block is also
-// added to the in-memory storage.
-func (s *Store) UpdateFeed(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string, newBlock types.BlockchainBlock) {
-	// Get the blockchain store associated with the user's feed.
-	blockchainStore := blockchainStorage.GetStore(IDFromUserID(userID))
-	// Update the last block.
-	blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
-	newBlockHash := hex.EncodeToString(newBlock.Hash)
-	newBlockBytes, _ := newBlock.Marshal()
-	// Append the block into the blockchain.
-	blockchainStore.Set(newBlockHash, newBlockBytes)
-	// Extract the content metadata.
-	metadata := content.ParseMetadata(newBlock.Value.CustomValue)
-	feed := s.GetFeed(blockchainStorage, metadataStore, userID)
-	s.Lock()
-	// Append into the in-memory as well.
-	s.processAndAppend(feed,
-		blockchainStorage, metadataStore, userID, metadata, newBlockHash)
-	s.Unlock()
 }

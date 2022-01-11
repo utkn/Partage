@@ -1438,7 +1438,7 @@ func Test_HW3_Tag_Paxos_Catchup(t *testing.T) {
 	// > let's add the third peer and see if it can catchup.
 
 	node3 := z.NewTestNode(t, peerFac, transp, "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
-	println("Late joiner address:", node3.GetAddr())
+	//println("Late joiner address:", node3.GetAddr())
 	defer node3.Stop()
 
 	node3.AddPeer(node2.GetAddr())

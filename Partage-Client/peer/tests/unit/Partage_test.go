@@ -516,7 +516,7 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	textContentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
 	// Comment on it.
-	commentContentID, commentHash, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
+	commentContentID, _, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the comment.
 	for _, n := range nodes {
@@ -542,15 +542,6 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 		receivedBytes, _ := n.DownloadPost(contentIDs[0])
 		commentPost := content.ParseCommentPost(receivedBytes)
 		require.Equal(t, originalComment, commentPost.Text)
-	}
-	// Now, first try to undo the comment.
-	node2.UpdateFeed(content.CreateUndoMetadata(node2.GetUserID(), utils.Time(), commentHash))
-	time.Sleep(1 * time.Second)
-	for _, n := range nodes {
-		c := n.GetFeedContents(node2.GetUserID())
-		require.Len(t, c, 2)
-		// Should be masked.
-		require.Equal(t, "", c[0].ContentID)
 	}
 }
 
@@ -666,6 +657,7 @@ func Test_Partage_Undo(t *testing.T) {
 	}
 	// Try to undo the text message itself.
 	node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), n1TextBlockHash))
+	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		contents := n.GetFeedContents(node1.GetUserID())
 		require.Len(t, contents, 2)
@@ -874,7 +866,7 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			require.Len(t, rumor.Rumors, 1)
 			r := rumor.Rumors[0]
 			require.Equal(t, node1.GetAddr(), r.Origin)
-			require.Equal(t, int64(1), r.Sequence) // must start with 1
+			require.Equal(t, uint(1), r.Sequence) // must start with 1
 
 			fake.Compare(t, r.Msg)
 
@@ -889,7 +881,7 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			require.Len(t, rumor.Rumors, 1)
 			r = rumor.Rumors[0]
 			require.Equal(t, node1.GetAddr(), r.Origin)
-			require.Equal(t, int64(1), r.Sequence)
+			require.Equal(t, uint(1), r.Sequence)
 
 			fake.Compare(t, r.Msg)
 

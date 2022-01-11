@@ -17,15 +17,26 @@ import (
 func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
 		utils.PrintDebug("social", "Updating local feed...")
-		// Update the feed, also appending to the appropriate blockchain.
-		feedStore.UpdateFeed(blockchainStorage, metadataStore, userID, newBlock)
+		// Get the blockchain store associated with the user's feed.
+		blockchainStore := blockchainStorage.GetStore(feed.IDFromUserID(userID))
+		// Update the last block.
+		blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
+		newBlockHash := hex.EncodeToString(newBlock.Hash)
+		newBlockBytes, _ := newBlock.Marshal()
+		// Append the block into the blockchain.
+		blockchainStore.Set(newBlockHash, newBlockBytes)
+		// Update the feed.
+		feedStore.AppendToFeed(blockchainStorage, metadataStore, userID, newBlock)
 	}
 }
 
 // FeedProposalChecker takes a user id and returns a paxos proposal checker.
 func FeedProposalChecker(userID string) paxos.ProposalChecker {
 	return func(msg types.PaxosProposeMessage) bool {
-		// TODO Check remaining credits, timestamp etc.
+		// TODO Check remaining credits, timestamp, signature etc.
+		// Self-endorsement, re-endorsement
+		// Re-reactions
+		// Malformed undo-s
 		return true
 	}
 }

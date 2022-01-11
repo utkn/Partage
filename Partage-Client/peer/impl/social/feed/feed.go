@@ -89,21 +89,30 @@ func (f *Feed) GetWithHash(blockHash string) (content.Metadata, error) {
 	return m, nil
 }
 
-// Append appends a new feed content into the feed without processing it. The associated blockchain is not modified.
-func (f *Feed) Append(c content.Metadata, blockHash string) {
+// Append appends a new feed content into the feed and updates the user state accordingly. The underlying blockchain is not modified.
+func (f *Feed) Append(c content.Metadata, blockHash string) error {
 	f.Lock()
 	defer f.Unlock()
 	// Add the metadata.
 	f.contents = append(f.contents, c)
 	f.blockHashes[blockHash] = c
+	return f.userState.Update(c)
 }
 
-// HideContent hides the contents of the post with the given content id. When GetContents is called, the content id of
-// the hidden posts are masked.
-func (f *Feed) HideContent(contentID string) {
+// Undo tries to undo the given already appended metadata. The underlying blockchain is not modified.
+func (f *Feed) Undo(c content.Metadata) error {
 	f.Lock()
 	defer f.Unlock()
-	f.hiddenContentIDs[contentID] = struct{}{}
+	// First, undo the user state if possible.
+	err := f.userState.Undo(c)
+	if err != nil {
+		return err
+	}
+	// Then, try to undo the feed.
+	if c.Type == content.TEXT || c.Type == content.COMMENT {
+		f.hiddenContentIDs[c.ContentID] = struct{}{}
+	}
+	return nil
 }
 
 // UpdateEndorsement updates the endorsement given by a different user.
