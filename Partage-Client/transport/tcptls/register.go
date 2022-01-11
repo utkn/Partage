@@ -19,9 +19,9 @@ const serverAddr = "127.0.0.1:1234" //Certificate Authority Server address
 // Since we are using Certificates in order to authenticate users, the users authentication is directly related to the TLS Socket
 func (tlsSock *Socket) RegisterUser() error {
 	//check if Certificate in use is self-signed, if so..
-	fmt.Println("DEBUG: registering new user...")
+	utils.PrintDebug("tls", "DEBUG: registering new user...")
 	if res, _ := utils.TLSIsSelfSigned(tlsSock.GetTLSCertificate()); !res {
-		fmt.Println("user already registered")
+		utils.PrintDebug("tls", "user already registered")
 		return nil
 	}
 	bufSize := 65000
@@ -34,13 +34,13 @@ func (tlsSock *Socket) RegisterUser() error {
 		// Convert to a network error to specifically check for timeout errors.
 		netErr, ok := err.(net.Error)
 		if ok && netErr.Timeout() {
-			fmt.Println("[ERROR] timeout while trying to establish connection with CA server...")
+			utils.PrintDebug("tls", "[ERROR] timeout while trying to establish connection with CA server...")
 			return transport.TimeoutErr(0)
 		}
 		if err == io.EOF {
-			fmt.Println("[WARNING] the CA server closed the connection!")
+			utils.PrintDebug("tls", "[WARNING] the CA server closed the connection!")
 		} else {
-			fmt.Println("[ERROR] dialing CA server...", err)
+			utils.PrintDebug("tls", "[ERROR] dialing CA server...", err)
 		}
 		return err
 	}
@@ -48,12 +48,12 @@ func (tlsSock *Socket) RegisterUser() error {
 	deadline := time.Now().Add(15 * time.Second) // Waits for CA-server response for..15 seconds
 	err = conn.SetReadDeadline(deadline)
 	if err != nil {
-		fmt.Println("[ERROR] setting read timeout with CA server...", err)
+		utils.PrintDebug("tls", "[ERROR] setting read timeout with CA server...", err)
 		return err
 	}
 	size, err := conn.Read(buf)
 	if err != nil {
-		fmt.Println("CA server didn't respond...try again later!", err)
+		utils.PrintDebug("tls", "CA server didn't respond...try again later!", err)
 		return err
 	}
 	err = msg.Decode(buf[:size])
@@ -64,7 +64,7 @@ func (tlsSock *Socket) RegisterUser() error {
 		for {
 			size, err := conn.Read(buf)
 			if err != nil {
-				fmt.Println("[ERROR] reading from CA server...", err)
+				utils.PrintDebug("tls", "[ERROR] reading from CA server...", err)
 				return err
 			}
 			cum = append(cum, buf[:size]...)
@@ -78,41 +78,41 @@ func (tlsSock *Socket) RegisterUser() error {
 	}
 	//PROCESS CA response
 	if msg.Type == "ERROR" {
-		fmt.Println("[ERROR] " + string(msg.Payload))
+		utils.PrintDebug("tls", "[ERROR] "+string(msg.Payload))
 		return errors.New(string(msg.Payload))
-	}else if msg.Type == "WARNING"{
-		fmt.Println(string(msg.Payload))
+	} else if msg.Type == "WARNING" {
+		utils.PrintDebug("tls", string(msg.Payload))
 		var input string
-		if utils.TESTING{
-			time.Sleep(time.Second*2)
-			input="12348765"
-		}else{
+		if utils.TESTING {
+			time.Sleep(time.Second * 2)
+			input = "12348765"
+		} else {
 			fmt.Print("[VERIFICATION CODE]: ")
 			//Read from stdin
 			fmt.Scanln(&input)
 		}
-		fmt.Println("Sending "+input+" code!")
-		codeMsg:=&types.CertificateAuthorityMessage{
-			Type: "CODE",
+		utils.PrintDebug("tls", "Sending "+input+" code!")
+		codeMsg := &types.CertificateAuthorityMessage{
+			Type:    "CODE",
 			Payload: []byte(input),
 		}
-		bytes,_:=codeMsg.Encode()
+		bytes, _ := codeMsg.Encode()
 		conn.Write(bytes)
 	} else {
-		fmt.Println("[ERROR] unknown type of CA message:", msg.Type)
+		utils.PrintDebug("tls", "[ERROR] unknown type of CA message:", msg.Type)
 		return errors.New("unknown type of CA msg")
 	}
 
 	deadline = time.Now().Add(15 * time.Second) // Waits for CA-server response for..15 seconds
 	err = conn.SetReadDeadline(deadline)
 	if err != nil {
-		fmt.Println("[ERROR] setting read timeout with CA server...", err)
+		utils.PrintDebug("tls", "[ERROR] setting read timeout with CA server...", err)
 		return err
 	}
 	//WAIT FOR CA RESPONSE
 	size, err = conn.Read(buf)
 	if err != nil {
-		fmt.Println("CA server didn't respond...try again later!", err)
+		utils.PrintDebug("tls", "CA server didn't respond...try again later!", err)
 		return err
 	}
 	err = msg.Decode(buf[:size])
@@ -123,7 +123,7 @@ func (tlsSock *Socket) RegisterUser() error {
 		for {
 			size, err := conn.Read(buf)
 			if err != nil {
-				fmt.Println("[ERROR] reading from CA server...", err)
+				utils.PrintDebug("tls", "[ERROR] reading from CA server...", err)
 				return err
 			}
 			cum = append(cum, buf[:size]...)
@@ -134,50 +134,50 @@ func (tlsSock *Socket) RegisterUser() error {
 				break
 			}
 		}
-	}	
+	}
 	//PROCESS CA response
 	if msg.Type == "ERROR" {
-		fmt.Println("[ERROR] " + string(msg.Payload))
+		utils.PrintDebug("tls", "[ERROR] "+string(msg.Payload))
 		return errors.New(string(msg.Payload))
 	} else if msg.Type == "OK" {
 		var details types.Registration
 		//SUCESS!
 		err = details.Decode(msg.Payload)
 		if err != nil {
-			fmt.Println("[ERROR] marshaling Registration details from CA server OK-response...", err)
+			utils.PrintDebug("tls", "[ERROR] marshaling Registration details from CA server OK-response...", err)
 			return err
 		}
 		newCert, err := utils.PemToCertificate(details.SignedCertificate)
 		if err != nil {
-			fmt.Println("[ERROR] converting signed PEM certificate to x509.Certificate...", err)
+			utils.PrintDebug("tls", "[ERROR] converting signed PEM certificate to x509.Certificate...", err)
 			return err
 		}
 		// Store signed-certificate
 		_, err = utils.StoreCertificate(newCert)
 		if err != nil {
-			fmt.Println("[ERROR] storing signed certificate...", err)
+			utils.PrintDebug("tls", "[ERROR] storing signed certificate...", err)
 			return err
 		}
 		// Store CA's certificate
 		_, err = utils.StoreCACertificate(conn.ConnectionState().PeerCertificates[0])
 		if err != nil {
-			fmt.Println("[ERROR] storing CA's certificate...", err)
+			utils.PrintDebug("tls", "[ERROR] storing CA's certificate...", err)
 			return err
 		}
 		// Store CA's signature of my Public Key
 		err = utils.StorePublicKeySignature(details.PublicKeySignature)
 		if err != nil {
-			fmt.Println("[ERROR] storing public key signature...", err)
+			utils.PrintDebug("tls", "[ERROR] storing public key signature...", err)
 			return err
 		}
 
 		// Update all certificate-dependent attributes with this newly-signed certificate
 		tlsSock.UpdateCertificate(newCert, tlsSock.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey), details.PublicKeySignature)
 	} else {
-		fmt.Println("[ERROR] unknown type of CA message:", msg.Type)
+		utils.PrintDebug("tls", "[ERROR] unknown type of CA message:", msg.Type)
 		return errors.New("unknown type of CA msg")
 	}
 
-	fmt.Println("DEBUG: successfully registered user!")
+	utils.PrintDebug("tls", "DEBUG: successfully registered user!")
 	return nil
 }
