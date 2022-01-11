@@ -31,6 +31,7 @@ const cryptoDir =dir+"crypto/"
 const certificatePath = cryptoDir + "cert.pem"
 const keyPath = cryptoDir + "key.pem"
 const signaturePath = cryptoDir + "publickey.signature"
+const BlockedUsersPath = cryptoDir + "blocked-users.db"
 const emailPath = dir+"my.email"
 const CACertificatePath = cryptoDir + "CA/cert.pem"
 
@@ -401,4 +402,20 @@ func PublicKeyToBytes(publicKey *rsa.PublicKey) ([]byte, error) {
 
 func Hash(bytes []byte) [32]byte {
 	return sha256.Sum256(bytes)
+}
+
+func LoadBlockedUsers() (map[[32]byte]struct{},error) {
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	windowSize:=32 //bytes
+	users := make(map[[32]byte]struct{})
+	data, err := os.ReadFile(rt+BlockedUsersPath)
+	if err == nil {
+		var hash [32]byte
+		for i:=0;i<=len(data)-windowSize;i+=windowSize{
+			copy(hash[:], data[i:i+windowSize])
+			users[hash] = struct{}{}
+		}
+	}
+	return users,nil
 }

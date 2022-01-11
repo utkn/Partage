@@ -35,7 +35,7 @@ func (l *Layer) broadcastAway(msg transport.Message) error {
 	rumor.Origin = l.GetAddress()
 	// Beginning of critical section (atomic update of sequence numbers).
 	l.rumorLock.Lock()
-	rumor.Sequence = l.view.GetSequence(l.GetAddress()) + 1
+	rumor.Sequence = uint(l.view.GetSequence(l.GetAddress()) + 1)
 	if l.cryptography != nil {
 		if err := rumor.AddValidation(l.cryptography.GetPrivateKey(), l.cryptography.GetSignedPublicKey()); err != nil {
 			fmt.Println("broadcast away:", err)

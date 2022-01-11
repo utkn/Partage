@@ -321,15 +321,17 @@ func (s *certificateAuthority) SendVerificationCode(email string) (string,error)
 	var challenge string
 	if server.TESTING{
 		challenge=strconv.Itoa(12348765)
+		return challenge,nil
 	}else{
 		challenge=strconv.Itoa(GenerateChallenge())	
-	}
-	msg := []byte("From: "+server.SmtpUsername+"\r\n" +
+		msg := []byte("From: "+server.SmtpUsername+"\r\n" +
         "To: "+email+"\r\n" +
         "Subject: Partage Verification Code\r\n\r\n" +
         "Welcome to Partage! Here you have your Verification Code: "+challenge+"\r\n")
-	err := smtp.SendMail(server.SmtpHost+":"+server.SmtpPort,*s.smtpAuth,server.SmtpUsername,[]string{email},msg)
-	return challenge,err
+		err := smtp.SendMail(server.SmtpHost+":"+server.SmtpPort,*s.smtpAuth,server.SmtpUsername,[]string{email},msg)
+		return challenge,err
+	}
+	
 } 
 
 func (s *certificateAuthority) VerifyUser(email string,conn *tls.Conn) error{

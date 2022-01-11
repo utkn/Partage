@@ -219,3 +219,7 @@ func (l *Layer) AddBlockedIP(addr string,publicKeyHash [32]byte) {
 func (l *Layer) HasBlockedIPs() bool{
 	return l.socket.HasBlockedIPs()
 }
+
+func (l *Layer) GetBlockedIPs() ([]string){
+	return l.socket.GetBlockedIPs()
+}

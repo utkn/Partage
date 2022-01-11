@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -45,6 +46,14 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	ca := utils.LoadCACertificate()
 	pkSignature := utils.LoadPublicKeySignature()
 
+	var blockedUsers map[[32]byte]struct{}
+	if utils.TESTING{
+		blockedUsers=make(map[[32]byte]struct{})
+	}else{
+		blockedUsers,_=utils.LoadBlockedUsers()
+	}
+	fp,_:=utils.OpenFileToAppend(utils.BlockedUsersPath) //to save blocked users in persistent memory
+
 	return &Socket{
 		listener:      &listener,
 		ins:           []transport.Packet{},
@@ -56,8 +65,9 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 		myPKSignature: pkSignature,
 		pktQueue:      make(chan *transport.Packet, 1024),
 		connPool:      newConnPool(),
-		blockedUsers:  make(map[[32]byte]struct{}),
+		blockedUsers:  blockedUsers,
 		blockedIPs: make(map[string][32]byte), //to reject rumors by origin!
+		fpBlockedUsers : fp,
 	}, nil
 }
 
@@ -79,10 +89,12 @@ type Socket struct {
 	connPool          ConnPool
 	pktQueue          chan *transport.Packet
 	CA                *x509.Certificate
+	//blocking mechanism
 	blockedUsers      map[[32]byte]struct{}
 	blockedUsersMutex sync.RWMutex
 	blockedIPs	map[string][32]byte
 	blockedIPsMutex sync.RWMutex
+	fpBlockedUsers *os.File
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -392,6 +404,7 @@ func (s *Socket) Block(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
 	defer s.blockedUsersMutex.Unlock()
 	s.blockedUsers[publicKeyHash] = struct{}{}
+	utils.AppendToFile(publicKeyHash[:],s.fpBlockedUsers)
 }
 
 func (s *Socket) Unblock(publicKeyHash [32]byte) {
@@ -406,6 +419,7 @@ func (s *Socket) Unblock(publicKeyHash [32]byte) {
 		}
 	}
 	s.blockedIPsMutex.Unlock()
+	s.storeBlockedUsers() //re-write blocked-users.db file with updated blocked users
 }
 
 func (s *Socket) IsBlockedIP(addr string) bool{
@@ -425,4 +439,36 @@ func (s *Socket) AddBlockedIP(addr string,publicKeyHash [32]byte) {
 	s.blockedIPsMutex.Lock()
 	defer s.blockedIPsMutex.Unlock()
 	s.blockedIPs[addr]=publicKeyHash
+}
+
+func (s *Socket) storeBlockedUsers() error{
+	s.blockedUsersMutex.Lock()
+	defer s.blockedUsersMutex.Unlock()
+	s.fpBlockedUsers.Close()
+	fp, err := utils.OpenFileToWrite(utils.BlockedUsersPath)
+	if err!=nil{
+		return err
+	}
+	s.fpBlockedUsers=fp
+	for k:=range(s.blockedUsers){
+		utils.AppendToFile(k[:],s.fpBlockedUsers)
+	}
+	s.fpBlockedUsers.Close()
+	s.fpBlockedUsers,err=utils.OpenFileToAppend((utils.BlockedUsersPath))
+	if err!=nil{
+		return err
+	}
+	return nil
+}
+
+func (s *Socket) GetBlockedIPs() []string{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	ips:=make([]string,len(s.blockedIPs))
+	i:=0
+	for ip := range(s.blockedIPs){
+		ips[i]=ip
+		i++
+	}
+	return ips
 }

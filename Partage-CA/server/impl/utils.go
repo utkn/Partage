@@ -63,7 +63,6 @@ func AppendToFile(data []byte, fp *os.File) error {
 }
 
 
-
 func GenerateChallenge() int{
 	//8 digits integer
 	low:=10000000 
