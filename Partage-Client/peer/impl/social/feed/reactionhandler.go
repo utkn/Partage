@@ -18,20 +18,31 @@ func NewReactionHandler() *ReactionHandler {
 	}
 }
 
+// AlreadyReacted returns true if the given user has reacted to the given content.
+func (h *ReactionHandler) AlreadyReacted(contentID string, userID string) bool {
+	h.RLock()
+	defer h.RUnlock()
+	// If already reacted, do not save!
+	for _, reactionInfo := range h.reactionMap[contentID] {
+		if reactionInfo.UserID == userID {
+			utils.PrintDebug("social", "re-react not allowed")
+			return true
+		}
+	}
+	return false
+}
+
 // SaveReaction tries to save the given reaction.
 func (h *ReactionHandler) SaveReaction(reaction content.Reaction, contentID string, userID string) {
+	// Do not want to save reactions if already reacted.
+	if h.AlreadyReacted(contentID, userID) {
+		return
+	}
 	h.Lock()
 	defer h.Unlock()
 	_, ok := h.reactionMap[contentID]
 	if !ok {
 		h.reactionMap[contentID] = []content.ReactionInfo{}
-	}
-	// If already reacted, do not save!
-	for _, reactionInfo := range h.reactionMap[contentID] {
-		if reactionInfo.UserID == userID {
-			utils.PrintDebug("social", "re-react not allowed")
-			return
-		}
 	}
 	// Save.
 	reactionInfo := content.ReactionInfo{

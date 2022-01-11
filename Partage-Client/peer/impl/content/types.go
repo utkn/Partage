@@ -8,6 +8,8 @@ import (
 	"strconv"
 )
 
+// TODO: convert parser errors into panics
+
 type Type int
 
 const (

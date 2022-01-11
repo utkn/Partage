@@ -1,8 +1,8 @@
 package feed
 
 import (
-	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/utils"
 )
 
 type EndorsementHandler struct {
@@ -35,6 +35,9 @@ func (e *EndorsementHandler) Copy() EndorsementHandler {
 }
 
 func (e *EndorsementHandler) Request(time int64) {
+	if !e.CanRequest() {
+		return
+	}
 	e.LastRequestedTime = time
 }
 
@@ -44,26 +47,40 @@ func (e *EndorsementHandler) Reset() {
 	e.EndorsedUsers = make(map[string]struct{}, REQUIRED_ENDORSEMENTS)
 }
 
-// Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
-func (e *EndorsementHandler) Update(currTime int64, endorserID string) bool {
-	// If there is no current endorsement request going on, do nothing.
+// CanRequest returns true if the user can request an endorsement.
+// For now, a user can always initiate a new endorsement request as long as their credits are within range,
+// overriding the last request.
+func (e EndorsementHandler) CanRequest() bool {
+	return true
+}
+
+func (e EndorsementHandler) CanEndorse(currTime int64, endorserID string) bool {
+	// If there is no current endorsement request going on, no endorsement possible.
 	if e.LastRequestedTime < 0 {
 		return false
 	}
-	// If the endorser is the user itself, do nothing.
+	// If the endorser is the user itself, no endorsement possible.
 	if endorserID == e.UserID {
-		fmt.Println("self-endorsement not allowed")
+		utils.PrintDebug("social", "self-endorsement not allowed")
 		return false
 	}
-	// If the user already endorsed, do nothing.
+	// If the user already endorsed, no endorsement possible.
 	_, alreadyEndorsed := e.EndorsedUsers[endorserID]
 	if alreadyEndorsed {
-		fmt.Println("multi-endorsement not allowed")
+		utils.PrintDebug("social", "multi-endorsement not allowed")
 		return false
 	}
-	// Make sure that the endorsement is valid. If not, invalidate it.
+	// Make sure that the endorsement time is valid.
 	if currTime-e.LastRequestedTime >= ENDORSEMENT_INTERVAL {
-		e.Reset()
+		return false
+	}
+	return true
+}
+
+// Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
+func (e *EndorsementHandler) Update(currTime int64, endorserID string) bool {
+	// If the endorsement is invalid, do not update.
+	if !e.CanEndorse(currTime, endorserID) {
 		return false
 	}
 	e.EndorsedUsers[endorserID] = struct{}{}
@@ -81,8 +98,6 @@ type UserState struct {
 	Followed       map[string]struct{}
 	EndorsementHandler
 }
-
-type StateProcessor = func(UserState, content.Metadata) UserState
 
 func NewInitialUserState(userID string) *UserState {
 	return &UserState{
@@ -141,8 +156,7 @@ func (s *UserState) Update(metadata content.Metadata) error {
 	}
 	// Handle endorsement request stuff. The given endorsements will be handled outside, since they reside in different
 	// blockchains.
-	// Only process an endorsement request if the user's credit is lower than the set amount.
-	if metadata.Type == content.ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
+	if metadata.Type == content.ENDORSEMENT_REQUEST {
 		s.EndorsementHandler.Request(metadata.Timestamp)
 	}
 	return nil

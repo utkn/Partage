@@ -3,6 +3,7 @@ package paxos
 import (
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -80,8 +81,15 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 		rejectMsg.Value.CustomValue = []byte("reject")
 		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is sending back an accept for ID", msg.ID)
 		rejectTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&rejectMsg)
-		// Broadcast the reject messages.
-		return a.paxos.Gossip.BroadcastMessage(protocol.WrapInConsensusMessage(a.paxos.ProtocolID, rejectTranspMsg))
+		// Privately send back the reject messages.
+		consensusMsg := protocol.WrapInConsensusMessage(a.paxos.ProtocolID, rejectTranspMsg)
+		consensusTransportMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&consensusMsg)
+		// Wrap the consensus msg in a private msg.
+		privateMsg := types.PrivateMessage{
+			Recipients: map[string]struct{}{msg.Source: {}},
+			Msg:        &consensusTransportMsg,
+		}
+		return a.paxos.Gossip.BroadcastMessage(privateMsg)
 	}
 	// Accept the value and save in the clock.
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is accepting by setting its accepted ID to", msg.ID)
@@ -148,6 +156,10 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 
 func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is handling paxos accept for ID", msg.ID)
+	// Dismiss rejects.
+	if content.IsReject(msg.Value.CustomValue) {
+		return nil
+	}
 	a.paxos.Clock.Lock.Lock()
 	// Do not consider accept messages for an invalid step or ID.
 	if a.paxos.Clock.ShouldIgnorePropose(msg.Step, int(msg.ID)) {

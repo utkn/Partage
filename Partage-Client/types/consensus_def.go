@@ -37,9 +37,10 @@ type PaxosPromiseMessage struct {
 // - implements types.Message
 // - implemented in HW3
 type PaxosProposeMessage struct {
-	Step  uint
-	ID    uint
-	Value PaxosValue
+	Step   uint
+	ID     uint
+	Source string
+	Value  PaxosValue
 }
 
 // PaxosAcceptMessage defines an accept message in Paxos
@@ -47,9 +48,10 @@ type PaxosProposeMessage struct {
 // - implements types.Message
 // - implemented in HW3
 type PaxosAcceptMessage struct {
-	Step  uint
-	ID    uint
-	Value PaxosValue
+	Step   uint
+	ID     uint
+	Source string
+	Value  PaxosValue
 }
 
 // TLCMessage defines a TLC message

@@ -38,13 +38,13 @@ func FeedProposalChecker(userID string, feedStore *feed.Store, blockchainStorage
 		if metadata.Type == content.DUMMY {
 			return false
 		}
-		proposerUserID := metadata.FeedUserID
-		// TODO Check remaining credits, timestamp, signature etc.
-		_ = feedStore.GetFeedCopy(blockchainStorage, metadataStore, proposerUserID)
-		// Self-endorsement, re-endorsement
-		// Re-reactions
-		// Malformed undo-s
-		return true
+		isValid := feedStore.IsValidMetadata(metadata, blockchainStorage, metadataStore)
+		return isValid
+		// TODO timestamp, signature etc.
+		// Check remaining credits ... DONE
+		// Self-endorsement, re-endorsement ... DONE
+		// Re-reactions ... DONE
+		// Malformed undo-s ... DONE
 	}
 }
 

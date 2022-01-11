@@ -39,7 +39,7 @@ func Test_Partage_Registration(t *testing.T) {
 	node3.RegisterUser()
 
 	// Wait for a while.
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// The length of the known users should be 3 for all nodes.
 	require.Len(t, node1.GetKnownUsers(), 3)
@@ -70,7 +70,7 @@ func Test_Partage_Late_Registration(t *testing.T) {
 	node2.RegisterUser()
 
 	// Wait for a while.
-	time.Sleep(3 * time.Second)
+	time.Sleep(4 * time.Second)
 
 	// Late registration.
 	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
@@ -79,7 +79,7 @@ func Test_Partage_Late_Registration(t *testing.T) {
 	node3.RegisterUser()
 
 	// Wait for a while.
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// The length of the known users should be 3 for all nodes.
 	require.Len(t, node1.GetKnownUsers(), 3)
@@ -178,25 +178,10 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	node3.RegisterUser()
 
 	// The first node is sharing three random text posts.
-	node1.UpdateFeed(content.Metadata{
-		FeedUserID: node1.GetUserID(),
-		Type:       content.TEXT,
-		ContentID:  "1",
-		Signature:  nil,
-	})
-	node1.UpdateFeed(content.Metadata{
-		FeedUserID: node1.GetUserID(),
-		Type:       content.TEXT,
-		ContentID:  "2",
-		Signature:  nil,
-	})
-	node1.UpdateFeed(content.Metadata{
-		FeedUserID: node1.GetUserID(),
-		Type:       content.TEXT,
-		ContentID:  "3",
-		Signature:  nil,
-	})
-	time.Sleep(1 * time.Second)
+	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
+	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
+	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
+	time.Sleep(10 * time.Second)
 
 	// Get the posts known by all three nodes.
 	n1Posts := node1.GetFeedContents(node1.GetUserID())
@@ -269,7 +254,7 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 		}(i, n)
 	}
 	// Wait for all the nodes to finalize.
-	time.Sleep(5 * time.Second)
+	time.Sleep(20 * time.Second)
 	// Get the posts known by all three nodes for every node.
 	for nodeIndex, n := range nodes {
 		n1Posts := n.GetFeedContents(n.GetUserID())
@@ -328,16 +313,20 @@ func Test_Partage_User_State(t *testing.T) {
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node3.GetUserState(node1.GetUserID()).Followed, 1)
-	require.True(t, node1.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
-	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
-	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
+	// Double follow is not allowed.
+	_, err := node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID()))
+	time.Sleep(1 * time.Second)
+	require.NotNil(t, err)
+	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
+	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
+	require.Len(t, node3.GetUserState(node1.GetUserID()).Followed, 1)
 	// User credits should not be changed.
 	require.Equal(t, feed.INITIAL_CREDITS, node1.GetUserState(node1.GetUserID()).CurrentCredits)
 	require.Equal(t, feed.INITIAL_CREDITS, node2.GetUserState(node1.GetUserID()).CurrentCredits)
 	require.Equal(t, feed.INITIAL_CREDITS, node3.GetUserState(node1.GetUserID()).CurrentCredits)
 }
 
-func Test_Partage_User_State_Endorsement(t *testing.T) {
+func Test_Partage_Endorsement(t *testing.T) {
 	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
 		z.WithTotalPeers(3),
 		z.WithPaxosID(1),
@@ -374,8 +363,9 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
-	// Try self-endorsement. Ideally should not be appended into the blockchain. Even if it does, should not have an effect.
-	node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), utils.Time(), node1.GetUserID()))
+	// Try self-endorsement. Should not be appended into the blockchain.
+	_, err := node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), utils.Time(), node1.GetUserID()))
+	require.NotNil(t, err)
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -389,7 +379,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Equal(t, 1, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
 	}
-	// Try endorsing through node 2 again. The state should not change.
+	// Try endorsing node 1 by node 2 again. The state should not change.
 	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), utils.Time(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
@@ -585,8 +575,9 @@ func Test_Partage_Reaction(t *testing.T) {
 	// Let node 3 to be angry by the meaning of this placeholder text.
 	node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.ANGRY, utils.Time(), textContentID))
 	// ... so angry that he tries to also disapprove, not knowing that re-reactions won't be registered by the network.
-	node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.DISAPPROVE, utils.Time(), textContentID))
+	_, err := node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.DISAPPROVE, utils.Time(), textContentID))
 	time.Sleep(1 * time.Second)
+	require.NotNil(t, err)
 	// Let check whether the reaction is reflected on all users.
 	for _, n := range nodes {
 		reactions := n.GetReactions("123")
@@ -672,11 +663,18 @@ func Test_Partage_Undo(t *testing.T) {
 		require.True(t, n.GetUserState(node3.GetUserID()).IsFollowing(node1.GetUserID()))
 	}
 	// Undo the follow.
+	// First, let node1 try to undo node 3's follow.
+	_, err := node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), followHash))
+	require.NotNil(t, err)
+	// Now, let node 3 undo its own follow.
 	node3.UpdateFeed(content.CreateUndoMetadata(node3.GetUserID(), utils.Time(), followHash))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.False(t, n.GetUserState(node3.GetUserID()).IsFollowing(node1.GetUserID()))
 	}
+	// Let node 1 try to undo an inexisting block.
+	_, err = node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), "test"))
+	require.NotNil(t, err)
 }
 
 func Test_Partage_Invalid_Block(t *testing.T) {

@@ -149,9 +149,10 @@ func (s ProposerWaitPromiseState) Name() string {
 func (s ProposerWaitAcceptState) Next() (State, types.BlockchainBlock) {
 	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	proposeMsg := types.PaxosProposeMessage{
-		Step:  s.proposalStep,
-		ID:    s.proposalID,
-		Value: s.chosenValue,
+		Step:   s.proposalStep,
+		ID:     s.proposalID,
+		Value:  s.chosenValue,
+		Source: s.paxos.Gossip.GetAddress(),
 	}
 	proposeTranspMsg, _ := s.paxos.Config.MessageRegistry.MarshalMessage(&proposeMsg)
 	// Broadcast the proposal.
