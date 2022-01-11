@@ -78,24 +78,24 @@ func CreateFollowUserMetadata(userID string, targetUserID string) Metadata {
 	}
 }
 
-func CreateEndorseUserMetadata(userID string, targetUserID string) Metadata {
+func CreateEndorseUserMetadata(userID string, timestamp int64, targetUserID string) Metadata {
 	data, _ := hex.DecodeString(targetUserID)
 	return Metadata{
 		FeedUserID: userID,
 		Type:       ENDORSEMENT,
 		ContentID:  "",
-		Timestamp:  utils.Time(),
+		Timestamp:  timestamp,
 		Data:       data,
 		Signature:  nil,
 	}
 }
 
-func CreateEndorsementRequestMetadata(userID string) Metadata {
+func CreateEndorsementRequestMetadata(userID string, timestamp int64) Metadata {
 	return Metadata{
 		FeedUserID: userID,
 		Type:       ENDORSEMENT_REQUEST,
 		ContentID:  "",
-		Timestamp:  utils.Time(),
+		Timestamp:  timestamp,
 		Data:       nil,
 		Signature:  nil,
 	}

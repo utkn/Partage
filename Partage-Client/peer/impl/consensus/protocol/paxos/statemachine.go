@@ -7,7 +7,7 @@ import (
 )
 
 type State interface {
-	Next() State
+	Next() (State, types.BlockchainBlock)
 	Accept(types.Message) bool
 	Name() string
 }
@@ -17,15 +17,17 @@ type StateMachine struct {
 	Current State
 }
 
-// Run runs the state machine with the given initial state, and returns the last state before termination.
-func (m *StateMachine) Run(initialState State) State {
+// Run runs the state machine with the given initial state, and returns the output of the last state.
+func (m *StateMachine) Run(initialState State) types.BlockchainBlock {
 	m.Lock()
 	m.Current = initialState
 	m.Unlock()
+	var finalOutput types.BlockchainBlock
 	for {
-		nextState := m.Current.Next()
+		nextState, stateOutput := m.Current.Next()
 		if nextState == nil {
 			utils.PrintDebug("statemachine", "State machine exited.")
+			finalOutput = stateOutput
 			break
 		}
 		// Switch the state.
@@ -34,7 +36,7 @@ func (m *StateMachine) Run(initialState State) State {
 		m.Current = nextState
 		m.Unlock()
 	}
-	return m.Current
+	return finalOutput
 }
 
 // Input routes the given message to the current state of the state machine.

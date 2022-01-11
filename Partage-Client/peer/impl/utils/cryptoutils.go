@@ -27,12 +27,12 @@ import (
 const TESTING = true //TODO: change!!
 
 const dir = "Partage/Partage-Client/partage-storage/"
-const cryptoDir =dir+"crypto/"
+const cryptoDir = dir + "crypto/"
 const certificatePath = cryptoDir + "cert.pem"
 const keyPath = cryptoDir + "key.pem"
 const signaturePath = cryptoDir + "publickey.signature"
 const BlockedUsersPath = cryptoDir + "blocked-users.db"
-const emailPath = dir+"my.email"
+const emailPath = dir + "my.email"
 const CACertificatePath = cryptoDir + "CA/cert.pem"
 
 func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
@@ -62,7 +62,7 @@ func LoadCertificate(fromPersistentMem bool) (*tls.Certificate, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &cert,nil
+			return &cert, nil
 		}
 		return &cert, nil
 
@@ -259,27 +259,28 @@ func generateKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, 1024)
 }
 
-func loadEmailFromFile() string{
+func loadEmailFromFile() string {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	data, err := os.ReadFile(rt+emailPath)
+	data, err := os.ReadFile(rt + emailPath)
 	if err != nil {
 		return ""
 	}
 	return string(data)
 }
+
 //used to generate a signed certificate (if signingAuthority==nil, certificate is self-signed)
 //returns new certificate as ASN.1 DER data (can be parsed to x509.Certificate object with x509.ParseCertificate(der []byte) function)
 func GenerateCertificate(privateKey *rsa.PrivateKey, signingAuthority *x509.Certificate) (*x509.Certificate, error) {
 	// Load e-mail from file!
 	var email string
-	if TESTING{
+	if TESTING {
 		mathRand.Seed(time.Now().Unix())
-		email="abdefg"+strconv.Itoa(mathRand.Intn(99999999))+"@gmail.com" //testing purposes	
-	}else{
-		email=loadEmailFromFile() 
+		email = "abdefg" + strconv.Itoa(mathRand.Intn(99999999)) + "@gmail.com" //testing purposes
+	} else {
+		email = loadEmailFromFile()
 	}
-	
+
 	//each certificate needs a unique serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -404,18 +405,18 @@ func Hash(bytes []byte) [32]byte {
 	return sha256.Sum256(bytes)
 }
 
-func LoadBlockedUsers() (map[[32]byte]struct{},error) {
+func LoadBlockedUsers() (map[[32]byte]struct{}, error) {
 	wd, _ := os.Getwd()
 	rt := wd[:strings.Index(wd, "Partage")]
-	windowSize:=32 //bytes
+	windowSize := 32 //bytes
 	users := make(map[[32]byte]struct{})
-	data, err := os.ReadFile(rt+BlockedUsersPath)
+	data, err := os.ReadFile(rt + BlockedUsersPath)
 	if err == nil {
 		var hash [32]byte
-		for i:=0;i<=len(data)-windowSize;i+=windowSize{
+		for i := 0; i <= len(data)-windowSize; i += windowSize {
 			copy(hash[:], data[i:i+windowSize])
 			users[hash] = struct{}{}
 		}
 	}
-	return users,nil
+	return users, nil
 }

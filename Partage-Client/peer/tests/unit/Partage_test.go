@@ -368,21 +368,21 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 
 	// First, request an endorsement.
 	nodes := []z.TestNode{node1, node2, node3}
-	node1.UpdateFeed(content.CreateEndorsementRequestMetadata(node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorsementRequestMetadata(node1.GetUserID(), utils.Time()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Try self-endorsement. Ideally should not be appended into the blockchain. Even if it does, should not have an effect.
-	node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), node1.GetUserID()))
+	node1.UpdateFeed(content.CreateEndorseUserMetadata(node1.GetUserID(), utils.Time(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
 		require.Equal(t, 0, n.GetUserState(node1.GetUserID()).GivenEndorsements)
 	}
 	// Now, let node 2 endorse the node 1.
-	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), utils.Time(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -390,7 +390,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 		require.Len(t, n.GetUserState(node1.GetUserID()).EndorsedUsers, 1)
 	}
 	// Try endorsing through node 2 again. The state should not change.
-	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), node1.GetUserID()))
+	node2.UpdateFeed(content.CreateEndorseUserMetadata(node2.GetUserID(), utils.Time(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		require.Equal(t, feed.INITIAL_CREDITS, n.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -400,7 +400,7 @@ func Test_Partage_User_State_Endorsement(t *testing.T) {
 	// Now, let node 3 endorse the node 1 as well.
 	defaultEndorsementCount := feed.REQUIRED_ENDORSEMENTS
 	feed.REQUIRED_ENDORSEMENTS = 2
-	node3.UpdateFeed(content.CreateEndorseUserMetadata(node3.GetUserID(), node1.GetUserID()))
+	node3.UpdateFeed(content.CreateEndorseUserMetadata(node3.GetUserID(), utils.Time(), node1.GetUserID()))
 	time.Sleep(1 * time.Second)
 	newCredits := feed.INITIAL_CREDITS + feed.ENDORSEMENT_REWARD
 	// The endorsement handler should be reset and the credits should be updated.

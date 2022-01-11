@@ -29,10 +29,10 @@ func (v *PeerView) getSequence(peerAddr string) int64 {
 	return int64(len(rumorList))
 }
 
-func (v *PeerView) DropViewFrom(addr string){
+func (v *PeerView) DropViewFrom(addr string) {
 	v.rumorMapLock.Lock()
 	defer v.rumorMapLock.Unlock()
-	delete(v.rumorMap,addr)
+	delete(v.rumorMap, addr)
 }
 
 func (v *PeerView) IsExpected(peerAddr string, givenSequence int64) bool {
@@ -114,7 +114,7 @@ func (v *PeerView) Compare(remoteSequenceMap SeqMap) (SeqMap, SeqMap) {
 	// Then, find all the new peers that current view has, i.e., This - Remote
 	for thisPeer, thisSeq := range mySeqMap {
 		remoteSeq, ok := remoteSequenceMap[thisPeer]
-		if remoteSeq==-1{
+		if remoteSeq == -1 {
 			continue //ignore
 		}
 		if !ok || thisSeq > remoteSeq {

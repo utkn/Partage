@@ -39,11 +39,9 @@ type ProposerDoneState struct {
 	proposalID    uint
 	proposedValue types.PaxosValue
 	originalValue types.PaxosValue
-
-	finalBlock types.BlockchainBlock
 }
 
-func (s ProposerBeginState) Next() State {
+func (s ProposerBeginState) Next() (State, types.BlockchainBlock) {
 	s.paxos.Clock.Lock.RLock()
 	// Catch up with the clock!
 	for int(s.paxos.LastProposalID) < s.paxos.Clock.MaxID {
@@ -61,7 +59,7 @@ func (s ProposerBeginState) Next() State {
 		proposalStep:  proposalStep,
 		notification:  utils.NewAsyncNotificationHandler(),
 		originalValue: s.value,
-	}
+	}, types.BlockchainBlock{}
 }
 
 func (s ProposerBeginState) Accept(message types.Message) bool {
@@ -72,7 +70,7 @@ func (s ProposerBeginState) Name() string {
 	return "ProposerBegin"
 }
 
-func (s ProposerWaitPromiseState) Next() State {
+func (s ProposerWaitPromiseState) Next() (State, types.BlockchainBlock) {
 	// First, broadcast the prepare-message.
 	prepareMsg := types.PaxosPrepareMessage{
 		Step:   s.proposalStep,
@@ -100,7 +98,7 @@ func (s ProposerWaitPromiseState) Next() State {
 		return ProposerBeginState{
 			paxos: s.paxos,
 			value: s.originalValue,
-		}
+		}, types.BlockchainBlock{}
 	}
 	// Get the highest last accepted value if it exists.
 	var alreadyAcceptedValue *types.PaxosValue
@@ -126,7 +124,7 @@ func (s ProposerWaitPromiseState) Next() State {
 		proposalID:    s.proposalID,
 		proposalStep:  s.proposalStep,
 		notification:  utils.NewAsyncNotificationHandler(),
-	}
+	}, types.BlockchainBlock{}
 }
 
 func (s ProposerWaitPromiseState) Accept(message types.Message) bool {
@@ -147,7 +145,7 @@ func (s ProposerWaitPromiseState) Name() string {
 	return "ProposerWaitPromise"
 }
 
-func (s ProposerWaitAcceptState) Next() State {
+func (s ProposerWaitAcceptState) Next() (State, types.BlockchainBlock) {
 	threshold := s.paxos.Config.PaxosThreshold(s.paxos.Config.TotalPeers)
 	proposeMsg := types.PaxosProposeMessage{
 		Step:  s.proposalStep,
@@ -178,15 +176,15 @@ func (s ProposerWaitAcceptState) Next() State {
 		return ProposerBeginState{
 			paxos: s.paxos,
 			value: s.originalValue,
-		}
+		}, types.BlockchainBlock{}
 	}
-	return &ProposerDoneState{
+	return ProposerDoneState{
 		paxos:         s.paxos,
 		proposalStep:  s.proposalStep,
 		proposalID:    s.proposalID,
 		proposedValue: s.chosenValue,
 		originalValue: s.originalValue,
-	}
+	}, types.BlockchainBlock{}
 }
 
 func (s ProposerWaitAcceptState) Accept(message types.Message) bool {
@@ -205,7 +203,7 @@ func (s ProposerWaitAcceptState) Name() string {
 	return "ProposerWaitAccept"
 }
 
-func (s *ProposerDoneState) Next() State {
+func (s ProposerDoneState) Next() (State, types.BlockchainBlock) {
 	// Listen to the tick from the global notification handler.
 	tlcMsg := s.paxos.Notification.ResponseCollector(fmt.Sprint("tick", s.proposalStep), s.paxos.Config.PaxosProposerRetry)
 	// Retry if the whole proposal has timed out.
@@ -214,25 +212,25 @@ func (s *ProposerDoneState) Next() State {
 		//println(p.gossip.GetAddress(), "NO TICK!")
 		return ProposerBeginState{
 			paxos: s.paxos,
-		}
+		}, types.BlockchainBlock{}
 	}
 	// Retry if the proposed value is not ours.
 	if s.originalValue.UniqID != s.proposedValue.UniqID {
 		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "will now retry to propose its own value.")
 		return ProposerBeginState{
 			paxos: s.paxos,
-		}
+		}, types.BlockchainBlock{}
 	}
-	s.finalBlock = tlcMsg.(types.TLCMessage).Block
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has concluded the proposal with ID",
 		s.proposalID, "and value", s.proposedValue.String())
-	return nil
+	// Stop the state machine and return the agreed block.
+	return nil, tlcMsg.(types.TLCMessage).Block
 }
 
-func (s *ProposerDoneState) Accept(message types.Message) bool {
+func (s ProposerDoneState) Accept(message types.Message) bool {
 	return false
 }
 
-func (s *ProposerDoneState) Name() string {
+func (s ProposerDoneState) Name() string {
 	return "ProposerDone"
 }

@@ -17,15 +17,15 @@ var DEBUG = map[string]bool{
 	"antientropy":   false,
 	"heartbeat":     false,
 	"messaging":     false,
-	"gossip":        false,
+	"gossip":        true,
 	"data":          false,
-	"acceptor":      false,
+	"acceptor":      true,
 	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
 	"social":        false,
 	"statemachine":  false,
-	"tls":           false,
+	"tls":           true,
 }
 
 func PrintDebug(tag string, objs ...interface{}) {

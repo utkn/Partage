@@ -45,12 +45,12 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 					// Valid..
 					bytesPK, _ := utils.PublicKeyToBytes(rumor.Check.SrcPublicKey.PublicKey)
 					hashPK := utils.Hash(bytesPK)
-					
+
 					//check if rumor is from blocked user
-					if l.cryptography.IsBlocked(hashPK){
-						if !l.cryptography.IsBlockedIP(rumor.Origin){
+					if l.cryptography.IsBlocked(hashPK) {
+						if !l.cryptography.IsBlockedIP(rumor.Origin) {
 							//store blocked user ip adr
-							l.cryptography.AddBlockedIP(rumor.Origin,hashPK)
+							l.cryptography.AddBlockedIP(rumor.Origin, hashPK)
 							//drop view
 							l.view.DropViewFrom(rumor.Origin)
 						}
@@ -102,9 +102,9 @@ func (l *Layer) RumorsMessageHandler(msg types.Message, pkt transport.Packet) er
 	ackMsg := types.AckMessage{}
 	ackMsg.AckedPacketID = pkt.Header.PacketID
 	ackMsg.Status = l.view.AsStatusMsg()
-	if l.cryptography!=nil{
-		for _,ip:=range(l.cryptography.GetBlockedIPs()){
-			ackMsg.Status[ip]=-1
+	if l.cryptography != nil {
+		for _, ip := range l.cryptography.GetBlockedIPs() {
+			ackMsg.Status[ip] = -1
 		}
 	}
 	// Convert it into a transport message.
@@ -130,9 +130,7 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 	// rmtNews contains the rumors that are new to me.
 	// thsNews contains the rumors that are new to the remote node.
 	rmtNews, thsNews := l.view.Compare(SeqMap(*statusMsg))
-	utils.PrintDebug("gossip", l.GetAddress(), "found the following differences:")
-	utils.PrintDebug("gossip", "rmtNews:", rmtNews)
-	utils.PrintDebug("gossip", "thsNews", thsNews)
+	utils.PrintDebug("gossip", l.GetAddress(), "found the following differences:", "\nrmtNews:", rmtNews, "\nthsNews:", thsNews)
 	// Send back the missing rumors.
 	if len(thsNews) > 0 {
 		rumorsMsg := types.RumorsMessage{}
@@ -170,20 +168,20 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 			return l.network.Route(l.GetAddress(), pkt.Header.RelayedBy, pkt.Header.RelayedBy, trnspMsg)
 		}
 	}
-	// Remove blocked user's IPs from rmtNews 
-	if l.cryptography.HasBlockedIPs(){
-		for k:=range(rmtNews){
-			if l.cryptography.IsBlockedIP(k){
-				delete(rmtNews,k) // remove blocked users entries to avoid requesting for it
+	// Remove blocked user's IPs from rmtNews
+	if l.cryptography != nil && l.cryptography.HasBlockedIPs() {
+		for k := range rmtNews {
+			if l.cryptography.IsBlockedIP(k) {
+				delete(rmtNews, k) // remove blocked users entries to avoid requesting for it
 			}
 		}
 	}
 	// Request my missing rumors from the remote peer after I make sure that he is up to date.
 	if len(rmtNews) > 0 {
 		myStatusMsg := l.view.AsStatusMsg()
-		if l.cryptography!=nil{
-			for _,ip:=range(l.cryptography.GetBlockedIPs()){
-				myStatusMsg[ip]=-1
+		if l.cryptography != nil {
+			for _, ip := range l.cryptography.GetBlockedIPs() {
+				myStatusMsg[ip] = -1
 			}
 		}
 		trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)
@@ -205,9 +203,9 @@ func (l *Layer) StatusMessageHandler(msg types.Message, pkt transport.Packet) er
 				return nil
 			}
 			myStatusMsg := l.view.AsStatusMsg()
-			if l.cryptography!=nil{
-				for _,ip:=range(l.cryptography.GetBlockedIPs()){
-					myStatusMsg[ip]=-1
+			if l.cryptography != nil {
+				for _, ip := range l.cryptography.GetBlockedIPs() {
+					myStatusMsg[ip] = -1
 				}
 			}
 			trnspMsg, _ := l.config.MessageRegistry.MarshalMessage(&myStatusMsg)

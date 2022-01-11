@@ -51,12 +51,11 @@ func (p *Paxos) GetProtocolID() string {
 }
 
 func (p *Paxos) Propose(val types.PaxosValue) (string, error) {
-	doneState := p.Proposer.Run(ProposerBeginState{
+	outputBlock := p.Proposer.Run(ProposerBeginState{
 		paxos: p,
 		value: val,
 	})
-	blockHashBytes := doneState.(*ProposerDoneState).finalBlock.Hash
-	return hex.EncodeToString(blockHashBytes), nil
+	return hex.EncodeToString(outputBlock.Hash), nil
 }
 
 func (p *Paxos) HandleConsensusMessage(msg protocol.ConsensusMessage) error {

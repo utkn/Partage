@@ -143,7 +143,7 @@ func (n *node) Start() error {
 						utils.PrintDebug("network", n.addr, "listener is about to process a", cpkt.Msg.Type)
 						err := n.conf.MessageRegistry.ProcessPacket(cpkt)
 						if err != nil {
-							fmt.Printf("could not process the packet: %s", err.Error())
+							fmt.Printf("could not process the %s packet: %s", cpkt.Msg.Type, err.Error())
 						}
 					}()
 					continue
@@ -161,6 +161,7 @@ func (n *node) Start() error {
 			}
 		}()
 	} else {
+		// No crypto
 		go func() {
 			quitListener, _ := n.quitDistributor.GetListener("server")
 			for {
@@ -187,7 +188,7 @@ func (n *node) Start() error {
 							utils.PrintDebug("network", n.addr, "listener is about to process a", pkt.Msg.Type)
 							err := n.conf.MessageRegistry.ProcessPacket(cpkt)
 							if err != nil {
-								fmt.Printf("could not process the packet: %s", err.Error())
+								fmt.Printf("could not process the %s packet: %s", cpkt.Msg.Type, err.Error())
 							}
 						}()
 						continue

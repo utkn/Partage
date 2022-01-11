@@ -167,7 +167,7 @@ func (a *Acceptor) HandleAccept(msg types.PaxosAcceptMessage) error {
 		Block: block,
 	}
 	tlcTranspMessage, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&tlcMessage)
-	utils.PrintDebug("proposer", a.paxos.Gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
+	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is broadcasting TLC for value", tlcMessage.Block.Value.String(),
 		"for step", msg.Step, "from accepthandler")
 	return a.paxos.Gossip.BroadcastMessage(protocol.WrapInConsensusMessage(a.paxos.ProtocolID, tlcTranspMessage))
 }
