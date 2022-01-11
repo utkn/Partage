@@ -323,7 +323,7 @@ func Test_Partage_User_State(t *testing.T) {
 	require.Equal(t, "Descartes", node2.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node3.GetUserState(node1.GetUserID()).Username)
 	// Then, follow a user.
-	h, _ := node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID()))
+	_, _ = node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID()))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
@@ -331,15 +331,6 @@ func Test_Partage_User_State(t *testing.T) {
 	require.True(t, node1.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
-	// Then, unfollow.
-	node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), h))
-	time.Sleep(1 * time.Second)
-	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 0)
-	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 0)
-	require.Len(t, node3.GetUserState(node1.GetUserID()).Followed, 0)
-	require.False(t, node1.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
-	require.False(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
-	require.False(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	// User credits should not be changed.
 	require.Equal(t, feed.INITIAL_CREDITS, node1.GetUserState(node1.GetUserID()).CurrentCredits)
 	require.Equal(t, feed.INITIAL_CREDITS, node2.GetUserState(node1.GetUserID()).CurrentCredits)
@@ -522,7 +513,7 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	originalComment := "Whoa! Nice placeholder you got there, man!"
 	nodes := []z.TestNode{node1, node2, node3}
-	textContentID, textHash, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	textContentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
 	// Comment on it.
 	commentContentID, commentHash, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
@@ -557,15 +548,6 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		c := n.GetFeedContents(node2.GetUserID())
-		require.Len(t, c, 2)
-		// Should be masked.
-		require.Equal(t, "", c[0].ContentID)
-	}
-	// And finally, try to undo the text.
-	node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), textHash))
-	time.Sleep(1 * time.Second)
-	for _, n := range nodes {
-		c := n.GetFeedContents(node1.GetUserID())
 		require.Len(t, c, 2)
 		// Should be masked.
 		require.Equal(t, "", c[0].ContentID)
@@ -607,7 +589,7 @@ func Test_Partage_Reaction(t *testing.T) {
 	textContentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
 	// Let node 2 to be confused by the meaning of this placeholder text.
-	n2ReactionBlockHash, _ := node2.UpdateFeed(content.CreateReactionMetadata(node2.GetUserID(), content.CONFUSED, utils.Time(), textContentID))
+	node2.UpdateFeed(content.CreateReactionMetadata(node2.GetUserID(), content.CONFUSED, utils.Time(), textContentID))
 	time.Sleep(1 * time.Second)
 	// Let node 3 to be angry by the meaning of this placeholder text.
 	node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.ANGRY, utils.Time(), textContentID))
@@ -627,15 +609,81 @@ func Test_Partage_Reaction(t *testing.T) {
 		require.Equal(t, reactions[1].RefContentID, textContentID)
 		require.Equal(t, reactions[1].UserID, node3.GetUserID())
 	}
+}
+
+func Test_Partage_Undo(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Share a text post.
+	originalText := "Lorem ipsum dolor sit amet!!!"
+	nodes := []z.TestNode{node1, node2, node3}
+	textContentID, n1TextBlockHash, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		contents := n.GetFeedContents(node1.GetUserID())
+		require.Len(t, contents, 1)
+		require.NotEqual(t, "", contents[0].ContentID)
+	}
+	// Let node 2 to be confused by the meaning of this placeholder text.
+	n2ReactionBlockHash, _ := node2.UpdateFeed(content.CreateReactionMetadata(node2.GetUserID(), content.CONFUSED, utils.Time(), textContentID))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		reactions := n.GetReactions(textContentID)
+		require.Len(t, reactions, 1)
+	}
 	// Try to undo the CONFUSED reaction by node 2.
 	node2.UpdateFeed(content.CreateUndoMetadata(node2.GetUserID(), utils.Time(), n2ReactionBlockHash))
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		reactions := n.GetReactions(textContentID)
-		require.Len(t, reactions, 1)
-		require.Equal(t, reactions[0].Reaction, content.ANGRY)
-		require.Equal(t, reactions[0].RefContentID, textContentID)
-		require.Equal(t, reactions[0].UserID, node3.GetUserID())
+		require.Len(t, reactions, 0)
+	}
+	// Try to undo the text message itself.
+	node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), n1TextBlockHash))
+	for _, n := range nodes {
+		contents := n.GetFeedContents(node1.GetUserID())
+		require.Len(t, contents, 2)
+		// Text content should be hidden.
+		require.Equal(t, "", contents[0].ContentID)
+		require.Equal(t, content.UNDO, contents[1].Type)
+	}
+	// Let node 3 follow node 1.
+	followHash, _ := node3.UpdateFeed(content.CreateFollowUserMetadata(node3.GetUserID(), node1.GetUserID()))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.True(t, n.GetUserState(node3.GetUserID()).IsFollowing(node1.GetUserID()))
+	}
+	// Undo the follow.
+	node3.UpdateFeed(content.CreateUndoMetadata(node3.GetUserID(), utils.Time(), followHash))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		require.False(t, n.GetUserState(node3.GetUserID()).IsFollowing(node1.GetUserID()))
 	}
 }
 
@@ -721,7 +769,7 @@ func Test_Partage_Broadcast_Rumor_To_Blocked_User(t *testing.T) {
 	node3.AddPeer(node4.GetAddr())
 	//topology:
 	//A--->B---->C---->D
-	
+
 	//nodeC blocks nodeA
 	node3.BlockUser(node1.GetHashedPublicKey())
 

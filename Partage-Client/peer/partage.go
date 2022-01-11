@@ -16,8 +16,9 @@ type PartageClient interface {
 	DownloadPost(contentID string) ([]byte, error)
 	// DiscoverContent returns the matched content ids.
 	DiscoverContent(filter content.Filter) ([]string, error)
-	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
+	// UpdateFeed appends the given content metadata into the peer's feed blockchain permanently. Returns the block hash.
 	UpdateFeed(content.Metadata) (string, error)
+	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}

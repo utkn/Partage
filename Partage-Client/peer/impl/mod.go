@@ -54,9 +54,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 
 	tlsSock, isRunningTLS := conf.Socket.(*tcptls.Socket)
 	if isRunningTLS {
-		_ = tlsSock.RegisterUser()	
-	} 
-		// Create the layers.
+		_ = tlsSock.RegisterUser()
+	}
+	// Create the layers.
 	networkLayer := network.Construct(&conf)
 	var cryptographyLayer *cryptography.Layer
 	if isRunningTLS {
@@ -91,7 +91,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
-	socialLayer.RegisterHandlers() 
+	socialLayer.RegisterHandlers()
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
@@ -290,7 +290,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 	return n.data.SearchFirst(pattern, conf)
 }
 
-// UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
+// UpdateFeed implements peer.DataSharing.
 func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
 	return n.social.ProposeNewPost(metadata)
 }

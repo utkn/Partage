@@ -100,7 +100,8 @@ func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeSto
 	s.feedMap[userID] = feed
 }
 
-// VERY IMPORTANT FUNCTION
+// processAndAppend processes the given metadata and appends it into the given feed.
+// Warning: Not threadsafe, lock should be acquired before calling the method.
 func (s *Store) processAndAppend(f *Feed, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string, c content.Metadata, blockHash string) {
 	// First, save the metadata into the metadata storage.
 	if c.ContentID != "" {
@@ -180,8 +181,10 @@ func (s *Store) UpdateFeed(blockchainStorage storage.MultipurposeStorage, metada
 	blockchainStore.Set(newBlockHash, newBlockBytes)
 	// Extract the content metadata.
 	metadata := content.ParseMetadata(newBlock.Value.CustomValue)
+	feed := s.GetFeed(blockchainStorage, metadataStore, userID)
+	s.Lock()
 	// Append into the in-memory as well.
-	s.processAndAppend(s.GetFeed(blockchainStorage, metadataStore, userID),
+	s.processAndAppend(feed,
 		blockchainStorage, metadataStore, userID, metadata, newBlockHash)
-
+	s.Unlock()
 }
