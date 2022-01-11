@@ -160,9 +160,9 @@ func (s *Store) processAndAppend(f *Feed, blockchainStorage storage.Multipurpose
 		if referredMetadata.Type == content.REACTION {
 			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, c.FeedUserID)
 		}
-		// Undo the text.
-		if referredMetadata.Type == content.TEXT {
-			// UNDO TEXT
+		// Undo the text or comment.
+		if referredMetadata.Type == content.TEXT || referredMetadata.Type == content.COMMENT {
+			f.HideContent(referredMetadata.ContentID)
 		}
 	}
 }

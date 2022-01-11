@@ -8,10 +8,10 @@ import (
 
 type PartageClient interface {
 	RegisterUser() error
-	// ShareTextPost shares the text post with the given content and returns the content id.
-	ShareTextPost(post content.TextPost) (string, error)
-	// ShareCommentPost shares the comment post with the given content and reference id and returns the content id.
-	ShareCommentPost(post content.CommentPost) (string, error)
+	// ShareTextPost shares the text post with the given content and returns the content id, block hash.
+	ShareTextPost(post content.TextPost) (string, string, error)
+	// ShareCommentPost shares the comment post with the given content and reference id and returns the content id, block hash.
+	ShareCommentPost(post content.CommentPost) (string, string, error)
 	// DownloadPost fetches the post with the given content id from the network.
 	DownloadPost(contentID string) ([]byte, error)
 	// DiscoverContent returns the matched content ids.

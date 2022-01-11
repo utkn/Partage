@@ -10,20 +10,23 @@ import (
 // Feed represents a user's feed.
 type Feed struct {
 	sync.RWMutex
-	UserID        string
-	userState     *UserState
-	contents      []content.Metadata
-	blockHashes   map[string]content.Metadata
-	metadataStore storage.Store
+	UserID      string
+	userState   *UserState
+	contents    []content.Metadata
+	blockHashes map[string]content.Metadata
+	// Undo-ed contents.
+	hiddenContentIDs map[string]struct{}
+	metadataStore    storage.Store
 }
 
 func NewEmptyFeed(userID string, metadataStore storage.Store) *Feed {
 	return &Feed{
-		UserID:        userID,
-		userState:     NewInitialUserState(userID),
-		contents:      []content.Metadata{},
-		blockHashes:   make(map[string]content.Metadata),
-		metadataStore: metadataStore,
+		UserID:           userID,
+		userState:        NewInitialUserState(userID),
+		contents:         []content.Metadata{},
+		blockHashes:      make(map[string]content.Metadata),
+		hiddenContentIDs: make(map[string]struct{}),
+		metadataStore:    metadataStore,
 	}
 }
 
@@ -39,11 +42,16 @@ func (f *Feed) Copy() *Feed {
 	for k, v := range f.blockHashes {
 		blockHashes[k] = v
 	}
+	hiddenContentIDs := make(map[string]struct{}, len(f.hiddenContentIDs))
+	for k, v := range f.hiddenContentIDs {
+		hiddenContentIDs[k] = v
+	}
 	return &Feed{
-		UserID:      f.UserID,
-		userState:   &userState,
-		contents:    contents,
-		blockHashes: blockHashes,
+		UserID:           f.UserID,
+		userState:        &userState,
+		contents:         contents,
+		blockHashes:      blockHashes,
+		hiddenContentIDs: hiddenContentIDs,
 		// The store cannot be copied!
 		metadataStore: f.metadataStore,
 	}
@@ -60,6 +68,11 @@ func (f *Feed) GetContents() []content.Metadata {
 	defer f.RUnlock()
 	var contents []content.Metadata
 	for _, c := range f.contents {
+		_, hidden := f.hiddenContentIDs[c.ContentID]
+		// Hide the content id.
+		if hidden {
+			c.ContentID = ""
+		}
 		contents = append(contents, c)
 	}
 	return contents
@@ -83,6 +96,14 @@ func (f *Feed) Append(c content.Metadata, blockHash string) {
 	// Add the metadata.
 	f.contents = append(f.contents, c)
 	f.blockHashes[blockHash] = c
+}
+
+// HideContent hides the contents of the post with the given content id. When GetContents is called, the content id of
+// the hidden posts are masked.
+func (f *Feed) HideContent(contentID string) {
+	f.Lock()
+	defer f.Unlock()
+	f.hiddenContentIDs[contentID] = struct{}{}
 }
 
 // UpdateEndorsement updates the endorsement given by a different user.

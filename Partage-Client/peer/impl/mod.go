@@ -365,28 +365,28 @@ func (n *node) GetUserState(userID string) feed.UserState {
 }
 
 // ShareTextPost implements peer.PartageClient.
-func (n *node) ShareTextPost(post content.TextPost) (string, error) {
+func (n *node) ShareTextPost(post content.TextPost) (string, string, error) {
 	// First, upload the text.
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
-	_, err = n.UpdateFeed(metadata)
-	return metadata.ContentID, err
+	blockHash, err := n.UpdateFeed(metadata)
+	return metadata.ContentID, blockHash, err
 }
 
-func (n *node) ShareCommentPost(post content.CommentPost) (string, error) {
+func (n *node) ShareCommentPost(post content.CommentPost) (string, string, error) {
 	// First, upload the comment.
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseCommentPost(post)))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
-	_, err = n.UpdateFeed(metadata)
-	return metadata.ContentID, err
+	blockHash, err := n.UpdateFeed(metadata)
+	return metadata.ContentID, blockHash, err
 }
 
 func (n *node) DiscoverContent(filter content.Filter) ([]string, error) {
