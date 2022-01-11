@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -87,4 +88,33 @@ func HashNameBlock(index int, uniqID string, fileName string, metahash string, p
 	h.Write(prevHash)
 	hashSlice := h.Sum(nil)
 	return hashSlice
+}
+
+func OpenFileToAppend(path string) (*os.File, error) {
+	//don't forget to close fp! fp.Close()
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	file, err := os.OpenFile(rt+path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func OpenFileToWrite(path string) (*os.File, error) {
+	//don't forget to close fp! fp.Close()
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	file, err := os.OpenFile(rt+path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func AppendToFile(data []byte, fp *os.File) error {
+	if _, err := fp.Write(data); err != nil {
+		return err
+	}
+	return nil
 }

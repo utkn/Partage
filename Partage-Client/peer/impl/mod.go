@@ -54,16 +54,9 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 
 	tlsSock, isRunningTLS := conf.Socket.(*tcptls.Socket)
 	if isRunningTLS {
-		//check if Certificate in use is self-signed, if so..
-		if res, _ := utils.TLSIsSelfSigned(tlsSock.GetCertificate()); res {
-			utils.PrintDebug("tls", "registering new user...")
-			if err := tlsSock.RegisterUser(); err == nil {
-				utils.PrintDebug("tls", "successfully registered user!")
-			}
-		}
-	}
-
-	// Create the layers.
+		_ = tlsSock.RegisterUser()	
+	} 
+		// Create the layers.
 	networkLayer := network.Construct(&conf)
 	var cryptographyLayer *cryptography.Layer
 	if isRunningTLS {
@@ -98,7 +91,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
-	socialLayer.RegisterHandlers()
+	socialLayer.RegisterHandlers() 
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)

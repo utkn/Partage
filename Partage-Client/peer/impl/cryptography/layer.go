@@ -29,7 +29,7 @@ func Construct(network *network.Layer, config *peer.Configuration) *Layer {
 	if !ok {
 		panic("node must have a tcp socket in order to use tls")
 	}
-	_, ok = socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+	_, ok = socket.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey)
 	if !ok {
 		panic("node must have a RSA based TLS Certificate")
 	}
@@ -117,7 +117,7 @@ func (l *Layer) GenerateValidation(msg *transport.Message) (*transport.Validatio
 } */
 
 func (l *Layer) GetPrivateKey() *rsa.PrivateKey {
-	return l.socket.GetCertificate().PrivateKey.(*rsa.PrivateKey)
+	return l.socket.GetTLSCertificate().PrivateKey.(*rsa.PrivateKey)
 }
 
 func (l *Layer) GetUserFromCatalog(hashedPK [32]byte) (*transport.SignedPublicKey, bool) {
@@ -202,4 +202,24 @@ func (l *Layer) GetSignedPublicKey() *transport.SignedPublicKey {
 
 func (l *Layer) GetCAPublicKey() *rsa.PublicKey {
 	return l.socket.GetCAPublicKey()
+}
+
+func (l *Layer) IsBlockedIP(addr string) bool{
+	return l.socket.IsBlockedIP(addr)
+}
+
+func (l *Layer) IsBlocked(hash [32]byte) bool{
+	return l.socket.IsBlocked(hash)
+}
+
+func (l *Layer) AddBlockedIP(addr string,publicKeyHash [32]byte) {
+	l.socket.AddBlockedIP(addr,publicKeyHash)
+}
+
+func (l *Layer) HasBlockedIPs() bool{
+	return l.socket.HasBlockedIPs()
+}
+
+func (l *Layer) GetBlockedIPs() ([]string){
+	return l.socket.GetBlockedIPs()
 }

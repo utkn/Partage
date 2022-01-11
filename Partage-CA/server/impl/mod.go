@@ -9,37 +9,48 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"net/mail"
+	"net/smtp"
 	"os"
 	"partage-ca/server"
+	"strconv"
 	"sync"
 	"time"
 )
 
 type certificateAuthority struct {
 	listener      net.Listener
+	smtpAuth 	*smtp.Auth
 	//storage
 	usersCatalog   map[[32]byte]struct{}
+	emailsCatalog map[string]struct{}
 	catalogMutex  sync.RWMutex
 	
 	myCertificate *x509.Certificate
 	myPrivateKey  *rsa.PrivateKey
-	fp *os.File
+	fpPublicKeys *os.File
+	fpEmails *os.File
 }
 
 func NewServer() server.Server {
 	//init TLS socket listener
-	l, cert, sk, err := initTLSSocket(server.Addr)
+	l, cert, sk, auth,err := initTLSSocket(server.Addr)
 	if err != nil {
 		fmt.Println("[ERROR] creating TLS socket listener...", err)
 		return nil
 	}
 	//load taken usernames from persistent memory
-	keys,err := LoadUsers()
+	keys,emails,err := LoadUsers()
 	if err != nil {
 		fmt.Println("[ERROR] reading from Public Keys file...", err)
 		return nil
 	}
-	fp,err:= OpenFileToAppend()
+	fp,err:= OpenFileToAppend(server.UsersPath)
+	if err != nil {
+		fmt.Println("[ERROR] opening Public Keys file in append mode...", err)
+		return nil
+	}
+	fpEmails,err:= OpenFileToAppend(server.EmailsPath)
 	if err != nil {
 		fmt.Println("[ERROR] opening Public Keys file in append mode...", err)
 		return nil
@@ -47,10 +58,13 @@ func NewServer() server.Server {
 
 	s := &certificateAuthority{
 		listener:      l,
+		smtpAuth: auth,
 		usersCatalog:   keys,
+		emailsCatalog: emails,
 		myCertificate: cert,
 		myPrivateKey:  sk,
-		fp: fp,
+		fpPublicKeys: fp,
+		fpEmails: fpEmails,
 	}
 
 	return s
@@ -77,7 +91,8 @@ func (s *certificateAuthority) Start() error {
 func (s *certificateAuthority) Stop() error {
 	fmt.Println("\nsmoothly stopping server...")
 	s.listener.Close()
-	s.fp.Close()
+	s.fpPublicKeys.Close()
+	s.fpEmails.Close()
 	return nil
 }
 
@@ -118,8 +133,39 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 	clientPublicKeyHash:=Hash(clientPublicKeyBytes)
 	fmt.Println("handling registration request ...")
 
+	// Get e-mail address from user's certificate
+	if len(clientCert.Subject.Organization)==0{
+		// Send msg to client saying that 
+		msg := &server.Message{Type: "ERROR", Payload: []byte("empty e-mail address field")}
+		msgBytes, err := msg.Encode()
+		if err != nil {
+			fmt.Println("[ERROR] marshaling {no email address} msg to send...", err)
+			return
+		}
+		_, err = conn.Write(msgBytes)
+		if err != nil {
+			fmt.Println("[ERROR] sending err message...", err)
+		}
+		return 
+	}
+	clientEmail:=clientCert.Subject.Organization[0]
+	if _,err:=mail.ParseAddress(clientEmail);err!=nil{
+		//invalid e-mail address
+		msg := &server.Message{Type: "ERROR", Payload: []byte("invalid e-mail address")}
+		msgBytes, err := msg.Encode()
+		if err != nil {
+			fmt.Println("[ERROR] marshaling {no email address} msg to send...", err)
+			return
+		}
+		_, err = conn.Write(msgBytes)
+		if err != nil {
+			fmt.Println("[ERROR] sending err message...", err)
+		}
+		return 
+	}
+	
+	s.catalogMutex.RLock()	
 	// Check if public key is not taken
-	s.catalogMutex.RLock()
 	if _, exists := s.usersCatalog[clientPublicKeyHash]; exists {
 		s.catalogMutex.RUnlock()
 		// Send msg to client saying that public key is already taken
@@ -135,10 +181,58 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 		}
 		return //...
 	}
+	// Check if email is not taken
+	if _, exists := s.emailsCatalog[clientEmail]; exists {
+		s.catalogMutex.RUnlock()
+		// Send msg to client saying that public key is already taken
+		msg := &server.Message{Type: "ERROR", Payload: []byte("e-mail address is taken")}
+		msgBytes, err := msg.Encode()
+		if err != nil {
+			fmt.Println("[ERROR] marshaling {email is taken} msg to send...", err)
+			return
+		}
+		_, err = conn.Write(msgBytes)
+		if err != nil {
+			fmt.Println("[ERROR] sending err message...", err)
+		}
+		return //...
+	}
 	s.catalogMutex.RUnlock()
+	// To avoid people registering with the same e-mail while CA is waiting for Verification Code
+	s.catalogMutex.Lock()
+	s.usersCatalog[clientPublicKeyHash] = struct{}{}
+	s.emailsCatalog[clientEmail] = struct{}{}
+	s.catalogMutex.Unlock()
+	fmt.Println("sending verification code to",clientEmail,"...")
+	// Tell user to check e-mail inbox
+	msg := &server.Message{Type: "WARNING", Payload: []byte("Check your "+clientEmail+" inbox for the Verification Code (valid for 4 minutes)")}
+	msgBytes, err := msg.Encode()
+	if err != nil {
+		fmt.Println("[ERROR] marshaling {check inbox} msg to send...", err)
+		return
+	}
+	_, err = conn.Write(msgBytes)
+	if err != nil {
+		fmt.Println("[ERROR] sending {check inbox} message...", err)
+		return
+	}
 
+	// Generate and Send Verification Code to user's e-mail (waits 4 minutes for verification code)
+	if err:=s.VerifyUser(clientEmail,conn); err!=nil{
+		//unable to verify
+		//close connection
+		conn.Close()
+		s.catalogMutex.Lock()
+		delete(s.usersCatalog,clientPublicKeyHash)
+		delete(s.emailsCatalog,clientEmail)
+		s.catalogMutex.Unlock()
+		fmt.Println("[ERROR] on receiving Verification Code from",clientEmail,"--->",err)
+		return 
+	}
+	fmt.Println("User e-mail was verified!")
 	s.catalogMutex.Lock()
 	// Sign client's certificate with CA!
+	clientCert.Subject.Organization=nil //remove e-mail from user's certificate
 	clientCertBytes, err := x509.CreateCertificate(rand.Reader, clientCert, s.myCertificate, clientPublicKey, s.myPrivateKey)
 	if err != nil {
 		s.catalogMutex.Unlock()
@@ -160,13 +254,19 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 	}
 
 	// Record public key as taken
-	err = AppendToFile(clientPublicKeyHash[:],s.fp)
+	err = AppendToFile(clientPublicKeyHash[:],s.fpPublicKeys)
 	if err != nil {
 		s.catalogMutex.Unlock()
 		fmt.Println("[ERROR] storing public key in persistent-memory...", err)
 		return
 	}
-	s.usersCatalog[clientPublicKeyHash] = struct{}{}
+	// Record e-mail as taken
+	err = AppendToFile([]byte(clientEmail+"\n"),s.fpEmails)
+	if err != nil {
+		s.catalogMutex.Unlock()
+		fmt.Println("[ERROR] storing e-mail in persistent-memory...", err)
+		return
+	}
 	s.catalogMutex.Unlock()
 
 	// Prepare registration message to send (SignedCertificate,PublicKeySignature)
@@ -179,8 +279,8 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 		fmt.Println("[ERROR] marshaling payload to json...", err)
 		return
 	}
-	msg := &server.Message{Type: "OK", Payload: payload}
-	msgBytes, err := msg.Encode()
+	msg = &server.Message{Type: "OK", Payload: payload}
+	msgBytes, err = msg.Encode()
 	if err != nil {
 		fmt.Println("[ERROR] marshaling msg to json...", err)
 		return
@@ -196,11 +296,11 @@ func (s *certificateAuthority) handleTLSConn(conn *tls.Conn) {
 	return
 }
 
-func initTLSSocket(address string) (net.Listener, *x509.Certificate, *rsa.PrivateKey, error) {
+func initTLSSocket(address string) (net.Listener, *x509.Certificate, *rsa.PrivateKey, *smtp.Auth,error) {
 	//load CA certificate from memory or generate one (if no certificate is found)
 	certificate, err := LoadCertificate(true)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil,nil, err
 	}
 	// Create tls config with loaded certificate
 	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}, ClientAuth: tls.RequestClientCert, InsecureSkipVerify: true}
@@ -208,9 +308,58 @@ func initTLSSocket(address string) (net.Listener, *x509.Certificate, *rsa.Privat
 	// Create the listening TCP/TLS socket.
 	listener, err := tls.Listen("tcp", address, cfg)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil,err
 	}
 	x509Cert, _ := x509.ParseCertificate(certificate.Certificate[0])
 	sk := certificate.PrivateKey.(*rsa.PrivateKey)
-	return listener, x509Cert, sk, nil
+	//smtp server auth
+	auth:=smtp.PlainAuth("",server.SmtpUsername,server.SmtpPassword,server.SmtpHost)
+	return listener, x509Cert, sk,&auth,nil
+}
+
+func (s *certificateAuthority) SendVerificationCode(email string) (string,error){
+	var challenge string
+	if server.TESTING{
+		challenge=strconv.Itoa(12348765)
+		return challenge,nil
+	}else{
+		challenge=strconv.Itoa(GenerateChallenge())	
+		msg := []byte("From: "+server.SmtpUsername+"\r\n" +
+        "To: "+email+"\r\n" +
+        "Subject: Partage Verification Code\r\n\r\n" +
+        "Welcome to Partage! Here you have your Verification Code: "+challenge+"\r\n")
+		err := smtp.SendMail(server.SmtpHost+":"+server.SmtpPort,*s.smtpAuth,server.SmtpUsername,[]string{email},msg)
+		return challenge,err
+	}
+	
+} 
+
+func (s *certificateAuthority) VerifyUser(email string,conn *tls.Conn) error{
+	challenge,err:=s.SendVerificationCode(email)
+	if err!=nil{
+		return err
+	}
+
+	deadline := time.Now().Add(time.Second*60*4) //4 minutes timeout
+	err = conn.SetReadDeadline(deadline)
+	if err != nil {
+		return err
+	}
+	buf:=make([]byte,4096)
+	size, err := conn.Read(buf)
+	if err != nil {
+		return err 
+	}
+	var msg server.Message 
+	err = msg.Decode(buf[:size])
+	if err != nil {
+		return err 
+	}
+	responseChallenge:=string(msg.Payload)
+	if challenge!=responseChallenge{
+		fmt.Println("rcvd:",responseChallenge," | expected:",challenge)
+		return fmt.Errorf("received invalid verification code")
+	}
+
+	return nil //success!
 }

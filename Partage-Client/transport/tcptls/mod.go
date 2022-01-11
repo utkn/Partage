@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -30,13 +31,12 @@ type TCP struct {
 // CreateSocket implements transport.Transport
 func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	// Load my TLS certificate from memory and my public key signature or generate one (if no certificate is found)
-	certificate, err := utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
+	certificate,err := utils.LoadCertificate(false) //false for testing purposed, true if you want to store and load a certificate from persistent memory!
 	if err != nil {
 		return nil, err
 	}
-
 	// Create tls config with loaded certificate
-	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}, ClientAuth: tls.RequestClientCert, InsecureSkipVerify: true}
+	cfg := &tls.Config{Certificates: []tls.Certificate{*certificate}, InsecureSkipVerify: true, ClientAuth: tls.RequestClientCert}
 	// Create the listening TCP/TLS socket.
 	listener, err := tls.Listen("tcp", address, cfg)
 	if err != nil {
@@ -46,18 +46,28 @@ func (n *TCP) CreateSocket(address string) (transport.ClosableSocket, error) {
 	ca := utils.LoadCACertificate()
 	pkSignature := utils.LoadPublicKeySignature()
 
+	var blockedUsers map[[32]byte]struct{}
+	if utils.TESTING{
+		blockedUsers=make(map[[32]byte]struct{})
+	}else{
+		blockedUsers,_=utils.LoadBlockedUsers()
+	}
+	fp,_:=utils.OpenFileToAppend(utils.BlockedUsersPath) //to save blocked users in persistent memory
+
 	return &Socket{
 		listener:      &listener,
 		ins:           []transport.Packet{},
 		outs:          []transport.Packet{},
 		tlsConfig:     cfg,
-		myCertificate: certificate,
+		myTLSCertificate: certificate,
 		CA:            ca,
 		Catalog:       make(map[[32]byte]*transport.SignedPublicKey), //hashed public key maps to *rsa.PublicKey
 		myPKSignature: pkSignature,
 		pktQueue:      make(chan *transport.Packet, 1024),
 		connPool:      newConnPool(),
-		blockedUsers:  make(map[[32]byte]struct{}),
+		blockedUsers:  blockedUsers,
+		blockedIPs: make(map[string][32]byte), //to reject rumors by origin!
+		fpBlockedUsers : fp,
 	}, nil
 }
 
@@ -72,15 +82,19 @@ type Socket struct {
 	ins               []transport.Packet
 	outs              []transport.Packet
 	tlsConfig         *tls.Config
-	myCertificate     *tls.Certificate
+	myTLSCertificate     *tls.Certificate
 	myPKSignature     []byte
 	Catalog           map[[32]byte]*transport.SignedPublicKey
 	CatalogLock       sync.RWMutex
 	connPool          ConnPool
 	pktQueue          chan *transport.Packet
 	CA                *x509.Certificate
+	//blocking mechanism
 	blockedUsers      map[[32]byte]struct{}
 	blockedUsersMutex sync.RWMutex
+	blockedIPs	map[string][32]byte
+	blockedIPsMutex sync.RWMutex
+	fpBlockedUsers *os.File
 }
 
 // Close implements transport.Socket. It returns an error if already closed.
@@ -226,7 +240,7 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn, connSaved bool) {
 		// Check for banned users packets and drop the ones that are for me! (still relay packets from blocked users)
 		if pkt.Header.Destination == s.GetAddress() && pkt.Header.Check != nil {
 			pkBytes, _ := utils.PublicKeyToBytes(pkt.Header.Check.SrcPublicKey.PublicKey)
-			if s.isBlocked(utils.Hash(pkBytes)) {
+			if s.IsBlocked(utils.Hash(pkBytes)) {
 				fmt.Println("avoided packet from blocked user")
 				continue
 			}
@@ -290,8 +304,8 @@ func (s *Socket) GetOuts() []transport.Packet {
 	return copyPacketList(s.outs)
 }
 
-func (s *Socket) GetCertificate() *tls.Certificate {
-	return s.myCertificate
+func (s *Socket) GetTLSCertificate() *tls.Certificate {
+	return s.myTLSCertificate
 }
 
 func (s *Socket) RemoveConn(tlsConn *tls.Conn) {
@@ -340,7 +354,7 @@ func (s *Socket) UpdateCertificate(cert *x509.Certificate, privKey *rsa.PrivateK
 
 	s.tlsConfig = newTLSConf
 	s.listener = &newListener
-	s.myCertificate = &tlsCert
+	s.myTLSCertificate = &tlsCert
 	s.connPool = newConnPool()
 	s.CA = ca
 	s.myPKSignature = publicKeySignature
@@ -353,7 +367,7 @@ func (s *Socket) GetTLSConfig() *tls.Config {
 }
 
 func (s *Socket) GetPublicKey() *rsa.PublicKey {
-	return &s.myCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
+	return &s.myTLSCertificate.PrivateKey.(*rsa.PrivateKey).PublicKey
 }
 
 func (s *Socket) GetSignedPublicKey() *transport.SignedPublicKey {
@@ -379,9 +393,7 @@ func (s *Socket) GetCAPublicKey() *rsa.PublicKey {
 	return nil
 }
 
-// TODO: Save blocked users in persistent storage.
-
-func (s *Socket) isBlocked(publicKeyHash [32]byte) bool {
+func (s *Socket) IsBlocked(publicKeyHash [32]byte) bool {
 	s.blockedUsersMutex.RLock()
 	defer s.blockedUsersMutex.RUnlock()
 	_, exists := s.blockedUsers[publicKeyHash]
@@ -392,11 +404,71 @@ func (s *Socket) Block(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
 	defer s.blockedUsersMutex.Unlock()
 	s.blockedUsers[publicKeyHash] = struct{}{}
-
+	utils.AppendToFile(publicKeyHash[:],s.fpBlockedUsers)
 }
 
 func (s *Socket) Unblock(publicKeyHash [32]byte) {
 	s.blockedUsersMutex.Lock()
-	defer s.blockedUsersMutex.Unlock()
 	delete(s.blockedUsers, publicKeyHash)
+	s.blockedUsersMutex.Unlock()
+	//remove blocked ip associated with user's pk
+	s.blockedIPsMutex.Lock()
+	for k,v:=range(s.blockedIPs){
+		if v==publicKeyHash{
+			delete(s.blockedIPs,k)
+		}
+	}
+	s.blockedIPsMutex.Unlock()
+	s.storeBlockedUsers() //re-write blocked-users.db file with updated blocked users
+}
+
+func (s *Socket) IsBlockedIP(addr string) bool{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	_,exists:=s.blockedIPs[addr]
+	return exists
+}
+
+func (s *Socket) HasBlockedIPs() bool{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	return len(s.blockedIPs)>0
+}
+
+func (s *Socket) AddBlockedIP(addr string,publicKeyHash [32]byte) {
+	s.blockedIPsMutex.Lock()
+	defer s.blockedIPsMutex.Unlock()
+	s.blockedIPs[addr]=publicKeyHash
+}
+
+func (s *Socket) storeBlockedUsers() error{
+	s.blockedUsersMutex.Lock()
+	defer s.blockedUsersMutex.Unlock()
+	s.fpBlockedUsers.Close()
+	fp, err := utils.OpenFileToWrite(utils.BlockedUsersPath)
+	if err!=nil{
+		return err
+	}
+	s.fpBlockedUsers=fp
+	for k:=range(s.blockedUsers){
+		utils.AppendToFile(k[:],s.fpBlockedUsers)
+	}
+	s.fpBlockedUsers.Close()
+	s.fpBlockedUsers,err=utils.OpenFileToAppend((utils.BlockedUsersPath))
+	if err!=nil{
+		return err
+	}
+	return nil
+}
+
+func (s *Socket) GetBlockedIPs() []string{
+	s.blockedIPsMutex.RLock()
+	defer s.blockedIPsMutex.RUnlock()
+	ips:=make([]string,len(s.blockedIPs))
+	i:=0
+	for ip := range(s.blockedIPs){
+		ips[i]=ip
+		i++
+	}
+	return ips
 }

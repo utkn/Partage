@@ -649,18 +649,22 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	net1 := tcpFac()
 	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0", z.WithMessage(fake, handler1), z.WithAntiEntropy(time.Millisecond*50))
 	defer node1.Stop()
+	//node1.RegisterUser()
 
 	net2 := tcpFac()
 	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2), z.WithAntiEntropy(time.Millisecond*50))
 	defer node2.Stop()
+	//node2.RegisterUser()
 
 	net3 := tcpFac()
 	node3 := z.NewTestNode(t, peerFac, net3, "127.0.0.1:0", z.WithMessage(fake, handler3), z.WithAntiEntropy(time.Millisecond*50))
 	defer node3.Stop()
+	//node3.RegisterUser()
 
 	net4 := tcpFac()
 	node4 := z.NewTestNode(t, peerFac, net4, "127.0.0.1:0", z.WithMessage(fake, handler4), z.WithAntiEntropy(time.Millisecond*50))
 	defer node4.Stop()
+	//node4.RegisterUser()
 
 	node1.AddPeer(node2.GetAddr())
 	node1.AddPeer(node3.GetAddr())
@@ -688,6 +692,43 @@ func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	status2.CheckCalled(t)
 	status3.CheckNotCalled(t)
 	status4.CheckCalled(t)
+}
+
+func Test_Partage_Broadcast_Rumor_To_Blocked_User(t *testing.T) {
+	fake := z.NewFakeMessage(t)
+	handler1, _ := fake.GetHandler(t)
+	handler2, _ := fake.GetHandler(t)
+	handler3, _ := fake.GetHandler(t)
+	handler4, _ := fake.GetHandler(t)
+
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithMessage(fake, handler1), z.WithAntiEntropy(time.Millisecond*50))
+	defer node1.Stop()
+
+	net2 := tcpFac()
+	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2), z.WithAntiEntropy(time.Millisecond*50))
+	defer node2.Stop()
+
+	net3 := tcpFac()
+	node3 := z.NewTestNode(t, peerFac, net3, "127.0.0.1:0", z.WithMessage(fake, handler3), z.WithAntiEntropy(time.Millisecond*50))
+	defer node3.Stop()
+
+	net4 := tcpFac()
+	node4 := z.NewTestNode(t, peerFac, net4, "127.0.0.1:0", z.WithMessage(fake, handler4), z.WithAntiEntropy(time.Millisecond*50))
+	defer node4.Stop()
+
+	node1.AddPeer(node2.GetAddr())
+	node2.AddPeer(node3.GetAddr())
+	node3.AddPeer(node4.GetAddr())
+	//topology:
+	//A--->B---->C---->D
+	
+	//nodeC blocks nodeA
+	node3.BlockUser(node1.GetHashedPublicKey())
+
+	//nodeA broadcasts rumor
+	node1.Broadcast(fake.GetNetMsg(t))
+
+	time.Sleep(time.Second * 1)
 }
 
 // A simple send/recv using tls
@@ -785,7 +826,7 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			require.Len(t, rumor.Rumors, 1)
 			r := rumor.Rumors[0]
 			require.Equal(t, node1.GetAddr(), r.Origin)
-			require.Equal(t, uint(1), r.Sequence) // must start with 1
+			require.Equal(t, int64(1), r.Sequence) // must start with 1
 
 			fake.Compare(t, r.Msg)
 
@@ -800,7 +841,7 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			require.Len(t, rumor.Rumors, 1)
 			r = rumor.Rumors[0]
 			require.Equal(t, node1.GetAddr(), r.Origin)
-			require.Equal(t, uint(1), r.Sequence)
+			require.Equal(t, int64(1), r.Sequence)
 
 			fake.Compare(t, r.Msg)
 
@@ -815,7 +856,7 @@ func Test_Partage_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			// >> node2 should have sent the following status to n1 {node1 => 1}
 
 			require.Len(t, ack.Status, 1)
-			require.Equal(t, uint(1), ack.Status[node1.GetAddr()])
+			require.Equal(t, int64(1), ack.Status[node1.GetAddr()])
 
 			// > node1 and node2 should've executed the handlers
 

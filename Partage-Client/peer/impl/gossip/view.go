@@ -6,8 +6,8 @@ import (
 	"go.dedis.ch/cs438/types"
 )
 
-type SeqMap map[string]uint
-type RumorMap map[string]map[uint]types.Rumor
+type SeqMap map[string]int64
+type RumorMap map[string]map[int64]types.Rumor
 
 type PeerView struct {
 	rumorMap     RumorMap
@@ -21,15 +21,21 @@ func NewPeerView() *PeerView {
 	}
 }
 
-func (v *PeerView) getSequence(peerAddr string) uint {
+func (v *PeerView) getSequence(peerAddr string) int64 {
 	rumorList, ok := v.rumorMap[peerAddr]
 	if !ok {
 		return 0
 	}
-	return uint(len(rumorList))
+	return int64(len(rumorList))
 }
 
-func (v *PeerView) IsExpected(peerAddr string, givenSequence uint) bool {
+func (v *PeerView) DropViewFrom(addr string){
+	v.rumorMapLock.Lock()
+	defer v.rumorMapLock.Unlock()
+	delete(v.rumorMap,addr)
+}
+
+func (v *PeerView) IsExpected(peerAddr string, givenSequence int64) bool {
 	v.rumorMapLock.Lock()
 	defer v.rumorMapLock.Unlock()
 	currSeq := v.getSequence(peerAddr)
@@ -56,7 +62,7 @@ func (v *PeerView) AsSequenceMap() SeqMap {
 	return seqMap
 }
 
-func (v *PeerView) GetSequence(peerAddr string) uint {
+func (v *PeerView) GetSequence(peerAddr string) int64 {
 	v.rumorMapLock.Lock()
 	defer v.rumorMapLock.Unlock()
 	return v.getSequence(peerAddr)
@@ -68,13 +74,13 @@ func (v *PeerView) SaveRumor(rumor types.Rumor) {
 	// Save the rumor into the table.
 	rumors, ok := v.rumorMap[rumor.Origin]
 	if !ok {
-		v.rumorMap[rumor.Origin] = make(map[uint]types.Rumor)
+		v.rumorMap[rumor.Origin] = make(map[int64]types.Rumor)
 		rumors = v.rumorMap[rumor.Origin]
 	}
-	rumors[rumor.Sequence] = rumor
+	rumors[int64(rumor.Sequence)] = rumor
 }
 
-func (v *PeerView) GetSavedRumor(origin string, sequence uint) (types.Rumor, bool) {
+func (v *PeerView) GetSavedRumor(origin string, sequence int64) (types.Rumor, bool) {
 	v.rumorMapLock.Lock()
 	defer v.rumorMapLock.Unlock()
 	rumors, ok := v.rumorMap[origin]
@@ -108,6 +114,9 @@ func (v *PeerView) Compare(remoteSequenceMap SeqMap) (SeqMap, SeqMap) {
 	// Then, find all the new peers that current view has, i.e., This - Remote
 	for thisPeer, thisSeq := range mySeqMap {
 		remoteSeq, ok := remoteSequenceMap[thisPeer]
+		if remoteSeq==-1{
+			continue //ignore
+		}
 		if !ok || thisSeq > remoteSeq {
 			thsNews[thisPeer] = thisSeq
 		}

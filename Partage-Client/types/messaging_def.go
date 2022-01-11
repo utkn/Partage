@@ -55,7 +55,7 @@ type AckMessage struct {
 //
 // - implements types.Message
 // - implemented in HW1
-type StatusMessage map[string]uint
+type StatusMessage map[string]int64
 
 // EmptyMessage describes an empty message. It is used for the heartbeat
 // mechanism.

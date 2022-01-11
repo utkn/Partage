@@ -162,6 +162,10 @@ func (m *CertificateAuthorityMessage) Decode(bytes []byte) error {
 	return json.Unmarshal(bytes, &m)
 }
 
+func (m *CertificateAuthorityMessage) Encode() ([]byte, error) {
+	return json.Marshal(m)
+}
+
 // Registration that comes with the CertificateAuthorityMessage
 func (r *Registration) Decode(bytes []byte) error {
 	return json.Unmarshal(bytes, &r)

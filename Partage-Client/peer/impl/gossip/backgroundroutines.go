@@ -19,6 +19,11 @@ func AntiEntropy(n *Layer, interval time.Duration) {
 			utils.PrintDebug("antientropy", n.GetAddress(), "has initiated anti-entropy")
 			time.Sleep(interval)
 			statusMsg := n.view.AsStatusMsg()
+			if n.cryptography!=nil{
+				for _,ip:=range(n.cryptography.GetBlockedIPs()){
+					statusMsg[ip]=-1
+				}
+			}
 			dest, err := n.network.ChooseRandomNeighbor(nil)
 			if err != nil {
 				continue
