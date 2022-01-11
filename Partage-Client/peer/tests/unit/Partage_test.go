@@ -323,7 +323,7 @@ func Test_Partage_User_State(t *testing.T) {
 	require.Equal(t, "Descartes", node2.GetUserState(node1.GetUserID()).Username)
 	require.Equal(t, "Descartes", node3.GetUserState(node1.GetUserID()).Username)
 	// Then, follow a user.
-	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), false))
+	h, _ := node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID()))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 1)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 1)
@@ -332,7 +332,7 @@ func Test_Partage_User_State(t *testing.T) {
 	require.True(t, node2.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	require.True(t, node3.GetUserState(node1.GetUserID()).IsFollowing(node2.GetUserID()))
 	// Then, unfollow.
-	node1.UpdateFeed(content.CreateFollowUserMetadata(node1.GetUserID(), node2.GetUserID(), true))
+	node1.UpdateFeed(content.CreateUndoMetadata(node1.GetUserID(), utils.Time(), h))
 	time.Sleep(1 * time.Second)
 	require.Len(t, node1.GetUserState(node1.GetUserID()).Followed, 0)
 	require.Len(t, node2.GetUserState(node1.GetUserID()).Followed, 0)
@@ -466,12 +466,12 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 			Types:    nil,
 		})
 		require.Len(t, contentIDs, 0)
-		// Now, try to discover only UNKNOWN content from node 1.
+		// Now, try to discover only REACTION content from node 1.
 		contentIDs, _ = n.DiscoverContent(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node1.GetUserID()},
-			Types:    []content.Type{content.UNKNOWN},
+			Types:    []content.Type{content.REACTION},
 		})
 		require.Len(t, contentIDs, 0)
 		// Finally, discover the text posts by node 1.
@@ -524,17 +524,6 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	nodes := []z.TestNode{node1, node2, node3}
 	textContentID, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
 	time.Sleep(1 * time.Second)
-	// Let each node try to download the file.
-	for _, n := range nodes {
-		contentIDs, _ := n.DiscoverContent(content.Filter{
-			MaxTime:  0,
-			MinTime:  0,
-			OwnerIDs: nil,
-			Types:    nil,
-		})
-		require.Len(t, contentIDs, 1)
-		require.Equal(t, textContentID, contentIDs[0])
-	}
 	// Comment on it.
 	commentContentID, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
 	time.Sleep(1 * time.Second)
@@ -562,6 +551,73 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 		receivedBytes, _ := n.DownloadPost(contentIDs[0])
 		commentPost := content.ParseCommentPost(receivedBytes)
 		require.Equal(t, originalComment, commentPost.Text)
+	}
+}
+
+func Test_Partage_Reaction(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Share a text post.
+	originalText := "Lorem ipsum dolor sit amet!!!"
+	nodes := []z.TestNode{node1, node2, node3}
+	textContentID, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	time.Sleep(1 * time.Second)
+	// Let node 2 to be confused by the meaning of this placeholder text.
+	n2ReactionBlockHash, _ := node2.UpdateFeed(content.CreateReactionMetadata(node2.GetUserID(), content.CONFUSED, utils.Time(), textContentID))
+	time.Sleep(1 * time.Second)
+	// Let node 3 to be angry by the meaning of this placeholder text.
+	node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.ANGRY, utils.Time(), textContentID))
+	// ... so angry that he tries to also disapprove, not knowing that re-reactions won't be registered by the network.
+	node3.UpdateFeed(content.CreateReactionMetadata(node3.GetUserID(), content.DISAPPROVE, utils.Time(), textContentID))
+	time.Sleep(1 * time.Second)
+	// Let check whether the reaction is reflected on all users.
+	for _, n := range nodes {
+		reactions := n.GetReactions("123")
+		require.Len(t, reactions, 0)
+		reactions = n.GetReactions(textContentID)
+		require.Len(t, reactions, 2)
+		require.Equal(t, reactions[0].Reaction, content.CONFUSED)
+		require.Equal(t, reactions[0].RefContentID, textContentID)
+		require.Equal(t, reactions[0].UserID, node2.GetUserID())
+		require.Equal(t, reactions[1].Reaction, content.ANGRY)
+		require.Equal(t, reactions[1].RefContentID, textContentID)
+		require.Equal(t, reactions[1].UserID, node3.GetUserID())
+	}
+	// Try to undo the CONFUSED reaction by node 2.
+	node2.UpdateFeed(content.CreateUndoMetadata(node2.GetUserID(), utils.Time(), n2ReactionBlockHash))
+	time.Sleep(1 * time.Second)
+	for _, n := range nodes {
+		reactions := n.GetReactions(textContentID)
+		require.Len(t, reactions, 1)
+		require.Equal(t, reactions[0].Reaction, content.ANGRY)
+		require.Equal(t, reactions[0].RefContentID, textContentID)
+		require.Equal(t, reactions[0].UserID, node3.GetUserID())
 	}
 }
 

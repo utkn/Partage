@@ -2,18 +2,18 @@ package feed
 
 import (
 	"fmt"
-	content2 "go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 )
 
-type Endorsement struct {
+type EndorsementHandler struct {
 	UserID            string
 	LastRequestedTime int64
 	GivenEndorsements int
 	EndorsedUsers     map[string]struct{}
 }
 
-func NewEndorsementHandler(userID string) Endorsement {
-	return Endorsement{
+func NewEndorsementHandler(userID string) EndorsementHandler {
+	return EndorsementHandler{
 		UserID:            userID,
 		LastRequestedTime: -1,
 		GivenEndorsements: 0,
@@ -21,12 +21,12 @@ func NewEndorsementHandler(userID string) Endorsement {
 	}
 }
 
-func (e *Endorsement) Copy() Endorsement {
+func (e *EndorsementHandler) Copy() EndorsementHandler {
 	endorsedUsers := make(map[string]struct{}, len(e.EndorsedUsers))
 	for k := range e.EndorsedUsers {
 		endorsedUsers[k] = struct{}{}
 	}
-	return Endorsement{
+	return EndorsementHandler{
 		UserID:            e.UserID,
 		LastRequestedTime: e.LastRequestedTime,
 		GivenEndorsements: e.GivenEndorsements,
@@ -34,18 +34,18 @@ func (e *Endorsement) Copy() Endorsement {
 	}
 }
 
-func (e *Endorsement) Request(time int64) {
+func (e *EndorsementHandler) Request(time int64) {
 	e.LastRequestedTime = time
 }
 
-func (e *Endorsement) Reset() {
+func (e *EndorsementHandler) Reset() {
 	e.LastRequestedTime = -1
 	e.GivenEndorsements = 0
 	e.EndorsedUsers = make(map[string]struct{}, REQUIRED_ENDORSEMENTS)
 }
 
 // Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
-func (e *Endorsement) Update(currTime int64, endorserID string) bool {
+func (e *EndorsementHandler) Update(currTime int64, endorserID string) bool {
 	// If there is no current endorsement request going on, do nothing.
 	if e.LastRequestedTime < 0 {
 		return false
@@ -79,17 +79,17 @@ type UserState struct {
 	CurrentCredits int
 	Username       string
 	Followed       map[string]struct{}
-	Endorsement
+	EndorsementHandler
 }
 
-type StateProcessor = func(UserState, content2.Metadata) UserState
+type StateProcessor = func(UserState, content.Metadata) UserState
 
 func NewInitialUserState(userID string) *UserState {
 	return &UserState{
-		CurrentCredits: INITIAL_CREDITS,
-		Username:       DEFAULT_USERNAME,
-		Followed:       make(map[string]struct{}),
-		Endorsement:    NewEndorsementHandler(userID),
+		CurrentCredits:     INITIAL_CREDITS,
+		Username:           DEFAULT_USERNAME,
+		Followed:           make(map[string]struct{}),
+		EndorsementHandler: NewEndorsementHandler(userID),
 	}
 }
 
@@ -99,44 +99,51 @@ func (s *UserState) Copy() UserState {
 		followedMap[k] = struct{}{}
 	}
 	return UserState{
-		CurrentCredits: s.CurrentCredits,
-		Username:       s.Username,
-		Followed:       followedMap,
-		Endorsement:    s.Endorsement.Copy(),
+		CurrentCredits:     s.CurrentCredits,
+		Username:           s.Username,
+		Followed:           followedMap,
+		EndorsementHandler: s.EndorsementHandler.Copy(),
 	}
 }
 
-func (s *UserState) Update(metadata content2.Metadata) error {
+// Undo removes the effects that was caused by the given metadata when possible. However, credits are not refunded.
+func (s *UserState) Undo(metadata content.Metadata) error {
+	// Undo the follow list.
+	if metadata.Type == content.FOLLOW {
+		targetUser, err := content.ParseFollowedUser(metadata)
+		if err != nil {
+			return err
+		}
+		delete(s.Followed, targetUser)
+	}
+	return nil
+}
+
+// Update updates the user state with the given metadata.
+func (s *UserState) Update(metadata content.Metadata) error {
 	// Apply the cost.
 	s.CurrentCredits -= metadata.Type.Cost()
 	// Update the username.
-	if metadata.Type == content2.USERNAME {
-		username, err := content2.ParseUsername(metadata)
+	if metadata.Type == content.USERNAME {
+		username, err := content.ParseUsername(metadata)
 		if err != nil {
 			return err
 		}
 		s.Username = username
 	}
 	// Update the follow list.
-	if metadata.Type == content2.FOLLOW {
-		targetUser, err := content2.ParseFollowedUser(metadata)
+	if metadata.Type == content.FOLLOW {
+		targetUser, err := content.ParseFollowedUser(metadata)
 		if err != nil {
 			return err
 		}
 		s.Followed[targetUser] = struct{}{}
 	}
-	if metadata.Type == content2.UNFOLLOW {
-		targetUser, err := content2.ParseFollowedUser(metadata)
-		if err != nil {
-			return err
-		}
-		delete(s.Followed, targetUser)
-	}
 	// Handle endorsement request stuff. The given endorsements will be handled outside, since they reside in different
 	// blockchains.
 	// Only process an endorsement request if the user's credit is lower than the set amount.
-	if metadata.Type == content2.ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
-		s.Endorsement.Request(metadata.Timestamp)
+	if metadata.Type == content.ENDORSEMENT_REQUEST && s.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT {
+		s.EndorsementHandler.Request(metadata.Timestamp)
 	}
 	return nil
 }

@@ -134,7 +134,7 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "is bypassing broadcast for step", msg.Step)
 	}
 	// Inform the local proposer that we have moved the clock.
-	a.paxos.Notification.DispatchResponse(fmt.Sprint("tick", msg.Step), types.EmptyMessage{})
+	a.paxos.Notification.DispatchResponse(fmt.Sprint("tick", msg.Step), msg)
 	utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "has updated its clock step to", newStep)
 	return nil
 }

@@ -5,26 +5,24 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer/impl/utils"
+	"strconv"
 )
 
 type Type int
 
 const (
-	UNKNOWN Type = iota
-	TEXT
+	TEXT Type = iota
 	COMMENT
 	REACTION
 	FOLLOW
-	UNFOLLOW
 	USERNAME
 	ENDORSEMENT
 	ENDORSEMENT_REQUEST
+	UNDO
 )
 
 func (c Type) String() string {
 	switch c {
-	case UNKNOWN:
-		return "unknown"
 	case TEXT:
 		return "text"
 	case COMMENT:
@@ -33,16 +31,16 @@ func (c Type) String() string {
 		return "reaction"
 	case FOLLOW:
 		return "follow"
-	case UNFOLLOW:
-		return "unfollow"
 	case USERNAME:
 		return "username"
 	case ENDORSEMENT:
 		return "endorsement"
 	case ENDORSEMENT_REQUEST:
 		return "endorsement_request"
+	case UNDO:
+		return "undo"
 	}
-	return "undefined"
+	return "unknown"
 }
 
 func (c Type) Cost() int {
@@ -68,15 +66,11 @@ func CreateChangeUsernameMetadata(userID string, newUsername string) Metadata {
 	}
 }
 
-func CreateFollowUserMetadata(userID string, targetUserID string, unfollow bool) Metadata {
-	t := FOLLOW
-	if unfollow {
-		t = UNFOLLOW
-	}
+func CreateFollowUserMetadata(userID string, targetUserID string) Metadata {
 	data, _ := hex.DecodeString(targetUserID)
 	return Metadata{
 		FeedUserID: userID,
-		Type:       t,
+		Type:       FOLLOW,
 		ContentID:  "",
 		Timestamp:  utils.Time(),
 		Data:       data,
@@ -136,6 +130,28 @@ func CreateCommentMetadata(userID string, timestamp int64, refContentID string, 
 	}
 }
 
+func CreateReactionMetadata(userID string, reaction Reaction, timestamp int64, refContentID string) Metadata {
+	return Metadata{
+		Type:         REACTION,
+		FeedUserID:   userID,
+		RefContentID: refContentID,
+		Timestamp:    timestamp,
+		Data:         []byte(strconv.Itoa(int(reaction))),
+		Signature:    nil,
+	}
+}
+
+func CreateUndoMetadata(userID string, timestamp int64, targetBlockHash string) Metadata {
+	targetHashBytes, _ := hex.DecodeString(targetBlockHash)
+	return Metadata{
+		Type:       UNDO,
+		FeedUserID: userID,
+		Timestamp:  timestamp,
+		Data:       targetHashBytes,
+		Signature:  nil,
+	}
+}
+
 // ParseUsername extracts the username string from a USERNAME metadata object.
 func ParseUsername(metadata Metadata) (string, error) {
 	if metadata.Type != USERNAME {
@@ -144,9 +160,9 @@ func ParseUsername(metadata Metadata) (string, error) {
 	return string(metadata.Data), nil
 }
 
-// ParseFollowedUser extracts the target followed user id string from a FOLLOW or UNFOLLOW metadata object.
+// ParseFollowedUser extracts the target followed user id string from a FOLLOW metadata object.
 func ParseFollowedUser(metadata Metadata) (string, error) {
-	if metadata.Type != FOLLOW && metadata.Type != UNFOLLOW {
+	if metadata.Type != FOLLOW {
 		return "", fmt.Errorf("cannot extract the followed user id from a non-follow metadata")
 	}
 	return hex.EncodeToString(metadata.Data), nil
@@ -166,4 +182,21 @@ func ParsePostMetadata(metadata Metadata) (string, error) {
 		return "", fmt.Errorf("cannot extract the metahash from non-text metadata")
 	}
 	return string(metadata.Data), nil
+}
+
+// ParseReactionMetadata extracts the reaction itself from the REACTION metadata object.
+func ParseReactionMetadata(metadata Metadata) (Reaction, error) {
+	if metadata.Type != REACTION {
+		return ANGRY, fmt.Errorf("cannot extract the reaction from non-reaction metadata")
+	}
+	reactionInt, err := strconv.Atoi(string(metadata.Data))
+	return Reaction(reactionInt), err
+}
+
+// ParseUndoMetadata extracts the referred block hash to undo from a UNDO metadata object.
+func ParseUndoMetadata(metadata Metadata) (string, error) {
+	if metadata.Type != UNDO {
+		return "", fmt.Errorf("cannot extract the reaction from non-reaction metadata")
+	}
+	return hex.EncodeToString(metadata.Data), nil
 }

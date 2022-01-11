@@ -17,11 +17,12 @@ type PartageClient interface {
 	// DiscoverContent returns the matched content ids.
 	DiscoverContent(filter content.Filter) ([]string, error)
 	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
-	UpdateFeed(info content.Metadata) error
+	UpdateFeed(content.Metadata) (string, error)
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}
 	GetFeedContents(userID string) []content.Metadata
+	GetReactions(contentID string) []content.ReactionInfo
 	GetUserState(userID string) feed.UserState
 	BlockUser(publicKeyHash [32]byte)
 	UnblockUser(publicKeyHash [32]byte)

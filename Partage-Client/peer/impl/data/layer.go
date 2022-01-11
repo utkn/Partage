@@ -144,7 +144,7 @@ func (l *Layer) Tag(name string, mh string) error {
 		l.config.Storage.GetNamingStore().Set(name, []byte(mh))
 		return nil
 	}
-	err := l.consensus.Propose(types.PaxosValue{
+	_, err := l.consensus.Propose(types.PaxosValue{
 		UniqID:   xid.New().String(),
 		Filename: name,
 		Metahash: mh,

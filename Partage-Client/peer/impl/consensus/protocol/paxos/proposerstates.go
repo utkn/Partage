@@ -39,6 +39,8 @@ type ProposerDoneState struct {
 	proposalID    uint
 	proposedValue types.PaxosValue
 	originalValue types.PaxosValue
+
+	finalBlock types.BlockchainBlock
 }
 
 func (s ProposerBeginState) Next() State {
@@ -178,7 +180,7 @@ func (s ProposerWaitAcceptState) Next() State {
 			value: s.originalValue,
 		}
 	}
-	return ProposerDoneState{
+	return &ProposerDoneState{
 		paxos:         s.paxos,
 		proposalStep:  s.proposalStep,
 		proposalID:    s.proposalID,
@@ -203,11 +205,11 @@ func (s ProposerWaitAcceptState) Name() string {
 	return "ProposerWaitAccept"
 }
 
-func (s ProposerDoneState) Next() State {
+func (s *ProposerDoneState) Next() State {
 	// Listen to the tick from the global notification handler.
-	success := s.paxos.Notification.ResponseCollector(fmt.Sprint("tick", s.proposalStep), s.paxos.Config.PaxosProposerRetry) != nil
+	tlcMsg := s.paxos.Notification.ResponseCollector(fmt.Sprint("tick", s.proposalStep), s.paxos.Config.PaxosProposerRetry)
 	// Retry if the whole proposal has timed out.
-	if !success {
+	if tlcMsg == nil {
 		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "timed out for some reason. Retrying...")
 		//println(p.gossip.GetAddress(), "NO TICK!")
 		return ProposerBeginState{
@@ -221,15 +223,16 @@ func (s ProposerDoneState) Next() State {
 			paxos: s.paxos,
 		}
 	}
+	s.finalBlock = tlcMsg.(types.TLCMessage).Block
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has concluded the proposal with ID",
 		s.proposalID, "and value", s.proposedValue.String())
 	return nil
 }
 
-func (s ProposerDoneState) Accept(message types.Message) bool {
+func (s *ProposerDoneState) Accept(message types.Message) bool {
 	return false
 }
 
-func (s ProposerDoneState) Name() string {
+func (s *ProposerDoneState) Name() string {
 	return "ProposerDone"
 }

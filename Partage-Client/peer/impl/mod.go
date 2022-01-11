@@ -298,7 +298,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
-func (n *node) UpdateFeed(metadata content.Metadata) error {
+func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
 	return n.social.ProposeNewPost(metadata)
 }
 
@@ -354,6 +354,11 @@ func (n *node) GetFeedContents(userID string) []content.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
 }
 
+// GetReactions implements peer.PartageClient
+func (n *node) GetReactions(contentID string) []content.ReactionInfo {
+	return n.social.FeedStore.GetReactions(contentID)
+}
+
 // GetUserState implements peer.PartageClient
 func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
@@ -368,7 +373,8 @@ func (n *node) ShareTextPost(post content.TextPost) (string, error) {
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
-	return metadata.ContentID, n.UpdateFeed(metadata)
+	_, err = n.UpdateFeed(metadata)
+	return metadata.ContentID, err
 }
 
 func (n *node) ShareCommentPost(post content.CommentPost) (string, error) {
@@ -379,7 +385,8 @@ func (n *node) ShareCommentPost(post content.CommentPost) (string, error) {
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
-	return metadata.ContentID, n.UpdateFeed(metadata)
+	_, err = n.UpdateFeed(metadata)
+	return metadata.ContentID, err
 }
 
 func (n *node) DiscoverContent(filter content.Filter) ([]string, error) {
