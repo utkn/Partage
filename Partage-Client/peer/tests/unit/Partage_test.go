@@ -148,7 +148,7 @@ func Test_Partage_Single_Post_Single_Node(t *testing.T) {
 	require.Equal(t, "123", n3Posts[0].ContentID)
 }
 
-func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
+func Test_Partage_Two_Posts_Single_Node(t *testing.T) {
 	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
 		z.WithTotalPeers(3),
 		z.WithPaxosID(1),
@@ -177,11 +177,20 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	node2.RegisterUser()
 	node3.RegisterUser()
 
-	// The first node is sharing three random text posts.
-	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
-	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
-	node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), "123", utils.Time()))
-	time.Sleep(10 * time.Second)
+	// The first node is sharing two random text posts.
+	node1.UpdateFeed(content.Metadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       content.TEXT,
+		ContentID:  "1",
+		Signature:  nil,
+	})
+	node1.UpdateFeed(content.Metadata{
+		FeedUserID: node1.GetUserID(),
+		Type:       content.TEXT,
+		ContentID:  "2",
+		Signature:  nil,
+	})
+	time.Sleep(3 * time.Second)
 
 	// Get the posts known by all three nodes.
 	n1Posts := node1.GetFeedContents(node1.GetUserID())
@@ -189,17 +198,17 @@ func Test_Partage_Three_Posts_Single_Node(t *testing.T) {
 	n3Posts := node3.GetFeedContents(node1.GetUserID())
 
 	// Make sure that the feeds are identical.
-	require.Len(t, n1Posts, 3)
-	require.Len(t, n2Posts, 3)
-	require.Len(t, n3Posts, 3)
-	for i := 1; i <= 3; i++ {
+	require.Len(t, n1Posts, 2)
+	require.Len(t, n2Posts, 2)
+	require.Len(t, n3Posts, 2)
+	for i := 1; i <= 2; i++ {
 		require.Equal(t, fmt.Sprint(i), n1Posts[i-1].ContentID)
 		require.Equal(t, fmt.Sprint(i), n2Posts[i-1].ContentID)
 		require.Equal(t, fmt.Sprint(i), n3Posts[i-1].ContentID)
 	}
 }
 
-func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
+func Test_Partage_Two_Posts_All_Nodes(t *testing.T) {
 	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
 		z.WithTotalPeers(3),
 		z.WithPaxosID(1),
@@ -234,37 +243,31 @@ func Test_Partage_Three_Posts_All_Nodes(t *testing.T) {
 		// Try to post in the background.
 		go func(nodeIndex int, node z.TestNode) {
 			node.UpdateFeed(content.Metadata{
-				FeedUserID: node1.GetUserID(),
+				FeedUserID: node.GetUserID(),
 				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-1", nodeIndex),
 				Signature:  nil,
 			})
 			node.UpdateFeed(content.Metadata{
-				FeedUserID: node1.GetUserID(),
+				FeedUserID: node.GetUserID(),
 				Type:       content.TEXT,
 				ContentID:  fmt.Sprintf("%d-2", nodeIndex),
-				Signature:  nil,
-			})
-			node.UpdateFeed(content.Metadata{
-				FeedUserID: node1.GetUserID(),
-				Type:       content.TEXT,
-				ContentID:  fmt.Sprintf("%d-3", nodeIndex),
 				Signature:  nil,
 			})
 		}(i, n)
 	}
 	// Wait for all the nodes to finalize.
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 	// Get the posts known by all three nodes for every node.
 	for nodeIndex, n := range nodes {
 		n1Posts := n.GetFeedContents(n.GetUserID())
 		n2Posts := node2.GetFeedContents(n.GetUserID())
 		n3Posts := node3.GetFeedContents(n.GetUserID())
 		// Make sure that the saved feeds for n are identical at every node.
-		require.Len(t, n1Posts, 3)
-		require.Len(t, n2Posts, 3)
-		require.Len(t, n3Posts, 3)
-		for i := 1; i <= 3; i++ {
+		require.Len(t, n1Posts, 2)
+		require.Len(t, n2Posts, 2)
+		require.Len(t, n3Posts, 2)
+		for i := 1; i <= 2; i++ {
 			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n1Posts[i-1].ContentID)
 			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n2Posts[i-1].ContentID)
 			require.Equal(t, fmt.Sprintf("%d-%d", nodeIndex, i), n3Posts[i-1].ContentID)
