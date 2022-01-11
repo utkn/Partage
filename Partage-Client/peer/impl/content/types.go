@@ -19,6 +19,7 @@ const (
 	ENDORSEMENT
 	ENDORSEMENT_REQUEST
 	UNDO
+	DUMMY
 )
 
 func (c Type) String() string {

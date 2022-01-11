@@ -19,6 +19,12 @@ type Metadata struct {
 	Signature    []byte
 }
 
+// IsReject checks whether the given CustomValue field in a PaxosValue denotes a rejection message.
+func IsReject(customValue []byte) bool {
+	rejectMsg := string(customValue)
+	return rejectMsg == "reject"
+}
+
 func ParseMetadata(metadataBytes []byte) Metadata {
 	var data Metadata
 	_ = json.Unmarshal(metadataBytes, &data)

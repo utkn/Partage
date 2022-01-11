@@ -2,6 +2,7 @@ package social
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
@@ -54,9 +55,9 @@ func (l *Layer) Register() error {
 	return l.gossip.BroadcastMessage(newUserMsg)
 }
 
-func (l *Layer) ProposeNewPost(info content.Metadata) (string, error) {
+func (l *Layer) ProposeMetadata(metadata content.Metadata) (string, error) {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
-	val := content.UnparseMetadata(info)
+	val := content.UnparseMetadata(metadata)
 	paxosVal := types.PaxosValue{
 		UniqID:      xid.New().String(),
 		CustomValue: val,
@@ -64,7 +65,7 @@ func (l *Layer) ProposeNewPost(info content.Metadata) (string, error) {
 	protocolID := feed.IDFromUserID(l.UserID)
 	blockHash, err := l.consensus.ProposeWithProtocol(protocolID, paxosVal)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not propose metadata at social layer: %v", err)
 	}
 	return blockHash, nil
 }

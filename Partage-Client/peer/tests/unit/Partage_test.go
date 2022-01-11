@@ -679,6 +679,40 @@ func Test_Partage_Undo(t *testing.T) {
 	}
 }
 
+func Test_Partage_Invalid_Block(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node1.Stop()
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node2.Stop()
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
+	defer node3.Stop()
+
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr())
+
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+
+	// Share a dummy post. Should be rejected by the network.
+	_, err := node1.UpdateFeed(content.Metadata{Type: content.DUMMY})
+	require.NotNil(t, err)
+}
+
 func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
 	fake := z.NewFakeMessage(t)
 	handler1, status1 := fake.GetHandler(t)

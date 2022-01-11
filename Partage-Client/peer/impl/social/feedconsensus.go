@@ -14,7 +14,7 @@ import (
 )
 
 // FeedBlockchainUpdater takes a user id and returns a paxos feed blockchain updater.
-func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) paxos.BlockchainUpdater {
+func FeedBlockchainUpdater(userID string, feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
 		utils.PrintDebug("social", "Updating local feed...")
 		// Get the blockchain store associated with the user's feed.
@@ -31,9 +31,16 @@ func FeedBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.Mult
 }
 
 // FeedProposalChecker takes a user id and returns a paxos proposal checker.
-func FeedProposalChecker(userID string) paxos.ProposalChecker {
+func FeedProposalChecker(userID string, feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) paxos.ProposalChecker {
 	return func(msg types.PaxosProposeMessage) bool {
+		metadata := content.ParseMetadata(msg.Value.CustomValue)
+		// Reject the dummy blocks!
+		if metadata.Type == content.DUMMY {
+			return false
+		}
+		proposerUserID := metadata.FeedUserID
 		// TODO Check remaining credits, timestamp, signature etc.
+		_ = feedStore.GetFeedCopy(blockchainStorage, metadataStore, proposerUserID)
 		// Self-endorsement, re-endorsement
 		// Re-reactions
 		// Malformed undo-s
@@ -75,6 +82,6 @@ func NewFeedConsensusProtocol(userID string, config *peer.Configuration, gossip 
 	protocolID := feed.IDFromUserID(userID)
 	return paxos.New(protocolID, config, gossip,
 		FeedBlockGenerator(userID, config.BlockchainStorage),
-		FeedBlockchainUpdater(feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata"), userID),
-		FeedProposalChecker(userID))
+		FeedBlockchainUpdater(userID, feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata")),
+		FeedProposalChecker(userID, feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata")))
 }

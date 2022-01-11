@@ -3,6 +3,7 @@ package paxos
 import (
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -160,10 +161,16 @@ func (s ProposerWaitAcceptState) Next() (State, types.BlockchainBlock) {
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has started waiting for paxos accepts with ID", s.proposalID)
 	var accepts []*types.PaxosAcceptMessage
 	responses := s.notification.MultiResponseCollector(fmt.Sprint("proposer-accept-id", proposeMsg.ID), s.paxos.Config.PaxosProposerRetry, threshold)
+	receivedRejects := 0
 	for _, r := range responses {
 		acceptMsg := r.(*types.PaxosAcceptMessage)
 		// Do not consider irrelevant accept messages.
 		if acceptMsg.Value.UniqID != s.chosenValue.UniqID {
+			continue
+		}
+		// Do not consider reject messages. Keep track of the # received.
+		if content.IsReject(acceptMsg.Value.CustomValue) {
+			receivedRejects += 1
 			continue
 		}
 		accepts = append(accepts, acceptMsg)
@@ -171,6 +178,12 @@ func (s ProposerWaitAcceptState) Next() (State, types.BlockchainBlock) {
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has received", len(accepts), "paxos accepts with ID", s.proposalID)
 	// Retry with new proposal ID if we couldn't collect enough accepts.
 	if len(accepts) < threshold {
+		// If the majority of the network has rejected our request, the issue is probably on our end...
+		// Prematurely terminate the proposal.
+		if receivedRejects >= threshold {
+			utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has received", receivedRejects, "rejects and terminating!")
+			return nil, types.BlockchainBlock{}
+		}
 		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "couldn't collect enough accepts. Retrying...")
 		//println(p.gossip.GetAddress(), "NOT ENOUGH ACCEPTS")
 		return ProposerBeginState{

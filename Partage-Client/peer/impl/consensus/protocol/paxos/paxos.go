@@ -2,6 +2,7 @@ package paxos
 
 import (
 	"encoding/hex"
+	"fmt"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/gossip"
@@ -55,6 +56,10 @@ func (p *Paxos) Propose(val types.PaxosValue) (string, error) {
 		paxos: p,
 		value: val,
 	})
+	// If the proposer returns an empty block, this means that the proposal has failed.
+	if outputBlock.Value.UniqID == "" {
+		return "", fmt.Errorf("proposal was rejected at the consensus layer")
+	}
 	return hex.EncodeToString(outputBlock.Hash), nil
 }
 

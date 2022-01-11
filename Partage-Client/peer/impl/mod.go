@@ -293,7 +293,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 
 // UpdateFeed implements peer.DataSharing.
 func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
-	return n.social.ProposeNewPost(metadata)
+	return n.social.ProposeMetadata(metadata)
 }
 
 // RegisterUser implements peer.PartageClient

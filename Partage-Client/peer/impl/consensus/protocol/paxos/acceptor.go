@@ -70,11 +70,18 @@ func (a *Acceptor) HandlePropose(msg types.PaxosProposeMessage) error {
 		a.paxos.Clock.Lock.Unlock()
 		return nil
 	}
-	// OR ignore when the proposal checker returns false.
+	// OR reject when the proposal checker returns false.
 	if !a.ProposalChecker(msg) {
-		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), a.paxos.Clock, "ignored the proposal, since the checker returned false")
+		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is rejecting the proposal, since the checker returned false")
 		a.paxos.Clock.Lock.Unlock()
-		return nil
+		// Inform the proposer that the checker has failed.
+		rejectMsg := types.PaxosAcceptMessage(msg)
+		// A reject message is an accept message with its custom field set to "reject" string
+		rejectMsg.Value.CustomValue = []byte("reject")
+		utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is sending back an accept for ID", msg.ID)
+		rejectTranspMsg, _ := a.paxos.Config.MessageRegistry.MarshalMessage(&rejectMsg)
+		// Broadcast the reject messages.
+		return a.paxos.Gossip.BroadcastMessage(protocol.WrapInConsensusMessage(a.paxos.ProtocolID, rejectTranspMsg))
 	}
 	// Accept the value and save in the clock.
 	utils.PrintDebug("acceptor", a.paxos.Gossip.GetAddress(), "is accepting by setting its accepted ID to", msg.ID)
