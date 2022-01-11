@@ -3,8 +3,7 @@ package data
 import (
 	"fmt"
 	"go.dedis.ch/cs438/peer"
-	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/transport"
 	"go.dedis.ch/cs438/types"
@@ -56,11 +55,11 @@ func (l *Layer) SearchPostContentRequestMessageHandler(msg types.Message, pkt tr
 		_ = l.cryptography.Route(searchRequestMsg.Origin, neighbor, neighbor, transpMsg)
 	}
 	var fileInfos []ContentInfo
-	contentFilter := contentfilter.ParseContentFilter(searchRequestMsg.ContentFilter)
-	matchedMetadatas := contentfilter.GetMatchedContentMetadatas(l.config.BlockchainStorage.GetStore("metadata"), contentFilter)
+	contentFilter := content.ParseContentFilter(searchRequestMsg.ContentFilter)
+	matchedMetadatas := content.GetMatchedContentMetadatas(l.config.BlockchainStorage.GetStore("metadata"), contentFilter)
 	for _, metadata := range matchedMetadatas {
 		// Extract the metahash from the post content metadata.
-		metahash, _ := content.ParseTextPostMetadata(metadata)
+		metahash, _ := content.ParsePostMetadata(metadata)
 		_, chunkHashes, err := utils.GetLocalChunks(l.config.Storage.GetDataBlobStore(), metahash, peer.MetafileSep)
 		// Skip if we couldn't get the chunks, which means metafile is not in the store.
 		if err != nil {

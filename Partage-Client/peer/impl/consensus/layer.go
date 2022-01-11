@@ -54,29 +54,26 @@ func (l *Layer) IsRegistered(id string) bool {
 }
 
 // Propose proposes the given value with the default protocol.
-func (l *Layer) Propose(value types.PaxosValue) error {
+func (l *Layer) Propose(value types.PaxosValue) (string, error) {
 	return l.ProposeWithProtocol("default", value)
 }
 
 // ProposeWithProtocol proposes the given value with the protocol associated with the given protocol id.
-func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) error {
+// Returns the newly appended block hash.
+func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) (string, error) {
 	// Consensus should not be invoked when there are <= 1 many peers.
 	if l.Config.TotalPeers <= 1 {
-		return fmt.Errorf("consensus is disabled for <= 1 many peers")
+		return "", fmt.Errorf("consensus is disabled for <= 1 many peers")
 	}
 	// Get the protocol
 	l.RLock()
 	p, ok := l.protocols[protocolID]
 	if !ok {
-		return fmt.Errorf("could not find the consensus protocol with id %s", protocolID)
+		return "", fmt.Errorf("could not find the consensus protocol with id %s", protocolID)
 	}
 	l.RUnlock()
 	// Initiate the Paxos consensus protocol.
-	err := p.Propose(value)
-	if err != nil {
-		return err
-	}
-	return nil
+	return p.Propose(value)
 }
 
 // -- Paxos functions for the default protocol.

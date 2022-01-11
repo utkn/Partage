@@ -1,16 +1,17 @@
 package data
 
 import (
+	"fmt"
 	"github.com/rs/xid"
-	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
+	content2 "go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"time"
 )
 
 // SearchAllPostContent returns the all the matched content ids.
-func (l *Layer) SearchAllPostContent(filter contentfilter.ContentFilter, budget uint, timeout time.Duration) ([]string, error) {
+func (l *Layer) SearchAllPostContent(filter content2.Filter, budget uint, timeout time.Duration) ([]string, error) {
 	utils.PrintDebug("data", l.GetAddress(), "is initiating a search...")
-	localMatches := contentfilter.GetMatchedContentMetadatas(l.config.BlockchainStorage.GetStore("metadata"), filter)
+	localMatches := content2.GetMatchedContentMetadatas(l.config.BlockchainStorage.GetStore("metadata"), filter)
 	allMatchesSet := make(map[string]struct{})
 	for _, m := range localMatches {
 		allMatchesSet[m.ContentID] = struct{}{}
@@ -29,7 +30,7 @@ func (l *Layer) SearchAllPostContent(filter contentfilter.ContentFilter, budget 
 		msg := SearchContentRequestMessage{
 			RequestID:     searchRequestID,
 			Origin:        l.GetAddress(),
-			ContentFilter: contentfilter.UnparseContentFilter(filter),
+			ContentFilter: content2.UnparseContentFilter(filter),
 			Budget:        budget,
 		}
 		transpMsg, _ := l.config.MessageRegistry.MarshalMessage(msg)
@@ -55,4 +56,16 @@ func (l *Layer) SearchAllPostContent(filter contentfilter.ContentFilter, budget 
 		allMatches = append(allMatches, m)
 	}
 	return allMatches, nil
+}
+
+func (l *Layer) DownloadContent(contentID string) ([]byte, error) {
+	// First, get the metadata with the given content id.
+	metadataBytes := l.config.BlockchainStorage.GetStore("metadata").Get(contentID)
+	if metadataBytes == nil {
+		return nil, fmt.Errorf("unknown content id")
+	}
+	metadata := content2.ParseMetadata(metadataBytes)
+	// Then, get the metahash associated with the given post content.
+	metahash, _ := content2.ParsePostMetadata(metadata)
+	return l.Download(metahash)
 }

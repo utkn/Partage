@@ -1,6 +1,7 @@
 package paxos
 
 import (
+	"encoding/hex"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/gossip"
@@ -49,12 +50,13 @@ func (p *Paxos) GetProtocolID() string {
 	return p.ProtocolID
 }
 
-func (p *Paxos) Propose(val types.PaxosValue) error {
-	p.Proposer.Run(ProposerBeginState{
+func (p *Paxos) Propose(val types.PaxosValue) (string, error) {
+	doneState := p.Proposer.Run(ProposerBeginState{
 		paxos: p,
 		value: val,
 	})
-	return nil
+	blockHashBytes := doneState.(*ProposerDoneState).finalBlock.Hash
+	return hex.EncodeToString(blockHashBytes), nil
 }
 
 func (p *Paxos) HandleConsensusMessage(msg protocol.ConsensusMessage) error {

@@ -5,10 +5,10 @@ import (
 	"github.com/rs/xid"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/data"
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
 )
@@ -54,7 +54,7 @@ func (l *Layer) Register() error {
 	return l.gossip.BroadcastMessage(newUserMsg)
 }
 
-func (l *Layer) ProposeNewPost(info content.Metadata) error {
+func (l *Layer) ProposeNewPost(info content.Metadata) (string, error) {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
 	val := content.UnparseMetadata(info)
 	paxosVal := types.PaxosValue{
@@ -62,9 +62,9 @@ func (l *Layer) ProposeNewPost(info content.Metadata) error {
 		CustomValue: val,
 	}
 	protocolID := feed.IDFromUserID(l.UserID)
-	err := l.consensus.ProposeWithProtocol(protocolID, paxosVal)
+	blockHash, err := l.consensus.ProposeWithProtocol(protocolID, paxosVal)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return blockHash, nil
 }

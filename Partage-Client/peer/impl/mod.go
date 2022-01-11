@@ -1,13 +1,13 @@
 package impl
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/data/contentfilter"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
 	"io"
 	"regexp"
 	"time"
@@ -56,8 +56,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	if isRunningTLS {
 		_ = tlsSock.RegisterUser()	
 	} 
-	
-	// Create the layers.
+		// Create the layers.
 	networkLayer := network.Construct(&conf)
 	var cryptographyLayer *cryptography.Layer
 	if isRunningTLS {
@@ -118,7 +117,7 @@ func (n *node) Start() error {
 						continue
 					}
 					//socket closed..stopping node..
-					fmt.Println("OUT 0")
+					utils.PrintDebug("tls", "OUT 0")
 					return
 				} else {
 					//create go routine to handle this connection (recv)
@@ -131,7 +130,7 @@ func (n *node) Start() error {
 			// Wait for new packets...
 			for pkt := range pktQueue {
 				if pkt == nil {
-					fmt.Println("OUT 1")
+					utils.PrintDebug("tls", "OUT 1")
 					return
 				}
 				cpkt := pkt.Copy()
@@ -292,7 +291,7 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 }
 
 // UpdateFeed appends the given content metadata into the peer's feed blockchain permanently.
-func (n *node) UpdateFeed(metadata content.Metadata) error {
+func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
 	return n.social.ProposeNewPost(metadata)
 }
 
@@ -348,35 +347,45 @@ func (n *node) GetFeedContents(userID string) []content.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
 }
 
+// GetReactions implements peer.PartageClient
+func (n *node) GetReactions(contentID string) []content.ReactionInfo {
+	return n.social.FeedStore.GetReactions(contentID)
+}
+
 // GetUserState implements peer.PartageClient
 func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
 }
 
-// SharePost implements peer.PartageClient.
-func (n *node) SharePost(data io.Reader) (string, error) {
+// ShareTextPost implements peer.PartageClient.
+func (n *node) ShareTextPost(post content.TextPost) (string, string, error) {
 	// First, upload the text.
-	metahash, err := n.data.Upload(data)
+	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateTextMetadata(n.social.GetUserID(), metahash)
-	return metadata.ContentID, n.UpdateFeed(metadata)
+	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
+	blockHash, err := n.UpdateFeed(metadata)
+	return metadata.ContentID, blockHash, err
 }
 
-func (n *node) DiscoverContent(filter contentfilter.ContentFilter) ([]string, error) {
+func (n *node) ShareCommentPost(post content.CommentPost) (string, string, error) {
+	// First, upload the comment.
+	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseCommentPost(post)))
+	if err != nil {
+		return "", "", err
+	}
+	// Then, update the feed with the new metadata.
+	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
+	blockHash, err := n.UpdateFeed(metadata)
+	return metadata.ContentID, blockHash, err
+}
+
+func (n *node) DiscoverContent(filter content.Filter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
 }
 
 func (n *node) DownloadPost(contentID string) ([]byte, error) {
-	// First, get the metadata with the given content id.
-	metadataBytes := n.conf.BlockchainStorage.GetStore("metadata").Get(contentID)
-	if metadataBytes == nil {
-		return nil, fmt.Errorf("unknown content id")
-	}
-	metadata := content.ParseMetadata(metadataBytes)
-	// Then, get the metahash associated with the given post content.
-	metahash, _ := content.ParseTextPostMetadata(metadata)
-	return n.data.Download(metahash)
+	return n.data.DownloadContent(contentID)
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var DEBUG = map[string]bool{
@@ -17,13 +18,14 @@ var DEBUG = map[string]bool{
 	"heartbeat":     false,
 	"messaging":     false,
 	"gossip":        false,
-	"data":          true,
+	"data":          false,
 	"acceptor":      false,
 	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
 	"social":        false,
 	"statemachine":  false,
+	"tls":           false,
 }
 
 func PrintDebug(tag string, objs ...interface{}) {
@@ -32,8 +34,8 @@ func PrintDebug(tag string, objs ...interface{}) {
 	}
 }
 
-func Time() int {
-	return 0
+func Time() int64 {
+	return time.Now().UTC().Unix()
 }
 
 func ChooseRandom(options map[string]struct{}, exclusion map[string]struct{}) (string, error) {
@@ -88,19 +90,6 @@ func HashNameBlock(index int, uniqID string, fileName string, metahash string, p
 	return hashSlice
 }
 
-func HashContentMetadata(index int, uniqID string, contentType string, userID string, contentID string,
-	prevHash []byte) []byte {
-	h := crypto.SHA256.New()
-	h.Write([]byte(strconv.Itoa(index)))
-	h.Write([]byte(uniqID))
-	h.Write([]byte(contentType))
-	h.Write([]byte(userID))
-	h.Write([]byte(contentID))
-	h.Write(prevHash)
-	hashSlice := h.Sum(nil)
-	return hashSlice
-}
-
 func OpenFileToAppend(path string) (*os.File, error) {
 	//don't forget to close fp! fp.Close()
 	wd, _ := os.Getwd()
@@ -129,4 +118,3 @@ func AppendToFile(data []byte, fp *os.File) error {
 	}
 	return nil
 }
-

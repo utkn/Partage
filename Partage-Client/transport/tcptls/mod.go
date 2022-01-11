@@ -125,7 +125,7 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 		}
 		// Add conn to pool
 		s.connPool.AddConn(dest, conn)
-		fmt.Println(s.GetAddress(), " created a goroutine to handle ", dest, " conn")
+		utils.PrintDebug("tls", s.GetAddress(), " created a goroutine to handle ", dest, " conn")
 
 		// Create a pkt listening goroutine for this new conn
 		go s.HandleTLSConn(conn, true)
@@ -225,7 +225,7 @@ func (s *Socket) HandleTLSConn(tlsConn *tls.Conn, connSaved bool) {
 		if !connSaved {
 			if !s.connPool.ConnExists(pkt.Header.RelayedBy) {
 				s.connPool.AddConn(pkt.Header.RelayedBy, tlsConn)
-				fmt.Println(s.GetAddress(), " created a goroutine to handle ", pkt.Header.RelayedBy, " conn")
+				utils.PrintDebug("tls", s.GetAddress(), " created a goroutine to handle ", pkt.Header.RelayedBy, " conn")
 			}
 			connSaved = true
 		}

@@ -1,29 +1,32 @@
 package feed
 
 import (
-	"encoding/hex"
 	"fmt"
-	"go.dedis.ch/cs438/peer/impl/social/feed/content"
+	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/storage"
-	"go.dedis.ch/cs438/types"
 	"sync"
 )
 
 // Feed represents a user's feed.
 type Feed struct {
 	sync.RWMutex
-	UserID        string
-	userState     *UserState
-	contents      []content.Metadata
-	metadataStore storage.Store
+	UserID      string
+	userState   *UserState
+	contents    []content.Metadata
+	blockHashes map[string]content.Metadata
+	// Undo-ed contents.
+	hiddenContentIDs map[string]struct{}
+	metadataStore    storage.Store
 }
 
 func NewEmptyFeed(userID string, metadataStore storage.Store) *Feed {
 	return &Feed{
-		UserID:        userID,
-		userState:     NewInitialUserState(userID),
-		contents:      []content.Metadata{},
-		metadataStore: metadataStore,
+		UserID:           userID,
+		userState:        NewInitialUserState(userID),
+		contents:         []content.Metadata{},
+		blockHashes:      make(map[string]content.Metadata),
+		hiddenContentIDs: make(map[string]struct{}),
+		metadataStore:    metadataStore,
 	}
 }
 
@@ -35,10 +38,20 @@ func (f *Feed) Copy() *Feed {
 	for _, c := range f.contents {
 		contents = append(contents, c)
 	}
+	blockHashes := make(map[string]content.Metadata, len(f.blockHashes))
+	for k, v := range f.blockHashes {
+		blockHashes[k] = v
+	}
+	hiddenContentIDs := make(map[string]struct{}, len(f.hiddenContentIDs))
+	for k, v := range f.hiddenContentIDs {
+		hiddenContentIDs[k] = v
+	}
 	return &Feed{
-		UserID:    f.UserID,
-		userState: &userState,
-		contents:  contents,
+		UserID:           f.UserID,
+		userState:        &userState,
+		contents:         contents,
+		blockHashes:      blockHashes,
+		hiddenContentIDs: hiddenContentIDs,
 		// The store cannot be copied!
 		metadataStore: f.metadataStore,
 	}
@@ -55,29 +68,42 @@ func (f *Feed) GetContents() []content.Metadata {
 	defer f.RUnlock()
 	var contents []content.Metadata
 	for _, c := range f.contents {
+		_, hidden := f.hiddenContentIDs[c.ContentID]
+		// Hide the content id.
+		if hidden {
+			c.ContentID = ""
+		}
 		contents = append(contents, c)
 	}
 	return contents
 }
 
-// Append appends a new feed content into the feed. The associated blockchain is not modified.
-func (f *Feed) Append(c content.Metadata) {
-	f.Lock()
-	defer f.Unlock()
-	f.processAndAppend(c)
+// GetWithHash returns the metadata associated with the given block hash.
+func (f *Feed) GetWithHash(blockHash string) (content.Metadata, error) {
+	f.RLock()
+	defer f.RUnlock()
+	m, ok := f.blockHashes[blockHash]
+	if !ok {
+		return content.Metadata{}, fmt.Errorf("feed: unknown block hash")
+	}
+	return m, nil
 }
 
-func (f *Feed) processAndAppend(c content.Metadata) {
-	// Process the metadata by updating the user state.
-	err := f.userState.Update(c)
-	if err != nil {
-		fmt.Printf("error while updating user state %s\n", err)
-	}
-	// Append the metadata.
+// Append appends a new feed content into the feed without processing it. The associated blockchain is not modified.
+func (f *Feed) Append(c content.Metadata, blockHash string) {
+	f.Lock()
+	defer f.Unlock()
+	// Add the metadata.
 	f.contents = append(f.contents, c)
-	// Save the metadata into the metadata storage.
-	metadataBytes := content.UnparseMetadata(c)
-	f.metadataStore.Set(c.ContentID, metadataBytes)
+	f.blockHashes[blockHash] = c
+}
+
+// HideContent hides the contents of the post with the given content id. When GetContents is called, the content id of
+// the hidden posts are masked.
+func (f *Feed) HideContent(contentID string) {
+	f.Lock()
+	defer f.Unlock()
+	f.hiddenContentIDs[contentID] = struct{}{}
 }
 
 // UpdateEndorsement updates the endorsement given by a different user.
@@ -85,51 +111,11 @@ func (f *Feed) UpdateEndorsement(endorsement content.Metadata) {
 	f.Lock()
 	defer f.Unlock()
 	endorserID := endorsement.FeedUserID
-	complete := f.userState.Endorsement.Update(endorsement.Timestamp, endorserID)
+	complete := f.userState.EndorsementHandler.Update(endorsement.Timestamp, endorserID)
 	// If the endorsement request was fulfilled by the network, reward the user.
 	if complete {
 		f.userState.CurrentCredits += ENDORSEMENT_REWARD
 	}
-}
-
-// LoadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
-func LoadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) *Feed {
-	// Get the feed blockchain associated with the given user id.
-	feedBlockchain := blockchainStorage.GetStore(IDFromUserID(userID))
-	// Construct the feed blockchain.
-	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
-	// If the associated blockchain is completely empty, return an empty feedBlockchain.
-	if lastBlockHashHex == "" {
-		return NewEmptyFeed(userID, metadataStore)
-	}
-	// The first block has its previous hash field set to this value.
-	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
-	var blocks []types.BlockchainBlock
-	// Go back from the last block to the first block.
-	for lastBlockHashHex != endBlockHasHex {
-		// Get the current last block.
-		lastBlockBuf := feedBlockchain.Get(lastBlockHashHex)
-		var currBlock types.BlockchainBlock
-		err := currBlock.Unmarshal(lastBlockBuf)
-		if err != nil {
-			fmt.Printf("Error during collecting feedBlockchain from blockchain %v\n", err)
-			continue
-		}
-		// Prepend into the list of blocks.
-		blocks = append([]types.BlockchainBlock{currBlock}, blocks...)
-		// Go back.
-		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
-	}
-	// Create the feed.
-	feed := NewEmptyFeed(userID, metadataStore)
-	// Now we have a list of blocks. Append them into the feed one by one.
-	for _, block := range blocks {
-		postInfo := content.ParseMetadata(block.Value.CustomValue)
-		// No need to acquire the lock because there are no other references to this feed yet.
-		feed.processAndAppend(postInfo)
-	}
-	// Return the feed.
-	return feed
 }
 
 func IDFromUserID(userID string) string {
