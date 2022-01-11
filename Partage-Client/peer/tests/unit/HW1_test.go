@@ -100,7 +100,7 @@ func Test_HW1_Messaging_Broadcast_Rumor_Simple(t *testing.T) {
 			// >> node2 should have sent the following status to n1 {node1 => 1}
 
 			require.Len(t, ack.Status, 1)
-			require.Equal(t, uint(1), ack.Status[node1.GetAddr()])
+			require.Equal(t, int64(1), ack.Status[node1.GetAddr()])
 
 			// > node1 and node2 should've executed the handlers
 

@@ -17,7 +17,7 @@ var DEBUG = map[string]bool{
 	"antientropy":   false,
 	"heartbeat":     false,
 	"messaging":     false,
-	"gossip":        true,
+	"gossip":        false,
 	"data":          false,
 	"acceptor":      true,
 	"proposer":      false,
