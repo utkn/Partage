@@ -6,7 +6,7 @@ import (
 	"go.dedis.ch/cs438/transport"
 )
 
-type PartageClient interface {
+type SocialPeer interface {
 	RegisterUser() error
 	// ShareTextPost shares the text post with the given content and returns the content id, block hash.
 	ShareTextPost(post content.TextPost) (string, string, error)

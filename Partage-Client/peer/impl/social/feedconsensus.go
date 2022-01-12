@@ -19,6 +19,7 @@ func FeedBlockchainUpdater(userID string, feedStore *feed.Store, blockchainStora
 		utils.PrintDebug("social", "Updating local feed...")
 		// Get the blockchain store associated with the user's feed.
 		blockchainStore := blockchainStorage.GetStore(feed.IDFromUserID(userID))
+		// If the block contains a join metadata, then we need to also append to the registration blockchain.
 		// Update the last block.
 		blockchainStore.Set(storage.LastBlockKey, newBlock.Hash)
 		newBlockHash := hex.EncodeToString(newBlock.Hash)
@@ -78,6 +79,7 @@ func FeedBlockGenerator(userID string, blockchainStorage storage.MultipurposeSto
 	}
 }
 
+// NewFeedConsensusProtocol generates a new consensus protocol for the given user.
 func NewFeedConsensusProtocol(userID string, config *peer.Configuration, gossip *gossip.Layer, feedStore *feed.Store) protocol.Protocol {
 	protocolID := feed.IDFromUserID(userID)
 	return paxos.New(protocolID, config, gossip,

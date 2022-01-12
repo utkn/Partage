@@ -6,7 +6,12 @@ import (
 	"go.dedis.ch/cs438/storage"
 )
 
+// IsValidMetadata checks whether the given metadata can be safely added to the blockchain. Used during consensus.
 func (feedStore *Store) IsValidMetadata(c content.Metadata, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) bool {
+	// The user must be registered!
+	if !feedStore.IsKnown(c.FeedUserID) {
+		return false
+	}
 	// Accept reactions only when the user has not reacted to the referred content id yet.
 	if c.Type == content.REACTION {
 		return !feedStore.reactionHandler.AlreadyReacted(c.RefContentID, c.FeedUserID)
@@ -49,10 +54,11 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata, blockchainStorage st
 			return false
 		}
 		// Only reactions, text, comments, and follows can be undone.
-		referredMetadataIsUndoable := referredMetadata.Type == content.REACTION ||
-			referredMetadata.Type == content.TEXT ||
-			referredMetadata.Type == content.COMMENT ||
-			referredMetadata.Type == content.FOLLOW
+		referredMetadataIsUndoable :=
+			referredMetadata.Type == content.REACTION ||
+				referredMetadata.Type == content.TEXT ||
+				referredMetadata.Type == content.COMMENT ||
+				referredMetadata.Type == content.FOLLOW
 		return referredMetadataIsUndoable
 	}
 	return true

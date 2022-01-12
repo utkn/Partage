@@ -91,7 +91,7 @@ func NewPeer(conf peer.Configuration) peer.Peer {
 	gossipLayer.RegisterHandlers()
 	consensusLayer.RegisterHandlers()
 	dataLayer.RegisterHandlers()
-	socialLayer.RegisterHandlers()
+	//socialLayer.RegisterHandlers()
 
 	conf.MessageRegistry.RegisterMessageCallback(types.ChatMessage{}, node.ChatMessageHandler)
 	conf.MessageRegistry.RegisterMessageCallback(types.EmptyMessage{}, node.EmptyMessageHandler)
@@ -296,18 +296,18 @@ func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
 	return n.social.ProposeMetadata(metadata)
 }
 
-// RegisterUser implements peer.PartageClient
+// RegisterUser implements peer.SocialPeer
 func (n *node) RegisterUser() error {
 	return n.social.Register()
 }
 
-// SharePrivatePost implements peer.PartageClient
+// SharePrivatePost implements peer.SocialPeer
 func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
 	//msg should be a marshaled types.Post message..
 	return n.gossip.SendPrivatePost(msg, recipients)
 }
 
-// BlockUser implements peer.PartageClient
+// BlockUser implements peer.SocialPeer
 func (n *node) BlockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
@@ -315,7 +315,7 @@ func (n *node) BlockUser(publicKeyHash [32]byte) {
 	}
 }
 
-// UnblockUser implements peer.PartageClient
+// UnblockUser implements peer.SocialPeer
 func (n *node) UnblockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
@@ -323,7 +323,7 @@ func (n *node) UnblockUser(publicKeyHash [32]byte) {
 	}
 }
 
-// GetHashedPublicKey implements peer.PartageClient
+// GetHashedPublicKey implements peer.SocialPeer
 func (n *node) GetHashedPublicKey() [32]byte {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
@@ -332,33 +332,33 @@ func (n *node) GetHashedPublicKey() [32]byte {
 	return [32]byte{}
 }
 
-// GetUserID implements peer.PartageClient
+// GetUserID implements peer.SocialPeer
 func (n *node) GetUserID() string {
 	b := n.GetHashedPublicKey()
 	return hex.EncodeToString(b[:])
 }
 
-// GetKnownUsers implements peer.PartageClient
+// GetKnownUsers implements peer.SocialPeer
 func (n *node) GetKnownUsers() map[string]struct{} {
-	return n.social.FeedStore.GetRegisteredUsers()
+	return n.social.FeedStore.GetKnownUsers()
 }
 
-// GetFeedContents implements peer.PartageClient
+// GetFeedContents implements peer.SocialPeer
 func (n *node) GetFeedContents(userID string) []content.Metadata {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
 }
 
-// GetReactions implements peer.PartageClient
+// GetReactions implements peer.SocialPeer
 func (n *node) GetReactions(contentID string) []content.ReactionInfo {
 	return n.social.FeedStore.GetReactions(contentID)
 }
 
-// GetUserState implements peer.PartageClient
+// GetUserState implements peer.SocialPeer
 func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
 }
 
-// ShareTextPost implements peer.PartageClient.
+// ShareTextPost implements peer.SocialPeer.
 func (n *node) ShareTextPost(post content.TextPost) (string, string, error) {
 	// First, upload the text.
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))

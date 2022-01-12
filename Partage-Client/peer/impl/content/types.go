@@ -13,7 +13,8 @@ import (
 type Type int
 
 const (
-	TEXT Type = iota
+	JOIN Type = iota
+	TEXT
 	COMMENT
 	REACTION
 	FOLLOW
@@ -26,6 +27,8 @@ const (
 
 func (c Type) String() string {
 	switch c {
+	case JOIN:
+		return "join"
 	case TEXT:
 		return "text"
 	case COMMENT:
@@ -56,6 +59,18 @@ func (c Type) Cost() int {
 		return 1
 	}
 	return 0
+}
+
+func CreateJoinMetadata(userID string, timestamp int64) Metadata {
+	return Metadata{
+		FeedUserID:   userID,
+		Type:         JOIN,
+		ContentID:    "",
+		RefContentID: "",
+		Timestamp:    timestamp,
+		Data:         nil,
+		Signature:    nil,
+	}
 }
 
 func CreateChangeUsernameMetadata(userID string, newUsername string) Metadata {

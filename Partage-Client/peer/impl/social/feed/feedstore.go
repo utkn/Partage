@@ -12,12 +12,14 @@ import (
 type Store struct {
 	sync.RWMutex
 	feedMap         map[string]*Feed
+	knownUsers      map[string]struct{}
 	reactionHandler *ReactionHandler
 }
 
 func LoadStore() *Store {
 	return &Store{
 		feedMap:         make(map[string]*Feed),
+		knownUsers:      make(map[string]struct{}),
 		reactionHandler: NewReactionHandler(),
 	}
 }
@@ -40,7 +42,11 @@ func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, metadataS
 // GetFeedCopy loads the feed of the user associated with the given id. The feed is loaded from the blockchain storage.
 // The returned feed is a copied instance.
 func (s *Store) GetFeedCopy(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) *Feed {
-	return s.GetFeed(blockchainStorage, metadataStore, userID).Copy()
+	feed := s.GetFeed(blockchainStorage, metadataStore, userID)
+	if feed == nil {
+		return nil
+	}
+	return feed.Copy()
 }
 
 // GetReactions returns the known reactions associated with the given content id.
@@ -48,28 +54,42 @@ func (s *Store) GetReactions(contentID string) []content.ReactionInfo {
 	return s.reactionHandler.GetReactionsCopy(contentID)
 }
 
-// GetRegisteredUsers returns the set of users that were registered with this feed store.
-func (s *Store) GetRegisteredUsers() map[string]struct{} {
+// GetKnownUsers returns the set of users that were registered with this feed store.
+func (s *Store) GetKnownUsers() map[string]struct{} {
 	s.RLock()
 	defer s.RUnlock()
 	userSet := make(map[string]struct{})
-	for userID := range s.feedMap {
+	for userID := range s.knownUsers {
 		userSet[userID] = struct{}{}
 	}
 	return userSet
 }
 
-// loadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage.
+func (s *Store) AddUser(userID string) {
+	s.Lock()
+	defer s.Unlock()
+	s.knownUsers[userID] = struct{}{}
+}
+
+func (s *Store) IsKnown(userID string) bool {
+	s.RLock()
+	defer s.RUnlock()
+	_, isKnown := s.knownUsers[userID]
+	return isKnown
+}
+
+// loadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage into memory.
+// Returns whether the load was successful or not. If not, a new empty feed is created in-memory.
 // Warning: Not thread-safe.
-func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) {
+func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) bool {
 	// Get the feed blockchain associated with the given user id.
 	feedBlockchain := blockchainStorage.GetStore(IDFromUserID(userID))
 	// Construct the feed blockchain.
 	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
-	// If the associated blockchain is completely empty, save an empty feed blockchain.
+	// If the associated blockchain is completely empty, save an empty feed.
 	if lastBlockHashHex == "" {
 		s.feedMap[userID] = NewEmptyFeed(userID, metadataStore)
-		return
+		return false
 	}
 	// The first block has its previous hash field set to this value.
 	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
@@ -81,8 +101,8 @@ func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeSto
 		var currBlock types.BlockchainBlock
 		err := currBlock.Unmarshal(lastBlockBuf)
 		if err != nil {
-			fmt.Printf("Error during collecting feedBlockchain from blockchain %v\n", err)
-			continue
+			fmt.Printf("error during collecting the feed from blockchain: %v\n", err)
+			break
 		}
 		// Prepend into the list of blocks.
 		blocks = append([]types.BlockchainBlock{currBlock}, blocks...)
@@ -93,6 +113,7 @@ func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeSto
 	for _, block := range blocks {
 		s.AppendToFeed(blockchainStorage, metadataStore, userID, block)
 	}
+	return true
 }
 
 // AppendToFeed updates the feed associated with the given user id with the given new block.
@@ -150,13 +171,13 @@ func (s *Store) AppendToFeed(blockchainStorage storage.MultipurposeStorage, meta
 			fmt.Println(err)
 			return
 		}
-		// Try to undo the feed.
+		// (1) Try to apply the undo to the feed.
 		err = f.Undo(referredMetadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		// Undo the reaction.
+		// (2) Try to undo a reaction.
 		if referredMetadata.Type == content.REACTION {
 			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, c.FeedUserID)
 		}

@@ -31,7 +31,7 @@ func Construct(config *peer.Configuration,
 	hashedPublicKey [32]byte) *Layer {
 	// Convert the byte array into a hex string.
 	userID := hex.EncodeToString(hashedPublicKey[:])
-	return &Layer{
+	l := &Layer{
 		consensus: consensus,
 		data:      data,
 		gossip:    gossip,
@@ -39,6 +39,11 @@ func Construct(config *peer.Configuration,
 		FeedStore: feed.LoadStore(),
 		UserID:    userID,
 	}
+	// Register the registration consensus protocol.
+	consensus.RegisterProtocol("registration", l.newRegistrationConsensusProtocol(config, gossip, l.FeedStore))
+	// Load the registered users during the construction.
+	l.loadRegisteredUsers(config.BlockchainStorage)
+	return l
 }
 
 func (l *Layer) GetAddress() string {
@@ -51,8 +56,17 @@ func (l *Layer) GetUserID() string {
 
 func (l *Layer) Register() error {
 	utils.PrintDebug("social", l.GetAddress(), "has initiated registration with id", l.UserID)
-	newUserMsg := NewUserMessage{UserID: l.UserID}
-	return l.gossip.BroadcastMessage(newUserMsg)
+	regMetadata := content.CreateJoinMetadata(l.UserID, utils.Time())
+	val := content.UnparseMetadata(regMetadata)
+	paxosVal := types.PaxosValue{
+		UniqID:      xid.New().String(),
+		CustomValue: val,
+	}
+	_, err := l.consensus.ProposeWithProtocol("registration", paxosVal)
+	if err != nil {
+		return fmt.Errorf("error during registration: %v", err)
+	}
+	return nil
 }
 
 func (l *Layer) ProposeMetadata(metadata content.Metadata) (string, error) {
