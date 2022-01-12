@@ -22,8 +22,8 @@ type SocialPeer interface {
 	GetHashedPublicKey() [32]byte
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}
-	GetFeedContents(userID string) []content.Metadata
-	GetReactions(contentID string) []content.ReactionInfo
+	GetFeedContents(userID string) []feed.Content
+	GetReactions(contentID string) []feed.ReactionInfo
 	GetUserState(userID string) feed.UserState
 	BlockUser(publicKeyHash [32]byte)
 	UnblockUser(publicKeyHash [32]byte)

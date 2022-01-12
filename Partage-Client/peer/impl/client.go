@@ -1,11 +1,14 @@
 package impl
 
+import "go.dedis.ch/cs438/peer"
+
 type Client struct {
 	Self UserData
+	Peer peer.SocialPeer
 }
 
 func (c *Client) GetUserData(userID string) UserData {
-	return UserData{}
+	return NewUserData(c.Self.UserID, c.Peer.GetUserState(userID))
 }
 
 func (c *Client) GetPosts(userIDs []string, minTime int64, maxTime int64) []Post {

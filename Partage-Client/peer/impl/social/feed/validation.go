@@ -16,10 +16,6 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
 		return !feedStore.reactionHandler.AlreadyReacted(c.RefContentID, c.FeedUserID)
 	}
 	proposerFeed := feedStore.GetFeedCopy(c.FeedUserID)
-	// Reject unknown users.
-	if proposerFeed == nil {
-		return false
-	}
 	// Make sure that the user can afford the cost.
 	if c.Type.Cost() > proposerFeed.userState.CurrentCredits {
 		return false
@@ -29,16 +25,16 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
 		withinRange := proposerFeed.userState.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT
 		return withinRange && proposerFeed.userState.EndorsementHandler.CanRequest()
 	}
-	// Reject double-follows.
+	// Reject follows for unknown users and double-follows.
 	if c.Type == content.FOLLOW {
 		targetUserID, _ := content.ParseFollowedUser(c)
-		return !proposerFeed.userState.IsFollowing(targetUserID)
+		return feedStore.IsKnown(targetUserID) && !proposerFeed.userState.IsFollowing(targetUserID)
 	}
 	// Check whether the given endorsement is valid.
 	if c.Type == content.ENDORSEMENT {
 		referredUser, _ := content.ParseEndorsedUserID(c)
 		referredFeed := feedStore.GetFeedCopy(referredUser)
-		return referredFeed.userState.CanEndorse(utils.Time(), c.FeedUserID)
+		return feedStore.IsKnown(referredUser) && referredFeed.userState.CanEndorse(utils.Time(), c.FeedUserID)
 	}
 	// Check whether the attempted undo is valid.
 	if c.Type == content.UNDO {

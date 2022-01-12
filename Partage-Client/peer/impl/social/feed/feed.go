@@ -7,12 +7,18 @@ import (
 	"sync"
 )
 
+// Content represents a content on a feed, which is a metadata + its block hash.
+type Content struct {
+	content.Metadata
+	BlockHash string
+}
+
 // Feed represents a user's feed.
 type Feed struct {
 	sync.RWMutex
 	UserID      string
 	userState   *UserState
-	contents    []content.Metadata
+	contents    []Content
 	blockHashes map[string]content.Metadata
 	// Undo-ed contents.
 	hiddenContentIDs map[string]struct{}
@@ -23,7 +29,7 @@ func NewEmptyFeed(userID string, metadataStore storage.Store) *Feed {
 	return &Feed{
 		UserID:           userID,
 		userState:        NewInitialUserState(userID),
-		contents:         []content.Metadata{},
+		contents:         []Content{},
 		blockHashes:      make(map[string]content.Metadata),
 		hiddenContentIDs: make(map[string]struct{}),
 		metadataStore:    metadataStore,
@@ -34,7 +40,7 @@ func (f *Feed) Copy() *Feed {
 	f.RLock()
 	defer f.RUnlock()
 	userState := f.userState.Copy()
-	var contents []content.Metadata
+	var contents []Content
 	for _, c := range f.contents {
 		contents = append(contents, c)
 	}
@@ -63,10 +69,10 @@ func (f *Feed) GetUserStateCopy() UserState {
 	return f.userState.Copy()
 }
 
-func (f *Feed) GetContents() []content.Metadata {
+func (f *Feed) GetContents() []Content {
 	f.RLock()
 	defer f.RUnlock()
-	var contents []content.Metadata
+	var contents []Content
 	for _, c := range f.contents {
 		_, hidden := f.hiddenContentIDs[c.ContentID]
 		// Hide the content id.
@@ -90,41 +96,59 @@ func (f *Feed) GetWithHash(blockHash string) (content.Metadata, error) {
 }
 
 // Append appends a new feed content into the feed and updates the user state accordingly. The underlying blockchain is not modified.
-func (f *Feed) Append(c content.Metadata, blockHash string) error {
+// Returns the appended content.
+func (f *Feed) Append(metadata content.Metadata, blockHash string) (Content, error) {
 	f.Lock()
 	defer f.Unlock()
-	// Add the metadata.
+	// Create the content.
+	c := Content{
+		Metadata:  metadata,
+		BlockHash: blockHash,
+	}
+	// Add the content.
 	f.contents = append(f.contents, c)
-	f.blockHashes[blockHash] = c
-	return f.userState.Update(c)
+	f.blockHashes[blockHash] = metadata
+	return c, f.userState.Update(metadata)
 }
 
 // Undo tries to undo the given already appended metadata. The underlying blockchain is not modified.
-func (f *Feed) Undo(c content.Metadata) error {
+func (f *Feed) Undo(metadata content.Metadata) error {
 	f.Lock()
 	defer f.Unlock()
 	// First, undo the user state if possible.
-	err := f.userState.Undo(c)
+	err := f.userState.Undo(metadata)
 	if err != nil {
 		return err
 	}
 	// Then, try to undo the feed.
-	if c.Type == content.TEXT || c.Type == content.COMMENT {
-		f.hiddenContentIDs[c.ContentID] = struct{}{}
+	if metadata.Type == content.TEXT || metadata.Type == content.COMMENT {
+		f.hiddenContentIDs[metadata.ContentID] = struct{}{}
 	}
 	return nil
 }
 
-// UpdateEndorsement updates the endorsement given by a different user.
-func (f *Feed) UpdateEndorsement(endorsement content.Metadata) {
+// ReceiveEndorsement updates the endorsement given by a different user.
+func (f *Feed) ReceiveEndorsement(endorsement content.Metadata) {
 	f.Lock()
 	defer f.Unlock()
 	endorserID := endorsement.FeedUserID
-	complete := f.userState.EndorsementHandler.Update(endorsement.Timestamp, endorserID)
+	complete := f.userState.EndorsementHandler.ReceiveEndorsement(endorsement.Timestamp, endorserID)
 	// If the endorsement request was fulfilled by the network, reward the user.
 	if complete {
 		f.userState.CurrentCredits += ENDORSEMENT_REWARD
 	}
+}
+
+func (f *Feed) AddFollower(followerID string) {
+	f.Lock()
+	defer f.Unlock()
+	f.userState.AddFollower(followerID)
+}
+
+func (f *Feed) RemoveFollower(followerID string) {
+	f.Lock()
+	defer f.Unlock()
+	f.userState.RemoveFollower(followerID)
 }
 
 func IDFromUserID(userID string) string {

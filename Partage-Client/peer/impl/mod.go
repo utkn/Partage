@@ -344,12 +344,12 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 }
 
 // GetFeedContents implements peer.SocialPeer
-func (n *node) GetFeedContents(userID string) []content.Metadata {
+func (n *node) GetFeedContents(userID string) []feed.Content {
 	return n.social.FeedStore.GetFeedCopy(userID).GetContents()
 }
 
 // GetReactions implements peer.SocialPeer
-func (n *node) GetReactions(contentID string) []content.ReactionInfo {
+func (n *node) GetReactions(contentID string) []feed.ReactionInfo {
 	return n.social.FeedStore.GetReactions(contentID)
 }
 

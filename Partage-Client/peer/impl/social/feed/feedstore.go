@@ -63,7 +63,7 @@ func (s *Store) GetFeedCopy(userID string) *Feed {
 }
 
 // GetReactions returns the known reactions associated with the given content id.
-func (s *Store) GetReactions(contentID string) []content.ReactionInfo {
+func (s *Store) GetReactions(contentID string) []ReactionInfo {
 	return s.reactionHandler.GetReactionsCopy(contentID)
 }
 
@@ -107,67 +107,82 @@ func (s *Store) AppendToFeed(userID string, newBlock types.BlockchainBlock) {
 // Thread unsafe version of AppendToFeed.
 func (s *Store) appendToFeed(userID string, newBlock types.BlockchainBlock) {
 	// Extract the content metadata.
-	c := content.ParseMetadata(newBlock.Value.CustomValue)
+	metadata := content.ParseMetadata(newBlock.Value.CustomValue)
 	// --- Append into the in-memory as well.
 	// Get the associated feed.
-	f := s.getFeed(userID)
+	feed := s.getFeed(userID)
 	// First, save the metadata into the metadata storage.
-	if c.ContentID != "" {
-		metadataBytes := content.UnparseMetadata(c)
-		f.metadataStore.Set(c.ContentID, metadataBytes)
+	if metadata.ContentID != "" {
+		metadataBytes := content.UnparseMetadata(metadata)
+		s.MetadataStore.Set(metadata.ContentID, metadataBytes)
 	}
 	blockHash := hex.EncodeToString(newBlock.Hash)
 	// Append into the actual feed & update the user state.
-	err := f.Append(c, blockHash)
+	feedContent, err := feed.Append(metadata, blockHash)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	// If we have a follow block, inform the followed user.
+	if metadata.Type == content.FOLLOW {
+		followedUserID, err := content.ParseFollowedUser(metadata)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		// Update the followed user's state.
+		s.getFeed(followedUserID).AddFollower(metadata.FeedUserID)
+	}
 	// If we have an endorsement block, then we need to update the endorsed user's state explicitly.
-	if c.Type == content.ENDORSEMENT {
+	if metadata.Type == content.ENDORSEMENT {
 		// Extract the endorsed user.
-		endorsedID, err := content.ParseEndorsedUserID(c)
+		endorsedID, err := content.ParseEndorsedUserID(metadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// Update the endorsed user's state.
-		s.getFeed(endorsedID).UpdateEndorsement(c)
+		s.getFeed(endorsedID).ReceiveEndorsement(metadata)
 	}
 	// If we have a reaction block, then we need to inform the reaction handler.
-	if c.Type == content.REACTION {
+	if metadata.Type == content.REACTION {
 		// Extract the reaction from metadata.
-		reaction, err := content.ParseReactionMetadata(c)
+		reaction, err := content.ParseReactionMetadata(metadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// Save the reaction.
-		s.reactionHandler.SaveReaction(reaction, c.RefContentID, c.FeedUserID)
+		s.reactionHandler.SaveReaction(feedContent, reaction)
 	}
 	// If we have an undo block, we need to do some special stuff.
-	if c.Type == content.UNDO {
+	if metadata.Type == content.UNDO {
 		// Extract the referred block hash.
-		refBlock, err := content.ParseUndoMetadata(c)
+		refBlock, err := content.ParseUndoMetadata(metadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// Get the referred metadata.
-		referredMetadata, err := f.GetWithHash(refBlock)
+		referredMetadata, err := feed.GetWithHash(refBlock)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// (1) Try to apply the undo to the feed.
-		err = f.Undo(referredMetadata)
+		err = feed.Undo(referredMetadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		// (2) Try to undo a reaction.
+		// (2) Try to undo the follow from the followed user.
+		if referredMetadata.Type == content.FOLLOW {
+			followedUserID, _ := content.ParseFollowedUser(referredMetadata)
+			s.getFeed(followedUserID).RemoveFollower(referredMetadata.FeedUserID)
+		}
+		// (3) Try to undo a reaction.
 		if referredMetadata.Type == content.REACTION {
-			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, c.FeedUserID)
+			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, metadata.FeedUserID)
 		}
 	}
 }
