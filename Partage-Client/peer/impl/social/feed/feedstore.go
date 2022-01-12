@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
 	"sync"
@@ -14,35 +15,47 @@ type Store struct {
 	feedMap         map[string]*Feed
 	knownUsers      map[string]struct{}
 	reactionHandler *ReactionHandler
+
+	BlockchainStorage storage.MultipurposeStorage
+	MetadataStore     storage.Store
 }
 
-func LoadStore() *Store {
+func LoadStore(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) *Store {
 	return &Store{
-		feedMap:         make(map[string]*Feed),
-		knownUsers:      make(map[string]struct{}),
-		reactionHandler: NewReactionHandler(),
+		feedMap:           make(map[string]*Feed),
+		knownUsers:        make(map[string]struct{}),
+		reactionHandler:   NewReactionHandler(),
+		BlockchainStorage: blockchainStorage,
+		MetadataStore:     metadataStore,
 	}
 }
 
-// GetFeed loads the feed of the user associated with the given id. The feed is loaded from the blockchain storage.
-func (s *Store) GetFeed(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) *Feed {
-	s.RLock()
-	feed, ok := s.feedMap[userID]
-	s.RUnlock()
-	if !ok {
-		s.Lock()
-		// Load the feed from the blockchain into the in-memory storage.
-		s.loadFeedFromBlockchain(blockchainStorage, metadataStore, userID)
-		feed = s.feedMap[userID]
-		s.Unlock()
+// loadFeed loads the feed associated with the given user id from the blockchain storage into memory.
+// Warning: thread-unsafe
+func (s *Store) loadFeed(userID string) {
+	store := s.BlockchainStorage.GetStore(IDFromUserID(userID))
+	blocks := utils.LoadBlockchain(store)
+	// Create an empty feed.
+	s.feedMap[userID] = NewEmptyFeed(userID, s.MetadataStore)
+	// Move into memory.
+	for _, block := range blocks {
+		s.appendToFeed(userID, block)
 	}
+}
+
+// getFeed returns the feed associated with the given user id.
+// Warning: thread-unsafe
+func (s *Store) getFeed(userID string) *Feed {
+	feed, _ := s.feedMap[userID]
 	return feed
 }
 
 // GetFeedCopy loads the feed of the user associated with the given id. The feed is loaded from the blockchain storage.
 // The returned feed is a copied instance.
-func (s *Store) GetFeedCopy(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) *Feed {
-	feed := s.GetFeed(blockchainStorage, metadataStore, userID)
+func (s *Store) GetFeedCopy(userID string) *Feed {
+	s.RLock()
+	defer s.RUnlock()
+	feed := s.getFeed(userID)
 	if feed == nil {
 		return nil
 	}
@@ -65,12 +78,18 @@ func (s *Store) GetKnownUsers() map[string]struct{} {
 	return userSet
 }
 
-func (s *Store) AddUser(userID string) {
+// LoadUser adds the given user id to this feed store and loads the feed from storage.
+// Should be invoked during user registration.
+func (s *Store) LoadUser(userID string) {
 	s.Lock()
 	defer s.Unlock()
+	// First save in the known users set.
 	s.knownUsers[userID] = struct{}{}
+	// Then, load the feed from the storage.
+	s.loadFeed(userID)
 }
 
+// IsKnown returns true if the given user id was added with LoadUser to this feed store.
 func (s *Store) IsKnown(userID string) bool {
 	s.RLock()
 	defer s.RUnlock()
@@ -78,51 +97,20 @@ func (s *Store) IsKnown(userID string) bool {
 	return isKnown
 }
 
-// loadFeedFromBlockchain loads the feed associated with the given user id from the blockchain storage into memory.
-// Returns whether the load was successful or not. If not, a new empty feed is created in-memory.
-// Warning: Not thread-safe.
-func (s *Store) loadFeedFromBlockchain(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string) bool {
-	// Get the feed blockchain associated with the given user id.
-	feedBlockchain := blockchainStorage.GetStore(IDFromUserID(userID))
-	// Construct the feed blockchain.
-	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
-	// If the associated blockchain is completely empty, save an empty feed.
-	if lastBlockHashHex == "" {
-		s.feedMap[userID] = NewEmptyFeed(userID, metadataStore)
-		return false
-	}
-	// The first block has its previous hash field set to this value.
-	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
-	var blocks []types.BlockchainBlock
-	// Go back from the last block to the first block.
-	for lastBlockHashHex != endBlockHasHex {
-		// Get the current last block.
-		lastBlockBuf := feedBlockchain.Get(lastBlockHashHex)
-		var currBlock types.BlockchainBlock
-		err := currBlock.Unmarshal(lastBlockBuf)
-		if err != nil {
-			fmt.Printf("error during collecting the feed from blockchain: %v\n", err)
-			break
-		}
-		// Prepend into the list of blocks.
-		blocks = append([]types.BlockchainBlock{currBlock}, blocks...)
-		// Go back.
-		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
-	}
-	// Now we have a list of blocks. Add them one by one.
-	for _, block := range blocks {
-		s.AppendToFeed(blockchainStorage, metadataStore, userID, block)
-	}
-	return true
+// AppendToFeed updates the feed state associated with the given user id with the given new block.
+func (s *Store) AppendToFeed(userID string, newBlock types.BlockchainBlock) {
+	s.Lock()
+	defer s.Unlock()
+	s.appendToFeed(userID, newBlock)
 }
 
-// AppendToFeed updates the feed associated with the given user id with the given new block.
-func (s *Store) AppendToFeed(blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store, userID string, newBlock types.BlockchainBlock) {
+// Thread unsafe version of AppendToFeed.
+func (s *Store) appendToFeed(userID string, newBlock types.BlockchainBlock) {
 	// Extract the content metadata.
 	c := content.ParseMetadata(newBlock.Value.CustomValue)
 	// --- Append into the in-memory as well.
 	// Get the associated feed.
-	f := s.GetFeed(blockchainStorage, metadataStore, userID)
+	f := s.getFeed(userID)
 	// First, save the metadata into the metadata storage.
 	if c.ContentID != "" {
 		metadataBytes := content.UnparseMetadata(c)
@@ -144,7 +132,7 @@ func (s *Store) AppendToFeed(blockchainStorage storage.MultipurposeStorage, meta
 			return
 		}
 		// Update the endorsed user's state.
-		s.GetFeed(blockchainStorage, metadataStore, endorsedID).UpdateEndorsement(c)
+		s.getFeed(endorsedID).UpdateEndorsement(c)
 	}
 	// If we have a reaction block, then we need to inform the reaction handler.
 	if c.Type == content.REACTION {

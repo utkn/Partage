@@ -226,13 +226,15 @@ func (s ProposerDoneState) Next() (State, types.BlockchainBlock) {
 		//println(p.gossip.GetAddress(), "NO TICK!")
 		return ProposerBeginState{
 			paxos: s.paxos,
+			value: s.originalValue,
 		}, types.BlockchainBlock{}
 	}
-	// Retry if the proposed value is not ours.
+	// Retry with the original value if the proposed value is not ours.
 	if s.originalValue.UniqID != s.proposedValue.UniqID {
 		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "will now retry to propose its own value.")
 		return ProposerBeginState{
 			paxos: s.paxos,
+			value: s.originalValue,
 		}, types.BlockchainBlock{}
 	}
 	utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "has concluded the proposal with ID",

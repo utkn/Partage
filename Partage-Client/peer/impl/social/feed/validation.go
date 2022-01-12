@@ -3,11 +3,10 @@ package feed
 import (
 	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
-	"go.dedis.ch/cs438/storage"
 )
 
 // IsValidMetadata checks whether the given metadata can be safely added to the blockchain. Used during consensus.
-func (feedStore *Store) IsValidMetadata(c content.Metadata, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) bool {
+func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
 	// The user must be registered!
 	if !feedStore.IsKnown(c.FeedUserID) {
 		return false
@@ -16,7 +15,7 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata, blockchainStorage st
 	if c.Type == content.REACTION {
 		return !feedStore.reactionHandler.AlreadyReacted(c.RefContentID, c.FeedUserID)
 	}
-	proposerFeed := feedStore.GetFeedCopy(blockchainStorage, metadataStore, c.FeedUserID)
+	proposerFeed := feedStore.GetFeedCopy(c.FeedUserID)
 	// Reject unknown users.
 	if proposerFeed == nil {
 		return false
@@ -38,7 +37,7 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata, blockchainStorage st
 	// Check whether the given endorsement is valid.
 	if c.Type == content.ENDORSEMENT {
 		referredUser, _ := content.ParseEndorsedUserID(c)
-		referredFeed := feedStore.GetFeedCopy(blockchainStorage, metadataStore, referredUser)
+		referredFeed := feedStore.GetFeedCopy(referredUser)
 		return referredFeed.userState.CanEndorse(utils.Time(), c.FeedUserID)
 	}
 	// Check whether the attempted undo is valid.

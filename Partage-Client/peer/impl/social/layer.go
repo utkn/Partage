@@ -29,6 +29,8 @@ func Construct(config *peer.Configuration,
 	consensus *consensus.Layer,
 	gossip *gossip.Layer,
 	hashedPublicKey [32]byte) *Layer {
+	// Create the feed store.
+	feedStore := feed.LoadStore(config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata"))
 	// Convert the byte array into a hex string.
 	userID := hex.EncodeToString(hashedPublicKey[:])
 	l := &Layer{
@@ -36,7 +38,7 @@ func Construct(config *peer.Configuration,
 		data:      data,
 		gossip:    gossip,
 		Config:    config,
-		FeedStore: feed.LoadStore(),
+		FeedStore: feedStore,
 		UserID:    userID,
 	}
 	// Register the registration consensus protocol.

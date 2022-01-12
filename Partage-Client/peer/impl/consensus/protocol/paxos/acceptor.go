@@ -107,6 +107,7 @@ func (a *Acceptor) HandleTLC(msg types.TLCMessage) error {
 	a.paxos.Clock.Lock.Lock()
 	// Do not consider old blocks.
 	if msg.Step < a.paxos.Clock.Step {
+		utils.PrintDebug("tlc", a.paxos.Gossip.GetAddress(), "has dismissed an old block.")
 		a.paxos.Clock.Lock.Unlock()
 		return nil
 	}

@@ -2,8 +2,11 @@ package utils
 
 import (
 	"crypto"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.dedis.ch/cs438/storage"
+	"go.dedis.ch/cs438/types"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +22,7 @@ var DEBUG = map[string]bool{
 	"messaging":     false,
 	"gossip":        false,
 	"data":          false,
+	"consensus":     false,
 	"acceptor":      false,
 	"proposer":      false,
 	"tlc":           false,
@@ -117,4 +121,39 @@ func AppendToFile(data []byte, fp *os.File) error {
 		return err
 	}
 	return nil
+}
+
+// LoadBlockchain loads the given blockchain from storage and returns it as an ordered list of blocks.
+// If the store is empty, returns an empty list (nil).
+func LoadBlockchain(blockchainStore storage.Store) []types.BlockchainBlock {
+	// Reconstruct the blockchain.
+	lastBlockHashHex := hex.EncodeToString(blockchainStore.Get(storage.LastBlockKey))
+	// If the associated blockchain is completely empty, save an empty feed.
+	if lastBlockHashHex == "" {
+		return nil
+	}
+	// The first block has its previous hash field set to this value.
+	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
+	var blocks []types.BlockchainBlock
+	// Go back from the last block to the first block.
+	for lastBlockHashHex != endBlockHasHex {
+		// Get the current last block.
+		lastBlockBuf := blockchainStore.Get(lastBlockHashHex)
+		var currBlock types.BlockchainBlock
+		err := currBlock.Unmarshal(lastBlockBuf)
+		if err != nil {
+			fmt.Printf("error during collecting the feed from blockchain: %v\n", err)
+			break
+		}
+		// Prepend into the list of blocks.
+		blocks = append([]types.BlockchainBlock{currBlock}, blocks...)
+		// Go back.
+		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
+	}
+	return blocks
+	// Now we have a list of blocks. Add them one by one.
+	//for _, block := range blocks {
+	//	s.AppendToFeed(blockchainStore, metadataStore, userID, block)
+	//}
+	//return true
 }

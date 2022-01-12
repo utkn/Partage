@@ -2,7 +2,6 @@ package social
 
 import (
 	"encoding/hex"
-	"fmt"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol"
 	"go.dedis.ch/cs438/peer/impl/consensus/protocol/paxos"
@@ -15,45 +14,21 @@ import (
 )
 
 func (l *Layer) registerUser(newUserID string) {
-	// Add the user to the list of known users.
-	l.FeedStore.AddUser(newUserID)
-	// Add the appropriate protocol.
+	// Load the user feed and add it to the list of known users.
+	l.FeedStore.LoadUser(newUserID)
+	// Add the appropriate protocol for new blocks proposed by this user.
 	protocolID := feed.IDFromUserID(newUserID)
 	alreadyExists := l.consensus.IsRegistered(protocolID)
 	if !alreadyExists {
 		utils.PrintDebug("social", l.GetAddress(), "is registering", newUserID)
-		l.consensus.RegisterProtocol(protocolID, NewFeedConsensusProtocol(newUserID, l.Config, l.gossip, l.FeedStore))
+		l.consensus.RegisterProtocol(protocolID, l.newFeedConsensusProtocol(newUserID))
 	}
 }
 
 // loadRegisteredUsers loads the registered users from the registration blockchain.
 func (l *Layer) loadRegisteredUsers(blockchainStorage storage.MultipurposeStorage) bool {
-	// Get the registration blockchain.
-	feedBlockchain := blockchainStorage.GetStore("registration")
-	// Reconstruct the blockchain.
-	lastBlockHashHex := hex.EncodeToString(feedBlockchain.Get(storage.LastBlockKey))
-	// If the associated blockchain is completely empty, simply return. New blocks will be added with consensus.
-	if lastBlockHashHex == "" {
-		return false
-	}
-	// The first block has its previous hash field set to this value.
-	endBlockHasHex := hex.EncodeToString(make([]byte, 32))
-	var blocks []types.BlockchainBlock
-	// Go back from the last block to the first block.
-	for lastBlockHashHex != endBlockHasHex {
-		// Get the current last block.
-		lastBlockBuf := feedBlockchain.Get(lastBlockHashHex)
-		var currBlock types.BlockchainBlock
-		err := currBlock.Unmarshal(lastBlockBuf)
-		if err != nil {
-			fmt.Printf("error during collecting users from registration blockchain: %v\n", err)
-			break
-		}
-		// Prepend into the list of blocks.
-		blocks = append([]types.BlockchainBlock{currBlock}, blocks...)
-		// Go back.
-		lastBlockHashHex = hex.EncodeToString(currBlock.PrevHash)
-	}
+	// Get the blocks.
+	blocks := utils.LoadBlockchain(blockchainStorage.GetStore("registration"))
 	// Now we have a list of registration blocks. Register them one by one.
 	for _, block := range blocks {
 		c := content.ParseMetadata(block.Value.CustomValue)
@@ -64,7 +39,7 @@ func (l *Layer) loadRegisteredUsers(blockchainStorage storage.MultipurposeStorag
 }
 
 // registrationBlockchainUpdater takes a user id and returns a paxos feed blockchain updater.
-func (l *Layer) registrationBlockchainUpdater(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) paxos.BlockchainUpdater {
+func (l *Layer) registrationBlockchainUpdater(blockchainStorage storage.MultipurposeStorage) paxos.BlockchainUpdater {
 	return func(newBlock types.BlockchainBlock) {
 		utils.PrintDebug("social", "Registering user...")
 		// Get the blockchain store associated with the user's feed.
@@ -84,7 +59,7 @@ func (l *Layer) registrationBlockchainUpdater(feedStore *feed.Store, blockchainS
 }
 
 // registrationProposalChecker takes a user id and returns a paxos proposal checker.
-func (l *Layer) registrationProposalChecker(feedStore *feed.Store, blockchainStorage storage.MultipurposeStorage, metadataStore storage.Store) paxos.ProposalChecker {
+func (l *Layer) registrationProposalChecker() paxos.ProposalChecker {
 	return func(msg types.PaxosProposeMessage) bool {
 		metadata := content.ParseMetadata(msg.Value.CustomValue)
 		// Only allow registration blocks.
@@ -92,7 +67,7 @@ func (l *Layer) registrationProposalChecker(feedStore *feed.Store, blockchainSto
 			return false
 		}
 		// The user must be unregistered!
-		return !feedStore.IsKnown(metadata.FeedUserID)
+		return !l.FeedStore.IsKnown(metadata.FeedUserID)
 	}
 }
 
@@ -130,6 +105,6 @@ func (l *Layer) newRegistrationConsensusProtocol(config *peer.Configuration, gos
 	protocolID := "registration"
 	return paxos.New(protocolID, config, gossip,
 		l.registrationBlockGenerator(config.BlockchainStorage),
-		l.registrationBlockchainUpdater(feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata")),
-		l.registrationProposalChecker(feedStore, config.BlockchainStorage, config.BlockchainStorage.GetStore("metadata")))
+		l.registrationBlockchainUpdater(config.BlockchainStorage),
+		l.registrationProposalChecker())
 }

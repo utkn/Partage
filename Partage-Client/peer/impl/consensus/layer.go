@@ -41,6 +41,7 @@ func (l *Layer) GetAddress() string {
 }
 
 func (l *Layer) RegisterProtocol(id string, protocol protocol.Protocol) {
+	utils.PrintDebug("consensus", l.GetAddress(), "is registering a new protocol", id)
 	l.Lock()
 	defer l.Unlock()
 	l.protocols[id] = protocol
@@ -61,6 +62,7 @@ func (l *Layer) Propose(value types.PaxosValue) (string, error) {
 // ProposeWithProtocol proposes the given value with the protocol associated with the given protocol id.
 // Returns the newly appended block hash.
 func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) (string, error) {
+	utils.PrintDebug("consensus", l.GetAddress(), "is proposing with", protocolID)
 	// Consensus should not be invoked when there are <= 1 many peers.
 	if l.Config.TotalPeers <= 1 {
 		return "", fmt.Errorf("consensus is disabled for <= 1 many peers")

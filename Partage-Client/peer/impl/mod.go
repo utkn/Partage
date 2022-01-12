@@ -345,7 +345,7 @@ func (n *node) GetKnownUsers() map[string]struct{} {
 
 // GetFeedContents implements peer.SocialPeer
 func (n *node) GetFeedContents(userID string) []content.Metadata {
-	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetContents()
+	return n.social.FeedStore.GetFeedCopy(userID).GetContents()
 }
 
 // GetReactions implements peer.SocialPeer
@@ -355,7 +355,7 @@ func (n *node) GetReactions(contentID string) []content.ReactionInfo {
 
 // GetUserState implements peer.SocialPeer
 func (n *node) GetUserState(userID string) feed.UserState {
-	return n.social.FeedStore.GetFeedCopy(n.conf.BlockchainStorage, n.conf.BlockchainStorage.GetStore("metadata"), userID).GetUserStateCopy()
+	return n.social.FeedStore.GetFeedCopy(userID).GetUserStateCopy()
 }
 
 // ShareTextPost implements peer.SocialPeer.
