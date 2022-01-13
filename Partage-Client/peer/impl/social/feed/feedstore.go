@@ -7,6 +7,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"go.dedis.ch/cs438/types"
+	"sort"
 	"sync"
 )
 
@@ -71,11 +72,47 @@ func (s *Store) GetReactions(contentID string) []ReactionInfo {
 func (s *Store) GetKnownUsers() map[string]struct{} {
 	s.RLock()
 	defer s.RUnlock()
+	return s.getKnownUsers()
+}
+
+// Thread-unsafe version of GetKnownUsers.
+func (s *Store) getKnownUsers() map[string]struct{} {
 	userSet := make(map[string]struct{})
 	for userID := range s.knownUsers {
 		userSet[userID] = struct{}{}
 	}
 	return userSet
+}
+
+// QueryContents returns all the known contents from the given filters, sorted by their metadata timestamp.
+func (s *Store) QueryContents(filter content.Filter) []Content {
+	s.RLock()
+	defer s.RUnlock()
+	// User selectors.
+	selectedUsers := filter.OwnerIDs
+	if selectedUsers == nil {
+		for u := range s.getKnownUsers() {
+			selectedUsers = append(selectedUsers, u)
+		}
+	}
+	selectedTypes := make(map[content.Type]struct{}, len(filter.Types))
+	for _, t := range filter.Types {
+		selectedTypes[t] = struct{}{}
+	}
+	var filtered []Content
+	for _, user := range selectedUsers {
+		contents := s.getFeed(user).GetContents()
+		for _, c := range contents {
+			if filter.Match(c.Metadata) {
+				filtered = append(filtered, c)
+			}
+		}
+	}
+	// Sort by the timestamp.
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].Timestamp < filtered[j].Timestamp
+	})
+	return filtered
 }
 
 // LoadUser adds the given user id to this feed store and loads the feed from storage.
@@ -163,26 +200,26 @@ func (s *Store) appendToFeed(userID string, newBlock types.BlockchainBlock) {
 			fmt.Println(err)
 			return
 		}
-		// Get the referred metadata.
-		referredMetadata, err := feed.GetWithHash(refBlock)
+		// Get the referred content.
+		referredContent, err := feed.GetWithHash(refBlock)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// (1) Try to apply the undo to the feed.
-		err = feed.Undo(referredMetadata)
+		err = feed.Undo(referredContent.Metadata)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		// (2) Try to undo the follow from the followed user.
-		if referredMetadata.Type == content.FOLLOW {
-			followedUserID, _ := content.ParseFollowedUser(referredMetadata)
-			s.getFeed(followedUserID).RemoveFollower(referredMetadata.FeedUserID)
+		if referredContent.Type == content.FOLLOW {
+			followedUserID, _ := content.ParseFollowedUser(referredContent.Metadata)
+			s.getFeed(followedUserID).RemoveFollower(referredContent.FeedUserID)
 		}
 		// (3) Try to undo a reaction.
-		if referredMetadata.Type == content.REACTION {
-			s.reactionHandler.UndoReaction(referredMetadata.RefContentID, metadata.FeedUserID)
+		if referredContent.Type == content.REACTION {
+			s.reactionHandler.UndoReaction(referredContent.RefContentID, metadata.FeedUserID)
 		}
 	}
 }

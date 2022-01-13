@@ -9,13 +9,16 @@ import (
 type SocialPeer interface {
 	RegisterUser() error
 	// ShareTextPost shares the text post with the given content and returns the content id, block hash.
-	ShareTextPost(post content.TextPost) (string, string, error)
+	ShareTextPost(post content.TextPost) (content.Metadata, string, error)
 	// ShareCommentPost shares the comment post with the given content and reference id and returns the content id, block hash.
-	ShareCommentPost(post content.CommentPost) (string, string, error)
+	ShareCommentPost(post content.CommentPost) (content.Metadata, string, error)
 	// DownloadPost fetches the post with the given content id from the network.
 	DownloadPost(contentID string) ([]byte, error)
-	// DiscoverContent returns the matched content ids.
-	DiscoverContent(filter content.Filter) ([]string, error)
+	// QueryContents queries the feed store and returns all the matching contents from the stored blockchains.
+	QueryContents(filter content.Filter) []feed.Content
+	// DiscoverContentIDs returns the matched content ids in all the network.
+	DiscoverContentIDs(filter content.Filter) ([]string, error)
+	CheckMetadata(metadata content.Metadata) error
 	// UpdateFeed appends the given content metadata into the peer's feed blockchain permanently. Returns the block hash.
 	UpdateFeed(content.Metadata) (string, error)
 	SharePrivatePost(msg transport.Message, recipients [][32]byte) error

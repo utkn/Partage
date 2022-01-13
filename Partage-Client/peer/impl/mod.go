@@ -293,7 +293,13 @@ func (n *node) SearchFirst(pattern regexp.Regexp, conf peer.ExpandingRing) (stri
 
 // UpdateFeed implements peer.DataSharing.
 func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
-	return n.social.ProposeMetadata(metadata)
+	blockHash, err := n.social.ProposeMetadata(metadata)
+	// If the proposal has failed, try to get a meaningful error by checking the metadata locally.
+	if err != nil {
+		metadataError := n.social.FeedStore.CheckMetadata(metadata)
+		return "", fmt.Errorf("could not update feed: %v (Reason: %v)", err, metadataError)
+	}
+	return blockHash, nil
 }
 
 // RegisterUser implements peer.SocialPeer
@@ -303,7 +309,7 @@ func (n *node) RegisterUser() error {
 
 // SharePrivatePost implements peer.SocialPeer
 func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
-	//msg should be a marshaled types.Post message..
+	//msg should be a marshaled types.Text message..
 	return n.gossip.SendPrivatePost(msg, recipients)
 }
 
@@ -359,32 +365,36 @@ func (n *node) GetUserState(userID string) feed.UserState {
 }
 
 // ShareTextPost implements peer.SocialPeer.
-func (n *node) ShareTextPost(post content.TextPost) (string, string, error) {
-	// First, upload the text.
+func (n *node) ShareTextPost(post content.TextPost) (content.Metadata, string, error) {
+	// First, "upload" the text (stored locally!)
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))
 	if err != nil {
-		return "", "", err
+		return content.Metadata{}, "", err
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
 	blockHash, err := n.UpdateFeed(metadata)
-	return metadata.ContentID, blockHash, err
+	return metadata, blockHash, err
 }
 
-func (n *node) ShareCommentPost(post content.CommentPost) (string, string, error) {
+func (n *node) ShareCommentPost(post content.CommentPost) (content.Metadata, string, error) {
 	// First, upload the comment.
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseCommentPost(post)))
 	if err != nil {
-		return "", "", err
+		return content.Metadata{}, "", err
 	}
 	// Then, update the feed with the new metadata.
 	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
 	blockHash, err := n.UpdateFeed(metadata)
-	return metadata.ContentID, blockHash, err
+	return metadata, blockHash, err
 }
 
-func (n *node) DiscoverContent(filter content.Filter) ([]string, error) {
+func (n *node) DiscoverContentIDs(filter content.Filter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
+}
+
+func (n *node) QueryContents(filter content.Filter) []feed.Content {
+	return n.social.FeedStore.QueryContents(filter)
 }
 
 func (n *node) DownloadPost(contentID string) ([]byte, error) {

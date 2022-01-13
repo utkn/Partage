@@ -19,7 +19,7 @@ type Feed struct {
 	UserID      string
 	userState   *UserState
 	contents    []Content
-	blockHashes map[string]content.Metadata
+	blockHashes map[string]Content
 	// Undo-ed contents.
 	hiddenContentIDs map[string]struct{}
 	metadataStore    storage.Store
@@ -30,7 +30,7 @@ func NewEmptyFeed(userID string, metadataStore storage.Store) *Feed {
 		UserID:           userID,
 		userState:        NewInitialUserState(userID),
 		contents:         []Content{},
-		blockHashes:      make(map[string]content.Metadata),
+		blockHashes:      make(map[string]Content),
 		hiddenContentIDs: make(map[string]struct{}),
 		metadataStore:    metadataStore,
 	}
@@ -44,7 +44,7 @@ func (f *Feed) Copy() *Feed {
 	for _, c := range f.contents {
 		contents = append(contents, c)
 	}
-	blockHashes := make(map[string]content.Metadata, len(f.blockHashes))
+	blockHashes := make(map[string]Content, len(f.blockHashes))
 	for k, v := range f.blockHashes {
 		blockHashes[k] = v
 	}
@@ -85,12 +85,12 @@ func (f *Feed) GetContents() []Content {
 }
 
 // GetWithHash returns the metadata associated with the given block hash.
-func (f *Feed) GetWithHash(blockHash string) (content.Metadata, error) {
+func (f *Feed) GetWithHash(blockHash string) (Content, error) {
 	f.RLock()
 	defer f.RUnlock()
 	m, ok := f.blockHashes[blockHash]
 	if !ok {
-		return content.Metadata{}, fmt.Errorf("feed: unknown block hash")
+		return Content{}, fmt.Errorf("feed: unknown block hash")
 	}
 	return m, nil
 }
@@ -100,14 +100,14 @@ func (f *Feed) GetWithHash(blockHash string) (content.Metadata, error) {
 func (f *Feed) Append(metadata content.Metadata, blockHash string) (Content, error) {
 	f.Lock()
 	defer f.Unlock()
-	// Create the content.
+	// Create the feed metadata.
 	c := Content{
 		Metadata:  metadata,
 		BlockHash: blockHash,
 	}
 	// Add the content.
 	f.contents = append(f.contents, c)
-	f.blockHashes[blockHash] = metadata
+	f.blockHashes[blockHash] = c
 	return c, f.userState.Update(metadata)
 }
 

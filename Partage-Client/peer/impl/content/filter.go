@@ -1,6 +1,7 @@
 package content
 
 import (
+	"bytes"
 	"encoding/json"
 	"go.dedis.ch/cs438/storage"
 )
@@ -17,6 +18,8 @@ type Filter struct {
 	Types []Type
 	// RefContentID filters by the reference id. Used for comments, reactions etc. Setting to "" disables it.
 	RefContentID string
+	// Data filters by the data field. An exact match is required. Setting to nil disables it.
+	Data []byte
 }
 
 func ParseContentFilter(contentFilterBytes []byte) Filter {
@@ -46,6 +49,10 @@ func (c Filter) Match(metadata Metadata) bool {
 	}
 	// Check against referenced id.
 	if c.RefContentID != "" && c.RefContentID != metadata.RefContentID {
+		return false
+	}
+	// Check against data.
+	if c.Data != nil && !bytes.Equal(c.Data, metadata.Data) {
 		return false
 	}
 	// Check against allowed owners.

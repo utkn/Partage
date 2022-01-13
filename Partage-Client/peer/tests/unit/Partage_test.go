@@ -509,12 +509,13 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	contentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	contentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
 	for _, n := range nodes {
 		// First try to discover the posts made by another user.
-		contentIDs, _ := n.DiscoverContent(content.Filter{
+		contentIDs, _ := n.DiscoverContentIDs(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node2.GetUserID()},
@@ -522,7 +523,7 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 0)
 		// Now, try to discover only REACTION content from node 1.
-		contentIDs, _ = n.DiscoverContent(content.Filter{
+		contentIDs, _ = n.DiscoverContentIDs(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node1.GetUserID()},
@@ -530,7 +531,7 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 0)
 		// Finally, discover the text posts by node 1.
-		contentIDs, _ = n.DiscoverContent(content.Filter{
+		contentIDs, _ = n.DiscoverContentIDs(content.Filter{
 			MaxTime:  0,
 			MinTime:  0,
 			OwnerIDs: []string{node1.GetUserID()},
@@ -577,15 +578,17 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	originalComment := "Whoa! Nice placeholder you got there, man!"
 	nodes := []z.TestNode{node1, node2, node3}
-	textContentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Comment on it.
-	commentContentID, _, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
+	md2, _, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
+	commentContentID := md2.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the comment.
 	for _, n := range nodes {
 		// First try to use wrong reference id.
-		contentIDs, _ := n.DiscoverContent(content.Filter{
+		contentIDs, _ := n.DiscoverContentIDs(content.Filter{
 			MaxTime:      0,
 			MinTime:      0,
 			OwnerIDs:     []string{node2.GetUserID()},
@@ -594,7 +597,7 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 0)
 		// Now, use the correct reference id.
-		contentIDs, _ = n.DiscoverContent(content.Filter{
+		contentIDs, _ = n.DiscoverContentIDs(content.Filter{
 			MaxTime:      0,
 			MinTime:      0,
 			OwnerIDs:     []string{node2.GetUserID()},
@@ -641,7 +644,8 @@ func Test_Partage_Reaction(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	textContentID, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let node 2 to be confused by the meaning of this placeholder text.
 	node2.UpdateFeed(content.CreateReactionMetadata(node2.GetUserID(), content.CONFUSED, utils.Time(), textContentID))
@@ -699,7 +703,8 @@ func Test_Partage_Undo(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	textContentID, n1TextBlockHash, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, n1TextBlockHash, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
 		contents := n.GetFeedContents(node1.GetUserID())

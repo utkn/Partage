@@ -42,7 +42,7 @@ func (l *Layer) feedProposalChecker(userID string) paxos.ProposalChecker {
 		if metadata.Type == content.DUMMY {
 			return false
 		}
-		isValid := l.FeedStore.IsValidMetadata(metadata)
+		isValid := l.FeedStore.CheckMetadata(metadata) == nil
 		utils.PrintDebug("social", l.GetAddress(), " has checked a proposal. Result =", isValid)
 		return isValid
 		// TODO timestamp, signature etc.

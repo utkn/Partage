@@ -12,6 +12,35 @@ type UserData struct {
 	Followees            []string
 	CanBeEndorsed        bool
 	ReceivedEndorsements int
+	Credits              int
+}
+
+type Reaction struct {
+	AuthorID     string
+	RefContentID string
+	ReactionText string
+	BlockHash    string
+	Timestamp    int64
+}
+
+type Comment struct {
+	AuthorID     string
+	ContentID    string
+	Text         string
+	RefContentID string
+	BlockHash    string
+	Timestamp    int64
+	Reactions    []Reaction
+}
+
+type Text struct {
+	AuthorID  string
+	ContentID string
+	Text      string
+	BlockHash string
+	Timestamp int64
+	Reactions []Reaction
+	Comments  []Comment
 }
 
 func NewUserData(selfUserID string, userState feed.UserState) UserData {
@@ -26,19 +55,12 @@ func NewUserData(selfUserID string, userState feed.UserState) UserData {
 	return UserData{
 		Username:             userState.Username,
 		UserID:               userState.UserID,
+		Credits:              userState.CurrentCredits,
 		Followers:            followers,
 		Followees:            followees,
 		CanBeEndorsed:        userState.CanEndorse(utils.Time(), selfUserID),
 		ReceivedEndorsements: userState.ReceivedEndorsements,
 	}
-}
-
-type Reaction struct {
-	AuthorID     string
-	RefContentID string
-	ReactionText string
-	BlockHash    string
-	Timestamp    int64
 }
 
 func NewReaction(info feed.ReactionInfo) Reaction {
@@ -51,38 +73,6 @@ func NewReaction(info feed.ReactionInfo) Reaction {
 	}
 }
 
-type Post struct {
-	AuthorID  string
-	ContentID string
-	Text      string
-	BlockHash string
-	Timestamp int64
-	Reactions []Reaction
-	Comments  []Comment
-}
-
-func NewPost(text string, c feed.Content, reactions []Reaction, comments []Comment) Post {
-	return Post{
-		AuthorID:  c.FeedUserID,
-		ContentID: c.ContentID,
-		Text:      text,
-		BlockHash: c.BlockHash,
-		Timestamp: c.Timestamp,
-		Reactions: reactions,
-		Comments:  comments,
-	}
-}
-
-type Comment struct {
-	AuthorID     string
-	ContentID    string
-	Text         string
-	RefContentID string
-	BlockHash    string
-	Timestamp    int64
-	Reactions    []Reaction
-}
-
 func NewComment(text string, c feed.Content, reactions []Reaction) Comment {
 	return Comment{
 		AuthorID:     c.FeedUserID,
@@ -92,5 +82,17 @@ func NewComment(text string, c feed.Content, reactions []Reaction) Comment {
 		BlockHash:    c.BlockHash,
 		Timestamp:    c.Timestamp,
 		Reactions:    reactions,
+	}
+}
+
+func NewText(text string, c feed.Content, reactions []Reaction, comments []Comment) Text {
+	return Text{
+		AuthorID:  c.FeedUserID,
+		ContentID: c.ContentID,
+		Text:      text,
+		BlockHash: c.BlockHash,
+		Timestamp: c.Timestamp,
+		Reactions: reactions,
+		Comments:  comments,
 	}
 }
