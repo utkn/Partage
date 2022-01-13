@@ -34,13 +34,14 @@ type Comment struct {
 }
 
 type Text struct {
-	AuthorID  string
-	ContentID string
-	Text      string
-	BlockHash string
-	Timestamp int64
-	Reactions []Reaction
-	Comments  []Comment
+	AuthorID   string
+	ContentID  string
+	Text       string
+	BlockHash  string
+	Timestamp  int64
+	Reactions  []Reaction
+	Comments   []Comment
+	Recipients []string
 }
 
 func NewUserData(selfUserID string, userState feed.UserState) UserData {

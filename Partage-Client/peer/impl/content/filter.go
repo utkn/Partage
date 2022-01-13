@@ -16,7 +16,9 @@ type Filter struct {
 	OwnerIDs []string
 	// Types filters by the list of types. Setting to empty list (nil) disables it.
 	Types []Type
-	// RefContentID filters by the reference id. Used for comments, reactions etc. Setting to "" disables it.
+	// ContentID filters by the content id. Setting to "" disables it.
+	ContentID string
+	// RefContentID filters by the reference content id. Used for comments, reactions etc. Setting to "" disables it.
 	RefContentID string
 	// Data filters by the data field. An exact match is required. Setting to nil disables it.
 	Data []byte
@@ -49,6 +51,10 @@ func (c Filter) Match(metadata Metadata) bool {
 	}
 	// Check against referenced id.
 	if c.RefContentID != "" && c.RefContentID != metadata.RefContentID {
+		return false
+	}
+	// Check against content id.
+	if c.ContentID != "" && c.ContentID != metadata.ContentID {
 		return false
 	}
 	// Check against data.

@@ -1,28 +1,28 @@
 package peer
 
 import (
+	"crypto/rsa"
 	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/social/feed"
-	"go.dedis.ch/cs438/transport"
 )
 
 type SocialPeer interface {
 	RegisterUser() error
-	// ShareTextPost shares the text post with the given content and returns the content id, block hash.
-	ShareTextPost(post content.TextPost) (content.Metadata, string, error)
-	// ShareCommentPost shares the comment post with the given content and reference id and returns the content id, block hash.
-	ShareCommentPost(post content.CommentPost) (content.Metadata, string, error)
-	// DownloadPost fetches the post with the given content id from the network.
-	DownloadPost(contentID string) ([]byte, error)
-	// QueryContents queries the feed store and returns all the matching contents from the stored blockchains.
-	QueryContents(filter content.Filter) []feed.Content
+	// ShareDownloadableContent shares the given content into the network and returns the generated metadata and its block hash.
+	ShareDownloadableContent(post content.PrivateContent) (content.Metadata, string, error)
+	// DownloadContent fetches the post with the given content id from the network.
+	DownloadContent(contentID string) ([]byte, error)
+	// QueryFeedContents queries the feed store and returns all the matching contents from the stored blockchains.
+	QueryFeedContents(filter content.Filter) []feed.Content
 	// DiscoverContentIDs returns the matched content ids in all the network.
 	DiscoverContentIDs(filter content.Filter) ([]string, error)
+	// CheckMetadata checks the validity of the given metadata. Returns nil if valid, else an explanatory error.
 	CheckMetadata(metadata content.Metadata) error
 	// UpdateFeed appends the given content metadata into the peer's feed blockchain permanently. Returns the block hash.
 	UpdateFeed(content.Metadata) (string, error)
-	SharePrivatePost(msg transport.Message, recipients [][32]byte) error
 	GetHashedPublicKey() [32]byte
+	GetPublicKey(publicKeyHash [32]byte) *rsa.PublicKey
+	GetPrivateKey() *rsa.PrivateKey
 	GetUserID() string
 	GetKnownUsers() map[string]struct{}
 	GetFeedContents(userID string) []feed.Content
