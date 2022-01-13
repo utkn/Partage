@@ -1,6 +1,8 @@
 package impl
 
 import (
+	"crypto/rsa"
+	"encoding/hex"
 	"fmt"
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/content"
@@ -14,6 +16,12 @@ type Client struct {
 	Peer peer.SocialPeer
 }
 
+func NewClient(joinNodeAddr string) *Client {
+	c := &Client{}
+	// ...
+	return c
+}
+
 // GetUserData returns the user data associated with the given user id.
 func (c *Client) GetUserData(userID string) UserData {
 	selfID := c.Peer.GetUserID()
@@ -24,11 +32,10 @@ func (c *Client) GetUserData(userID string) UserData {
 func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text {
 	// First, create the filter accordingly.
 	filter := content.Filter{
-		MaxTime:      maxTime,
-		MinTime:      minTime,
-		OwnerIDs:     userIDs,
-		Types:        []content.Type{content.TEXT},
-		RefContentID: "",
+		MaxTime:  maxTime,
+		MinTime:  minTime,
+		OwnerIDs: userIDs,
+		Types:    []content.Type{content.TEXT},
 	}
 	textThings := c.getDownloadableThings(filter, c.downloadText)
 	var texts []Text
@@ -46,9 +53,6 @@ func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text
 func (c *Client) GetComments(contentID string) []Comment {
 	// First, create the filter accordingly.
 	filter := content.Filter{
-		MaxTime:      0,
-		MinTime:      0,
-		OwnerIDs:     nil,
 		Types:        []content.Type{content.COMMENT},
 		RefContentID: contentID,
 	}
@@ -76,15 +80,57 @@ func (c *Client) GetReactions(contentID string) []Reaction {
 
 // PostText posts a new text.
 func (c *Client) PostText(text string) error {
-	postable := content.NewTextPost(c.Peer.GetUserID(), text, utils.Time())
-	_, _, err := c.Peer.ShareTextPost(postable)
+	// Create an unencrypted content.
+	cnt := content.NewPublicContent(c.Peer.GetUserID(), text, utils.Time(), "").Unencrypted()
+	_, _, err := c.Peer.ShareDownloadableContent(cnt)
 	return err
 }
 
-// PostComment posts a new comment.
+func (c *Client) PostPrivateText(text string, recipientUserIDs []string) error {
+	// Create the content.
+	cnt := content.NewPublicContent(c.Peer.GetUserID(), text, utils.Time(), "")
+	recipientMap, err := c.recipientListToRecipientMap(recipientUserIDs)
+	if err != nil {
+		return fmt.Errorf("error while parsing recipients: %v", err)
+	}
+	// Encrypt it.
+	prCnt, err := cnt.Encrypted(recipientMap)
+	if err != nil {
+		return fmt.Errorf("error during encrypting private text: %v", err)
+	}
+	// Share the encrypted content.
+	_, _, err = c.Peer.ShareDownloadableContent(prCnt)
+	return err
+}
+
+// PostComment posts a new comment. If the given post is private, the comment will also be encrypted in the same fashion.
 func (c *Client) PostComment(comment string, postContentID string) error {
-	postable := content.NewCommentPost(c.Peer.GetUserID(), comment, utils.Time(), postContentID)
-	_, _, err := c.Peer.ShareCommentPost(postable)
+	// Download the content associated with the content id. Since we are posting a comment to it, we most likely have it in the local storage already.
+	contents := c.getDownloadableThings(content.Filter{ContentID: postContentID}, c.downloadUploadedContent)
+	if len(contents) != 1 {
+		return fmt.Errorf("there are %d != 1 associated texts", len(contents))
+	}
+	// Get the recipients associated with this
+	referredPostRecipientList := contents[0].(content.PrivateContent).RecipientList
+	publicContent := content.NewPublicContent(c.Peer.GetUserID(), comment, utils.Time(), postContentID)
+	var privateContent content.PrivateContent
+	// Check the encryption status of the parent text post.
+	if len(referredPostRecipientList) == 0 {
+		// If it was not encrypted, do not encrypt the comment.
+		privateContent = publicContent.Unencrypted()
+	} else {
+		// Directly use the parent post's recipient list.
+		recptMap, err := c.recipientListToRecipientMap(referredPostRecipientList)
+		if err != nil {
+			return fmt.Errorf("could not encrypt comment: %v", err)
+		}
+		privateContent, err = publicContent.Encrypted(recptMap)
+		if err != nil {
+			return fmt.Errorf("could not encrypt comment: %v", err)
+		}
+	}
+	// Post the comment. Finally.
+	_, _, err := c.Peer.ShareDownloadableContent(privateContent)
 	return err
 }
 
@@ -97,9 +143,7 @@ func (c *Client) ReactToPost(reaction content.Reaction, contentID string) error 
 // UndoReaction undoes the reaction made to the content associated with the given content id.
 func (c *Client) UndoReaction(contentID string) error {
 	// Try to find the latest reaction made by this user for the given user.
-	reactions := c.Peer.QueryContents(content.Filter{
-		MaxTime:      0,
-		MinTime:      0,
+	reactions := c.Peer.QueryFeedContents(content.Filter{
 		OwnerIDs:     []string{c.Peer.GetUserID()},
 		Types:        []content.Type{content.REACTION},
 		RefContentID: contentID,
@@ -121,9 +165,7 @@ func (c *Client) FollowUser(userID string) error {
 // UnfollowUser unfollows the user associated with the given user id.
 func (c *Client) UnfollowUser(userID string) error {
 	// Try to find the latest follow made by this user for the given user.
-	follows := c.Peer.QueryContents(content.Filter{
-		MaxTime:  0,
-		MinTime:  0,
+	follows := c.Peer.QueryFeedContents(content.Filter{
 		OwnerIDs: []string{c.Peer.GetUserID()},
 		Types:    []content.Type{content.FOLLOW},
 		Data:     content.CreateFollowUserMetadata(c.Peer.GetUserID(), userID).Data,
@@ -155,16 +197,31 @@ func (c *Client) downloadText(cnt feed.Content) (interface{}, error) {
 	// Get the related comments.
 	comments := c.GetComments(cnt.ContentID)
 	// If for any reason, we are not able to download it, return an error and an incomplete post.
-	postBytes, err := c.Peer.DownloadPost(cnt.ContentID)
+	downloadedBytes, err := c.Peer.DownloadContent(cnt.ContentID)
 	if err != nil {
-		return NewText("###", cnt, reactions, comments), err
+		return NewText("[error: could not fetch]", cnt, reactions, comments), err
 	}
-	if postBytes == nil {
-		return NewText("###", cnt, reactions, comments), fmt.Errorf("could not download the post at client.downloadText")
+	if downloadedBytes == nil {
+		return NewText("[error: could not fetch]", cnt, reactions, comments), fmt.Errorf("could not download the post at client.downloadText")
 	}
 	// Otherwise, create the full post.
-	text := content.ParseTextPost(postBytes)
-	return NewText(text.Text, cnt, reactions, comments), nil
+	downloaded := content.ParseContent(downloadedBytes)
+	// But first, try to decrypt.
+	decrypted, err := downloaded.Decrypted(c.Peer.GetHashedPublicKey(), c.Peer.GetPrivateKey())
+	return NewText(decrypted.Text, cnt, reactions, comments), nil
+}
+
+func (c *Client) downloadUploadedContent(cnt feed.Content) (interface{}, error) {
+	// If for any reason, we are not able to download it, return an error and an incomplete post.
+	downloadedBytes, err := c.Peer.DownloadContent(cnt.ContentID)
+	if err != nil {
+		return nil, err
+	}
+	if downloadedBytes == nil {
+		return nil, fmt.Errorf("could not download the decryption data")
+	}
+	downloaded := content.ParseContent(downloadedBytes)
+	return downloaded, nil
 }
 
 // In case of an error, returns an incomplete Comment and an error.
@@ -172,16 +229,18 @@ func (c *Client) downloadComment(cnt feed.Content) (interface{}, error) {
 	// Get the related reactions.
 	reactions := c.GetReactions(cnt.ContentID)
 	// If for any reason, we are not able to download it, return an error and an incomplete post.
-	postBytes, err := c.Peer.DownloadPost(cnt.ContentID)
+	downloadedBytes, err := c.Peer.DownloadContent(cnt.ContentID)
 	if err != nil {
-		return NewComment("###", cnt, reactions), err
+		return NewComment("[error: could not fetch]", cnt, reactions), err
 	}
-	if postBytes == nil {
-		return NewComment("###", cnt, reactions), fmt.Errorf("could not download the comment at client.downloadText")
+	if downloadedBytes == nil {
+		return NewComment("[error: could not fetch]", cnt, reactions), fmt.Errorf("could not download the post at client.downloadText")
 	}
 	// Otherwise, create the full post.
-	text := content.ParseCommentPost(postBytes)
-	return NewComment(text.Text, cnt, reactions), nil
+	downloaded := content.ParseContent(downloadedBytes)
+	// But first, try to decrypt.
+	decrypted, err := downloaded.Decrypted(c.Peer.GetHashedPublicKey(), c.Peer.GetPrivateKey())
+	return NewComment(decrypted.Text, cnt, reactions), nil
 }
 
 // getDownloadableThings first loads the feed content from the feed store according to the given filter.
@@ -189,7 +248,7 @@ func (c *Client) downloadComment(cnt feed.Content) (interface{}, error) {
 // In case of download failure, it invokes the discovery before continuing.
 func (c *Client) getDownloadableThings(filter content.Filter, downloader func(feed.Content) (interface{}, error)) []interface{} {
 	// First, query the text content from the feed store.
-	contents := c.Peer.QueryContents(filter)
+	contents := c.Peer.QueryFeedContents(filter)
 	var thingsList []interface{}
 	// Now, let's download the thing. Also check if we need to perform a discovery over the network.
 	shouldDiscover := false
@@ -213,4 +272,18 @@ func (c *Client) getDownloadableThings(filter content.Filter, downloader func(fe
 		}
 	}
 	return thingsList
+}
+
+func (c *Client) recipientListToRecipientMap(l []string) (map[[32]byte]*rsa.PublicKey, error) {
+	m := make(map[[32]byte]*rsa.PublicKey)
+	for _, r := range l {
+		hashedPK, err := hex.DecodeString(r)
+		if err != nil {
+			return nil, fmt.Errorf("error while posting private text: malformed recipient %s", r)
+		}
+		var hashedPKArray [32]byte
+		copy(hashedPKArray[:], hashedPK)
+		m[hashedPKArray] = c.Peer.GetPublicKey(hashedPKArray)
+	}
+	return m, nil
 }

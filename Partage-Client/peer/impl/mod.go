@@ -2,6 +2,7 @@ package impl
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -307,12 +308,6 @@ func (n *node) RegisterUser() error {
 	return n.social.Register()
 }
 
-// SharePrivatePost implements peer.SocialPeer
-func (n *node) SharePrivatePost(msg transport.Message, recipients [][32]byte) error {
-	//msg should be a marshaled types.Text message..
-	return n.gossip.SendPrivatePost(msg, recipients)
-}
-
 // BlockUser implements peer.SocialPeer
 func (n *node) BlockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
@@ -331,11 +326,17 @@ func (n *node) UnblockUser(publicKeyHash [32]byte) {
 
 // GetHashedPublicKey implements peer.SocialPeer
 func (n *node) GetHashedPublicKey() [32]byte {
-	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
-	if ok {
-		return tlsSock.GetHashedPublicKey()
-	}
-	return [32]byte{}
+	return n.cryptography.GetHashedPublicKey()
+}
+
+// GetPublicKey implements peer.SocialPeer
+func (n *node) GetPublicKey(hashedPK [32]byte) *rsa.PublicKey {
+	return n.cryptography.SearchPublicKey(hashedPK, n.cryptography.GetExpandingConf())
+}
+
+// GetPrivateKey implements peer.SocialPeer
+func (n *node) GetPrivateKey() *rsa.PrivateKey {
+	return n.cryptography.GetPrivateKey()
 }
 
 // GetUserID implements peer.SocialPeer
@@ -364,27 +365,15 @@ func (n *node) GetUserState(userID string) feed.UserState {
 	return n.social.FeedStore.GetFeedCopy(userID).GetUserStateCopy()
 }
 
-// ShareTextPost implements peer.SocialPeer.
-func (n *node) ShareTextPost(post content.TextPost) (content.Metadata, string, error) {
-	// First, "upload" the text (stored locally!)
-	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseTextPost(post)))
-	if err != nil {
-		return content.Metadata{}, "", err
-	}
-	// Then, update the feed with the new metadata.
-	metadata := content.CreateTextMetadata(post.AuthorID, post.Timestamp, metahash)
-	blockHash, err := n.UpdateFeed(metadata)
-	return metadata, blockHash, err
-}
-
-func (n *node) ShareCommentPost(post content.CommentPost) (content.Metadata, string, error) {
+// ShareDownloadableContent implements peer.SocialPeer.
+func (n *node) ShareDownloadableContent(cnt content.PrivateContent) (content.Metadata, string, error) {
 	// First, upload the comment.
-	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseCommentPost(post)))
+	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseContent(cnt)))
 	if err != nil {
 		return content.Metadata{}, "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateCommentMetadata(post.AuthorID, post.Timestamp, post.RefContentID, metahash)
+	metadata := content.CreateCommentMetadata(cnt.AuthorID, cnt.Timestamp, cnt.RefContentID, metahash)
 	blockHash, err := n.UpdateFeed(metadata)
 	return metadata, blockHash, err
 }
@@ -393,10 +382,10 @@ func (n *node) DiscoverContentIDs(filter content.Filter) ([]string, error) {
 	return n.data.SearchAllPostContent(filter, 3, time.Second*2)
 }
 
-func (n *node) QueryContents(filter content.Filter) []feed.Content {
+func (n *node) QueryFeedContents(filter content.Filter) []feed.Content {
 	return n.social.FeedStore.QueryContents(filter)
 }
 
-func (n *node) DownloadPost(contentID string) ([]byte, error) {
+func (n *node) DownloadContent(contentID string) ([]byte, error) {
 	return n.data.DownloadContent(contentID)
 }

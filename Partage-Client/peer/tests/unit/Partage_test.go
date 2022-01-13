@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
@@ -72,7 +73,7 @@ func Test_Partage_Late_Registration(t *testing.T) {
 	// Wait for a while.
 	time.Sleep(4 * time.Second)
 
-	// Late registration.
+	// Late registration through node 2.
 	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
 	defer node3.Stop()
 	node3.AddPeer(node2.GetAddr())
@@ -509,7 +510,7 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
 	contentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
@@ -539,8 +540,8 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 1)
 		require.Equal(t, contentID, contentIDs[0])
-		receivedBytes, _ := n.DownloadPost(contentID)
-		textPost := content.ParseTextPost(receivedBytes)
+		receivedBytes, _ := n.DownloadContent(contentID)
+		textPost := content.ParseContent(receivedBytes)
 		require.Equal(t, originalText, textPost.Text)
 	}
 }
@@ -578,11 +579,11 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	originalComment := "Whoa! Nice placeholder you got there, man!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Comment on it.
-	md2, _, _ := node2.ShareCommentPost(content.NewCommentPost(node2.GetUserID(), originalComment, utils.Time(), textContentID))
+	md2, _, _ := node2.ShareDownloadableContent(content.NewPublicContent(node2.GetUserID(), originalComment, utils.Time(), textContentID).Unencrypted())
 	commentContentID := md2.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the comment.
@@ -606,8 +607,8 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 		})
 		require.Len(t, contentIDs, 1)
 		require.Equal(t, commentContentID, contentIDs[0])
-		receivedBytes, _ := n.DownloadPost(contentIDs[0])
-		commentPost := content.ParseCommentPost(receivedBytes)
+		receivedBytes, _ := n.DownloadContent(contentIDs[0])
+		commentPost := content.ParseContent(receivedBytes)
 		require.Equal(t, originalComment, commentPost.Text)
 	}
 }
@@ -644,7 +645,7 @@ func Test_Partage_Reaction(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let node 2 to be confused by the meaning of this placeholder text.
@@ -703,7 +704,7 @@ func Test_Partage_Undo(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, n1TextBlockHash, _ := node1.ShareTextPost(content.NewTextPost(node1.GetUserID(), originalText, utils.Time()))
+	md, n1TextBlockHash, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
@@ -790,59 +791,79 @@ func Test_Partage_Invalid_Block(t *testing.T) {
 	require.NotNil(t, err)
 }
 
-func Test_Partage_Messaging_Broadcast_Private_Post(t *testing.T) {
-	fake := z.NewFakeMessage(t)
-	handler1, status1 := fake.GetHandler(t)
-	handler2, status2 := fake.GetHandler(t)
-	handler3, status3 := fake.GetHandler(t)
-	handler4, status4 := fake.GetHandler(t)
-
-	net1 := tcpFac()
-	node1 := z.NewTestNode(t, peerFac, net1, "127.0.0.1:0", z.WithMessage(fake, handler1), z.WithAntiEntropy(time.Millisecond*50))
+func Test_Partage_Private_Post(t *testing.T) {
+	node1 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(1),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node1.Stop()
-	//node1.AddUser()
-
-	net2 := tcpFac()
-	node2 := z.NewTestNode(t, peerFac, net2, "127.0.0.1:0", z.WithMessage(fake, handler2), z.WithAntiEntropy(time.Millisecond*50))
+	node2 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(2),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node2.Stop()
-	//node2.AddUser()
-
-	net3 := tcpFac()
-	node3 := z.NewTestNode(t, peerFac, net3, "127.0.0.1:0", z.WithMessage(fake, handler3), z.WithAntiEntropy(time.Millisecond*50))
+	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node3.Stop()
-	//node3.AddUser()
-
-	net4 := tcpFac()
-	node4 := z.NewTestNode(t, peerFac, net4, "127.0.0.1:0", z.WithMessage(fake, handler4), z.WithAntiEntropy(time.Millisecond*50))
+	node4 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0",
+		z.WithTotalPeers(3),
+		z.WithPaxosID(3),
+		z.WithAntiEntropy(time.Second),
+	)
 	defer node4.Stop()
-	//node4.AddUser()
 
-	node1.AddPeer(node2.GetAddr())
-	node1.AddPeer(node3.GetAddr())
-	node1.AddPeer(node4.GetAddr())
+	node1.AddPeer(node2.GetAddr(), node3.GetAddr(), node4.GetAddr())
+	node2.AddPeer(node1.GetAddr(), node3.GetAddr(), node4.GetAddr())
+	node3.AddPeer(node2.GetAddr(), node1.GetAddr(), node4.GetAddr())
+	node4.AddPeer(node1.GetAddr(), node2.GetAddr(), node3.GetAddr())
 
-	fakeMsg := fake.GetNetMsg(t)
+	// Register the nodes.
+	node1.RegisterUser()
+	node2.RegisterUser()
+	node3.RegisterUser()
+	node4.RegisterUser()
 
-	fmt.Println("node1:", node1.GetAddr())
-	fmt.Println("node2:", node2.GetAddr())
-	fmt.Println("node3:", node3.GetAddr())
-	fmt.Println("node4:", node4.GetAddr())
-	recipients := [][32]byte{
-		node2.GetHashedPublicKey(),
-		node4.GetHashedPublicKey(),
+	privateText := "private stuff"
+	recipientMap := map[[32]byte]*rsa.PublicKey{
+		node2.GetHashedPublicKey(): node2.GetPublicKey(node2.GetHashedPublicKey()),
+		node4.GetHashedPublicKey(): node4.GetPublicKey(node4.GetHashedPublicKey()),
 	}
 
-	bytes, _ := json.Marshal(fakeMsg)
-	fmt.Println("private message to be sent to node2 and node4:", bytes)
-	err := node1.SharePrivatePost(fakeMsg, recipients)
+	fmt.Println("encrypted msg to be sent to node2 and node4:", privateText)
+	// Let node 2 share a private message with node 4 & node 2 (itself).
+	encryptedContent, err := content.NewPublicContent(node2.GetUserID(), privateText, utils.Time(), "").Encrypted(recipientMap)
 	require.NoError(t, err)
-
-	time.Sleep(time.Second * 10)
-
-	status1.CheckNotCalled(t)
-	status2.CheckCalled(t)
-	status3.CheckNotCalled(t)
-	status4.CheckCalled(t)
+	md, _, err := node2.ShareDownloadableContent(encryptedContent)
+	time.Sleep(time.Second * 1)
+	require.NoError(t, err)
+	// Node 2 and node 4 should be able to decrypt the message.
+	for _, n := range []z.TestNode{node2, node4} {
+		// Discover everything :p
+		_, err := n.DiscoverContentIDs(content.Filter{})
+		require.NoError(t, err)
+		// Download the shared content.
+		bytes, err := n.DownloadContent(md.ContentID)
+		require.NoError(t, err)
+		decrypted, err := content.ParseContent(bytes).Decrypted(n.GetHashedPublicKey(), n.GetPrivateKey())
+		require.NoError(t, err)
+		require.Equal(t, privateText, decrypted.Text)
+	}
+	// Node 1 and node 3 should not be able to decrypt the message.
+	for _, n := range []z.TestNode{node1, node3} {
+		// Discover everything :p
+		_, err := n.DiscoverContentIDs(content.Filter{})
+		require.NoError(t, err)
+		// Download the shared content.
+		bytes, err := n.DownloadContent(md.ContentID)
+		require.NoError(t, err)
+		_, err = content.ParseContent(bytes).Decrypted(n.GetHashedPublicKey(), n.GetPrivateKey())
+		require.Error(t, err)
+	}
 }
 
 func Test_Partage_Broadcast_Rumor_To_Blocked_User(t *testing.T) {
