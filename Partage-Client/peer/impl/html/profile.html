@@ -1,0 +1,185 @@
+<!-- profile.html -->
+<head>
+    <script src="script.js"></script> 
+    <link rel="stylesheet" href="style.css">
+    {{ if .IsMe}}
+    <title>Your Profile</title>
+    {{else}}
+    <title>{{.Data.Username}} Profile</title>
+    {{end}}
+    <title>Pr</title>
+</head>
+
+<body>
+    <div class="navbar">
+    <a href="">Home</a>
+    <a href="/discover">Discover</a>
+    <a href="/profile?UserID={{.MyUserID}}">Profile</a>
+    </div>
+
+    {{ if .IsMe}}
+    <h4>You're looking at your profile, @{{.Data.Username}} <a href="/profile?UserID={{.Data.UserID}}">({{.Data.UserID}})</a></h4>
+    <br><br>
+    {{end}}
+
+    <div class="userInfo">
+        <h2>@{{.Data.Username}}</h2>
+        <h3><a href="/profile?UserID={{.Data.UserID}}">({{.Data.UserID}})</a></h3>
+        <p><b>{{.Data.Credits}}</b> Tokens</p>
+        <table>
+            <tr>
+                <td onclick="showFollowers()"><b>{{len .Followers}} Followers</b></td>
+                <td onclick="showFollowees()"><b>{{len .Followees}} Following</b></td>
+            </tr>
+        </table>
+        <p>Received <b>{{.Data.ReceivedEndorsements}}</b> Endorsements</p>
+        {{ if not .IsMe}}
+            {{ if .IFollow}}
+            <form action="/profile" method="PUT">
+                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="submit" value="Unfollow">
+            </form>
+            {{else}}
+            <form action="/profile" method="POST">
+                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="submit" value="Follow">
+            </form>
+            {{end}}
+            {{if .Data.CanBeEndorsed}}
+            <form action="/endorse" method="POST">
+                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="submit" value="Endorse">
+            </form>
+            <br>
+            {{end}}
+            {{ if .ImFollowedBy}}
+            <p>..Follows you</p>
+            {{else}}
+            <p>..Doesn't follow you</p>
+            {{end}}
+        {{else}}
+        <form action="/endorse" method="GET">
+            <input type="submit" value="Request Endorsement">
+        </form>
+        {{end}}
+        <div class="followersList">
+            {{if ne (len .Data.Followers) "0"}}
+            <br>
+            <h3 onclick="showFollowers()">Followers:</h3>
+            {{end}}
+            {{range .Data.Followers}}
+            <a href="/profile?UserID={{.}}">{{.}}</a>                            
+            <br>
+            {{end}}
+        </div>
+        <div class="followeesList">
+            {{if ne (len .Data.Followees) "0"}}
+            <br>
+            <h3 onclick="showFollowees()">Following:</h3>
+            {{end}}
+            {{range .Data.Followees}}
+            <a href="/profile?UserID={{.}}">{{.}}</a>                            
+            <br>
+            {{end}}
+        </div>
+    </div>
+
+    {{ if .IsMe}}
+        <!-- Create post-->
+        <div class="writePostBox">
+            <form action="/post" method="POST">
+                <input type="text" id="Content" name="Content" required>
+                <br>
+                <input type="submit" value="Post">
+            </form>
+        </div>
+    {{end}}
+
+    <!-- USER POSTS-->
+    <div class="postsDiv">
+        <h4>Posts</h4>
+        {{range .Posts}}
+            <div class="postDiv">
+                <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a href="/post?PostID={{.ContentID}}">{{(call .TimestampToDate .Timestamp)}}</a></p>
+                <p>{{.Text}}</p>
+                <table>
+                    <tr>
+                        <td onclick="showReactions()">{{len .Reactions}} reactions</td>
+                        <td onclick="showComments()">{{len .Comments}} comments</td>
+                    </tr>
+                </table>
+                <div class="reactionsDiv">
+                    <div class="reactionDiv">
+                        <form action="/react" method="POST">
+                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                            <select name="Reaction" id="Reaction"></select>
+                                <option value="" selected disabled hidden>Choose reaction</option>
+                                <option value="happy">Happy</option>
+                                <option value="angry">Angry</option>
+                                <option value="confused">Confused</option>
+                                <option value="approve">Approve</option>
+                                <option value="disapprove">Disapprove</option>
+                            </select>
+                            <input type="submit" value="React">
+                        </form>
+                        <form action="/react" method="DELETE">
+                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                            <input type="submit" value="Undo">
+                        </form>
+                    </div>
+                    <div class="displayReactionsDiv">
+                        <!--Show 1 reaction only..-->
+                        {{ if ne (len .Reactions) "0"}}
+                        <div class="displayReactionDiv">
+                            <p><a href="/profile?UserID={{(index .Reaction 0).AuthorID}}">{{(index .Reaction 0).AuthorID}}</a> reacted: {{(index .Reaction 0).ReactionText}}</p>                            
+                            <br>
+                            <!--Redirect to post's single page-->
+                            <a style="text-align: center;" href="/post?PostID={{.ContentID}}"><button>See more</button></a>
+                            <br>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                <div class="commentsDiv">
+                    <div class="displayCommentsDiv">
+                        <!--Show 1 comment only..-->
+                        {{ if ne (len .Comments) "0"}}
+                        <div class="displayCommentDiv">
+                            <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a> commented: {{(index .Comments 0).Text}} at {{(call .TimestampToDate (index .Comments 0).Timestamp)}}</p>
+                            <p>{{len .Reactions}} reactions</p>
+                            <form action="/react" method="POST">
+                                <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                                <select name="Reaction" id="Reaction"></select>
+                                    <option value="" selected disabled hidden>Choose reaction</option>
+                                    <option value="happy">Happy</option>
+                                    <option value="angry">Angry</option>
+                                    <option value="confused">Confused</option>
+                                    <option value="approve">Approve</option>
+                                    <option value="disapprove">Disapprove</option>
+                                </select>
+                                <input type="submit" value="React">
+                            </form>
+                            <form action="/react" method="DELETE">
+                                <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                                <input type="submit" value="Undo">
+                            </form>
+                            <br>
+                            <!--Redirect to post's single page-->
+                            <a style="text-align: center;" href="/post?PostID={{.ContentID}}"><button>See more</button></a>
+                            <br>
+                        </div>
+                        {{end}}
+                    </div>
+                    <div class="commentDiv">
+                        <!--Post comment..-->
+                        <form action="/comment" method="POST">
+                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                            <input type="text" id="Text" name="Text" required>
+                            <input type="submit" value="Comment">
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <br><br>
+        {{end}}
+    </div>
