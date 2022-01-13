@@ -16,6 +16,12 @@ type Client struct {
 	Peer peer.SocialPeer
 }
 
+func NewClient(joinNodeAddr string) *Client {
+	c := &Client{}
+	// ...
+	return c
+}
+
 // GetUserData returns the user data associated with the given user id.
 func (c *Client) GetUserData(userID string) UserData {
 	selfID := c.Peer.GetUserID()
@@ -26,11 +32,10 @@ func (c *Client) GetUserData(userID string) UserData {
 func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text {
 	// First, create the filter accordingly.
 	filter := content.Filter{
-		MaxTime:      maxTime,
-		MinTime:      minTime,
-		OwnerIDs:     userIDs,
-		Types:        []content.Type{content.TEXT},
-		RefContentID: "",
+		MaxTime:  maxTime,
+		MinTime:  minTime,
+		OwnerIDs: userIDs,
+		Types:    []content.Type{content.TEXT},
 	}
 	textThings := c.getDownloadableThings(filter, c.downloadText)
 	var texts []Text
@@ -48,9 +53,6 @@ func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text
 func (c *Client) GetComments(contentID string) []Comment {
 	// First, create the filter accordingly.
 	filter := content.Filter{
-		MaxTime:      0,
-		MinTime:      0,
-		OwnerIDs:     nil,
 		Types:        []content.Type{content.COMMENT},
 		RefContentID: contentID,
 	}
@@ -142,8 +144,6 @@ func (c *Client) ReactToPost(reaction content.Reaction, contentID string) error 
 func (c *Client) UndoReaction(contentID string) error {
 	// Try to find the latest reaction made by this user for the given user.
 	reactions := c.Peer.QueryFeedContents(content.Filter{
-		MaxTime:      0,
-		MinTime:      0,
 		OwnerIDs:     []string{c.Peer.GetUserID()},
 		Types:        []content.Type{content.REACTION},
 		RefContentID: contentID,
@@ -166,8 +166,6 @@ func (c *Client) FollowUser(userID string) error {
 func (c *Client) UnfollowUser(userID string) error {
 	// Try to find the latest follow made by this user for the given user.
 	follows := c.Peer.QueryFeedContents(content.Filter{
-		MaxTime:  0,
-		MinTime:  0,
 		OwnerIDs: []string{c.Peer.GetUserID()},
 		Types:    []content.Type{content.FOLLOW},
 		Data:     content.CreateFollowUserMetadata(c.Peer.GetUserID(), userID).Data,

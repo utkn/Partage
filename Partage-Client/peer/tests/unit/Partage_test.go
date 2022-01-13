@@ -73,7 +73,7 @@ func Test_Partage_Late_Registration(t *testing.T) {
 	// Wait for a while.
 	time.Sleep(4 * time.Second)
 
-	// Late registration.
+	// Late registration through node 2.
 	node3 := z.NewTestNode(t, peerFac, tcpFac(), "127.0.0.1:0", z.WithTotalPeers(3), z.WithPaxosID(3))
 	defer node3.Stop()
 	node3.AddPeer(node2.GetAddr())
