@@ -25,9 +25,3 @@ func (r Reaction) String() string {
 	}
 	return "unknown"
 }
-
-type ReactionInfo struct {
-	Reaction     Reaction
-	UserID       string
-	RefContentID string
-}

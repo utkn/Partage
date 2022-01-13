@@ -6,18 +6,18 @@ import (
 )
 
 type EndorsementHandler struct {
-	UserID            string
-	LastRequestedTime int64
-	GivenEndorsements int
-	EndorsedUsers     map[string]struct{}
+	UserID               string
+	LastRequestedTime    int64
+	ReceivedEndorsements int
+	EndorsedUsers        map[string]struct{}
 }
 
 func NewEndorsementHandler(userID string) EndorsementHandler {
 	return EndorsementHandler{
-		UserID:            userID,
-		LastRequestedTime: -1,
-		GivenEndorsements: 0,
-		EndorsedUsers:     make(map[string]struct{}, REQUIRED_ENDORSEMENTS),
+		UserID:               userID,
+		LastRequestedTime:    -1,
+		ReceivedEndorsements: 0,
+		EndorsedUsers:        make(map[string]struct{}, REQUIRED_ENDORSEMENTS),
 	}
 }
 
@@ -27,10 +27,10 @@ func (e *EndorsementHandler) Copy() EndorsementHandler {
 		endorsedUsers[k] = struct{}{}
 	}
 	return EndorsementHandler{
-		UserID:            e.UserID,
-		LastRequestedTime: e.LastRequestedTime,
-		GivenEndorsements: e.GivenEndorsements,
-		EndorsedUsers:     endorsedUsers,
+		UserID:               e.UserID,
+		LastRequestedTime:    e.LastRequestedTime,
+		ReceivedEndorsements: e.ReceivedEndorsements,
+		EndorsedUsers:        endorsedUsers,
 	}
 }
 
@@ -43,7 +43,7 @@ func (e *EndorsementHandler) Request(time int64) {
 
 func (e *EndorsementHandler) Reset() {
 	e.LastRequestedTime = -1
-	e.GivenEndorsements = 0
+	e.ReceivedEndorsements = 0
 	e.EndorsedUsers = make(map[string]struct{}, REQUIRED_ENDORSEMENTS)
 }
 
@@ -77,15 +77,15 @@ func (e EndorsementHandler) CanEndorse(currTime int64, endorserID string) bool {
 	return true
 }
 
-// Update tries to update the endorsement counter and returns whether enough endorsements were achieved.
-func (e *EndorsementHandler) Update(currTime int64, endorserID string) bool {
+// ReceiveEndorsement tries to update the endorsement counter and returns whether enough endorsements were achieved.
+func (e *EndorsementHandler) ReceiveEndorsement(currTime int64, endorserID string) bool {
 	// If the endorsement is invalid, do not update.
 	if !e.CanEndorse(currTime, endorserID) {
 		return false
 	}
 	e.EndorsedUsers[endorserID] = struct{}{}
-	e.GivenEndorsements += 1
-	if e.GivenEndorsements >= REQUIRED_ENDORSEMENTS {
+	e.ReceivedEndorsements += 1
+	if e.ReceivedEndorsements >= REQUIRED_ENDORSEMENTS {
 		e.Reset()
 		return true
 	}
@@ -95,7 +95,10 @@ func (e *EndorsementHandler) Update(currTime int64, endorserID string) bool {
 type UserState struct {
 	CurrentCredits int
 	Username       string
-	Followed       map[string]struct{}
+	// Set of users followed by this user.
+	Followees map[string]struct{}
+	// Set of users that follow this user.
+	Followers map[string]struct{}
 	EndorsementHandler
 }
 
@@ -103,33 +106,39 @@ func NewInitialUserState(userID string) *UserState {
 	return &UserState{
 		CurrentCredits:     INITIAL_CREDITS,
 		Username:           DEFAULT_USERNAME,
-		Followed:           make(map[string]struct{}),
+		Followees:          make(map[string]struct{}),
+		Followers:          make(map[string]struct{}),
 		EndorsementHandler: NewEndorsementHandler(userID),
 	}
 }
 
 func (s *UserState) Copy() UserState {
-	followedMap := make(map[string]struct{}, len(s.Followed))
-	for k := range s.Followed {
-		followedMap[k] = struct{}{}
+	followees := make(map[string]struct{}, len(s.Followees))
+	for k := range s.Followees {
+		followees[k] = struct{}{}
+	}
+	followers := make(map[string]struct{}, len(s.Followers))
+	for k := range s.Followers {
+		followers[k] = struct{}{}
 	}
 	return UserState{
 		CurrentCredits:     s.CurrentCredits,
 		Username:           s.Username,
-		Followed:           followedMap,
+		Followees:          followees,
+		Followers:          followers,
 		EndorsementHandler: s.EndorsementHandler.Copy(),
 	}
 }
 
 // Undo removes the effects that was caused by the given metadata when possible. However, credits are not refunded.
 func (s *UserState) Undo(metadata content.Metadata) error {
-	// Undo the follow list.
+	// Undo the followee list.
 	if metadata.Type == content.FOLLOW {
 		targetUser, err := content.ParseFollowedUser(metadata)
 		if err != nil {
 			return err
 		}
-		delete(s.Followed, targetUser)
+		delete(s.Followees, targetUser)
 	}
 	return nil
 }
@@ -152,7 +161,7 @@ func (s *UserState) Update(metadata content.Metadata) error {
 		if err != nil {
 			return err
 		}
-		s.Followed[targetUser] = struct{}{}
+		s.Followees[targetUser] = struct{}{}
 	}
 	// Handle endorsement request stuff. The given endorsements will be handled outside, since they reside in different
 	// blockchains.
@@ -162,7 +171,20 @@ func (s *UserState) Update(metadata content.Metadata) error {
 	return nil
 }
 
+func (s *UserState) AddFollower(userID string) {
+	s.Followers[userID] = struct{}{}
+}
+
+func (s *UserState) RemoveFollower(userID string) {
+	delete(s.Followers, userID)
+}
+
 func (s UserState) IsFollowing(targetUserID string) bool {
-	_, ok := s.Followed[targetUserID]
+	_, ok := s.Followees[targetUserID]
+	return ok
+}
+
+func (s UserState) IsFollowedBy(targetUserID string) bool {
+	_, ok := s.Followers[targetUserID]
 	return ok
 }

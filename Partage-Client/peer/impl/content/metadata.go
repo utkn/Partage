@@ -12,7 +12,7 @@ type Metadata struct {
 	FeedUserID string
 	Type       Type
 	ContentID  string
-	// Used by Comments, Reactions...
+	// RefContentID is used by Comments, Reactions...
 	RefContentID string
 	Timestamp    int64
 	Data         []byte

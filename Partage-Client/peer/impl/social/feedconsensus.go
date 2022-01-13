@@ -34,11 +34,15 @@ func (l *Layer) feedBlockchainUpdater(userID string) paxos.BlockchainUpdater {
 func (l *Layer) feedProposalChecker(userID string) paxos.ProposalChecker {
 	return func(msg types.PaxosProposeMessage) bool {
 		metadata := content.ParseMetadata(msg.Value.CustomValue)
+		// Reject if the feed user id does not match.
+		if metadata.FeedUserID != userID {
+			return false
+		}
 		// Reject the dummy blocks!
 		if metadata.Type == content.DUMMY {
 			return false
 		}
-		isValid := l.FeedStore.IsValidMetadata(metadata)
+		isValid := l.FeedStore.CheckMetadata(metadata) == nil
 		utils.PrintDebug("social", l.GetAddress(), " has checked a proposal. Result =", isValid)
 		return isValid
 		// TODO timestamp, signature etc.

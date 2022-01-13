@@ -1,44 +1,60 @@
 package feed
 
 import (
+	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
 	"go.dedis.ch/cs438/peer/impl/utils"
 )
 
-// IsValidMetadata checks whether the given metadata can be safely added to the blockchain. Used during consensus.
-func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
+// CheckMetadata checks the validity of the given metadata. Returns either an error string explaining the issue or nil
+// in case the metadata is valid.
+func (feedStore *Store) CheckMetadata(c content.Metadata) error {
 	// The user must be registered!
 	if !feedStore.IsKnown(c.FeedUserID) {
-		return false
+		return fmt.Errorf("user is not registered")
 	}
 	// Accept reactions only when the user has not reacted to the referred content id yet.
 	if c.Type == content.REACTION {
-		return !feedStore.reactionHandler.AlreadyReacted(c.RefContentID, c.FeedUserID)
+		alreadyReacted := feedStore.reactionHandler.AlreadyReacted(c.RefContentID, c.FeedUserID)
+		if alreadyReacted {
+			return fmt.Errorf("already reacted")
+		}
 	}
 	proposerFeed := feedStore.GetFeedCopy(c.FeedUserID)
-	// Reject unknown users.
-	if proposerFeed == nil {
-		return false
-	}
 	// Make sure that the user can afford the cost.
 	if c.Type.Cost() > proposerFeed.userState.CurrentCredits {
-		return false
+		return fmt.Errorf("not enough credits")
 	}
 	// Only process an endorsement request if the user's credit is lower than the set amount.
 	if c.Type == content.ENDORSEMENT_REQUEST {
 		withinRange := proposerFeed.userState.CurrentCredits <= ENDORSEMENT_REQUEST_CREDIT_LIMIT
-		return withinRange && proposerFeed.userState.EndorsementHandler.CanRequest()
+		if !withinRange {
+			return fmt.Errorf("too rich to request endorsements")
+		}
+		if !proposerFeed.userState.EndorsementHandler.CanRequest() {
+			return fmt.Errorf("cannot request endorsements")
+		}
 	}
-	// Reject double-follows.
+	// Reject follows for unknown users and double-follows.
 	if c.Type == content.FOLLOW {
 		targetUserID, _ := content.ParseFollowedUser(c)
-		return !proposerFeed.userState.IsFollowing(targetUserID)
+		if !feedStore.IsKnown(targetUserID) {
+			return fmt.Errorf("user to follow is not known")
+		}
+		if proposerFeed.userState.IsFollowing(targetUserID) {
+			return fmt.Errorf("already following user")
+		}
 	}
 	// Check whether the given endorsement is valid.
 	if c.Type == content.ENDORSEMENT {
 		referredUser, _ := content.ParseEndorsedUserID(c)
 		referredFeed := feedStore.GetFeedCopy(referredUser)
-		return referredFeed.userState.CanEndorse(utils.Time(), c.FeedUserID)
+		if !feedStore.IsKnown(referredUser) {
+			return fmt.Errorf("user to endorse is not known")
+		}
+		if !referredFeed.userState.CanEndorse(utils.Time(), c.FeedUserID) {
+			return fmt.Errorf("cannot endorse the user")
+		}
 	}
 	// Check whether the attempted undo is valid.
 	if c.Type == content.UNDO {
@@ -46,11 +62,11 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
 		referredMetadata, err := proposerFeed.GetWithHash(referredHash)
 		// The referred hash must exist.
 		if err != nil {
-			return false
+			return fmt.Errorf("nothing to undo")
 		}
 		// Referred metadata must be owned by the same user
 		if c.FeedUserID != referredMetadata.FeedUserID {
-			return false
+			return fmt.Errorf("cannot undo other people's stuff")
 		}
 		// Only reactions, text, comments, and follows can be undone.
 		referredMetadataIsUndoable :=
@@ -58,7 +74,9 @@ func (feedStore *Store) IsValidMetadata(c content.Metadata) bool {
 				referredMetadata.Type == content.TEXT ||
 				referredMetadata.Type == content.COMMENT ||
 				referredMetadata.Type == content.FOLLOW
-		return referredMetadataIsUndoable
+		if !referredMetadataIsUndoable {
+			return fmt.Errorf("content is not undoable")
+		}
 	}
-	return true
+	return nil
 }
