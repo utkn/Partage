@@ -4,7 +4,7 @@
 
 <body>
     <div class="navbar">
-    <a href="">Home</a>
+    <a href="/">Home</a>
     <a href="/discover">Discover</a>
     <a href="/profile?UserID={{.UserID}}">Profile</a>
     </div>
@@ -15,6 +15,7 @@
         <!--Create post..-->
         <p>Publish your thoughts..</p>
         <form action="/post" method="POST">
+            <input type="hidden" id="from" name="from" value="/">
             <textarea id="Content" name="Content" rows="4" cols="60" required></textarea>
            <!-- <input type="text" id="Content" name="Content" required>-->
             <br>
@@ -26,6 +27,7 @@
         <div id="privMsgWriteBox" style="display:none">
             <p>Privately..</p>
             <form  action="/postPrivate" method="POST">
+                <input type="hidden" id="from" name="from" value="/">
                 <label for="Content">Content:</label>
                 <textarea id="Content" name="Content" rows="4" cols="53" required></textarea>
                 <br>
@@ -40,21 +42,14 @@
         <h4>Latest Posts</h4>
         {{range .Posts}}
             <div class="postDiv">
-                <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a href="/post?PostID={{.ContentID}}">{{(call .TimestampToDate .Timestamp)}}</a></p>
+                <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a href="/post?PostID={{.ContentID}}">{{.Timestamp}}</a></p>
                 <p>{{.Text}}</p>
-                <table>
-                    <tr>
-                    <!--
-                      <td><a href="/post?PostID={{.ContentID}}">{{len .Reactions}} reactions</a></td>
-                      <td><a href="/post?PostID={{.ContentID}}">{{len .Comments}} comments</a></td>
-                    -->
-                        <td onclick="showReactions()">{{len .Reactions}} reactions</td>
-                        <td onclick="showComments()">{{len .Comments}} comments</td>
-                    </tr>
-                </table>
+                <span onclick="showReactions()">{{len .Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                <span onclick="showComments()">{{len .Comments}} comments</span>
                 <div class="reactionsDiv">
                     <div class="reactionDiv">
                         <form action="/react" method="POST">
+                            <input type="hidden" id="from" name="from" value="/">
                             <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                             <select name="Reaction" id="Reaction">
                                 <option value="" selected disabled hidden>Choose reaction</option>
@@ -66,7 +61,8 @@
                             </select>
                             <input type="submit" value="React">
                         </form>
-                        <form action="/react" method="DELETE">
+                        <form action="/react" method="GET">
+                            <input type="hidden" id="from" name="from" value="/">
                             <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                             <input type="submit" value="Undo">
                         </form>
@@ -75,7 +71,7 @@
                         <!--Show 1 reaction only..-->
                         {{ if ne (len .Reactions) 0}}
                         <div class="displayReactionDiv">
-                            <p><a href="/profile?UserID={{(index .Reaction 0).AuthorID}}">{{(index .Reaction 0).AuthorID}}</a> reacted: {{(index .Reaction 0).ReactionText}}</p>                            
+                            <p><a href="/profile?UserID={{(index .Reactions 0).AuthorID}}">{{(index .Reactions 0).AuthorID}}</a> reacted: {{(index .Reactions 0).ReactionText}}</p>                            
                             <br>
                             <!--Redirect to post's single page-->
                             <a style="text-align: center;" href="/post?PostID={{.ContentID}}"><button>See more</button></a>
@@ -89,9 +85,10 @@
                         <!--Show 1 comment only..-->
                         {{ if ne (len .Comments) 0}}
                         <div class="displayCommentDiv">
-                            <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a> commented: {{(index .Comments 0).Text}} at {{(call .TimestampToDate (index .Comments 0).Timestamp)}}</p>
+                            <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a> commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
                             <p>{{len .Reactions}} reactions</p>
                             <form action="/react" method="POST">
+                                <input type="hidden" id="from" name="from" value="/">
                                 <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
                                 <select name="Reaction" id="Reaction">
                                     <option value="" selected disabled hidden>Choose reaction</option>
@@ -103,7 +100,8 @@
                                 </select>
                                 <input type="submit" value="React">
                             </form>
-                            <form action="/react" method="DELETE">
+                            <form action="/react" method="GET">
+                                <input type="hidden" id="from" name="from" value="/">
                                 <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
                                 <input type="submit" value="Undo">
                             </form>
@@ -117,6 +115,7 @@
                     <div class="commentDiv">
                         <!--Post comment..-->
                         <form action="/comment" method="POST">
+                            <input type="hidden" id="from" name="from" value="/">
                             <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                             <input type="text" id="Text" name="Text" required>
                             <input type="submit" value="Comment">
@@ -150,16 +149,6 @@
         border: 5px outset rgb(6, 85, 204);
         background-color: rgb(206, 221, 245);
         text-align: left;
-    }
-    table {
-        font-family: arial, sans-serif;
-        border-collapse: collapse;
-        width: 100%;
-    }
-    td, th {
-        border: 0px solid #dddddd;
-        text-align: left;
-        padding: 8px;
     }
     .displayCommentsDiv{
         display: none;

@@ -13,17 +13,14 @@
     <br><br>
 
     <div class="postDiv">
-        <p><b></b><a href="/profile?UserID={{.Post.AuthorID}}">{{.Post.AuthorID}}</a></b> at <a href="/post?PostID={{.Post.ContentID}}">{{(call .TimestampToDate .Post.Timestamp)}}</a></p>
-        <p>{{.Text}}</p>
-        <table>
-            <tr>
-                <td onclick="showReactions()">{{len .Post.Reactions}} reactions</td>
-                <td onclick="showComments()">{{len .Post.Comments}} comments</td>
-            </tr>
-        </table>
+        <p><b></b><a href="/profile?UserID={{.Post.AuthorID}}">{{.Post.AuthorID}}</a></b> at <a href="/post?PostID={{.Post.ContentID}}">{{( .Post.Timestamp)}}</a></p>
+        <p>{{.Post.Text}}</p>
+        <span onclick="showReactions()">{{len .Post.Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <span onclick="showComments()">{{len .Post.Comments}} comments</span>
         <div class="reactionsDiv">
             <div class="reactionDiv">
                 <form action="/react" method="POST">
+                    <input type="hidden" id="from" name="from" value="/post?PostID={{.Post.ContentID}}">
                     <input type="hidden" id="PostID" name="PostID" value="{{.Post.ContentID}}">
                     <select name="Reaction" id="Reaction">
                         <option value="" selected disabled hidden>Choose reaction</option>
@@ -35,7 +32,8 @@
                     </select>
                     <input type="submit" value="React">
                 </form>
-                <form action="/react" method="DELETE">
+                <form action="/react" method="GET">
+                    <input type="hidden" id="from" name="from" value="/post?PostID={{.Post.ContentID}}">
                     <input type="hidden" id="PostID" name="PostID" value="{{.Post.ContentID}}">
                     <input type="submit" value="Undo">
                 </form>
@@ -55,10 +53,11 @@
                 <!--Show all comments!-->
                 {{range .Post.Comments}}
                 <div class="displayCommentDiv">
-                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a> commented: {{.Text}} at {{(call .TimestampToDate .Timestamp)}}</p>
+                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a> commented: {{.Text}} at {{( .Timestamp)}}</p>
                     <p onclick="showCommentReactions()">{{len .Reactions}} reactions</p>
                     <form action="/react" method="POST">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <input type="hidden" id="from" name="from" value="/post?PostID={{.Post.ContentID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <select name="Reaction" id="Reaction">
                             <option value="" selected disabled hidden>Choose reaction</option>
                             <option value="happy">Happy</option>
@@ -69,8 +68,9 @@
                         </select>
                         <input type="submit" value="React">
                     </form>
-                    <form action="/react" method="DELETE">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                    <form action="/react" method="GET">
+                        <input type="hidden" id="from" name="from" value="/post?PostID={{.Post.ContentID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <input type="submit" value="Undo">
                     </form>
                     <br>
@@ -89,6 +89,7 @@
             <div class="commentDiv">
                 <!--Post comment..-->
                 <form action="/comment" method="POST">
+                    <input type="hidden" id="from" name="from" value="/post?PostID={{.Post.ContentID}}">
                     <input type="hidden" id="PostID" name="PostID" value="{{.Post.ContentID}}">
                     <input type="text" id="Text" name="Text" required>
                     <input type="submit" value="Comment">
@@ -118,16 +119,6 @@
         border: 5px outset rgb(6, 85, 204);
         background-color: rgb(206, 221, 245);
         text-align: left;
-    }
-    table {
-        font-family: arial, sans-serif;
-        border-collapse: collapse;
-        width: 100%;
-    }
-    td, th {
-        border: 0px solid #dddddd;
-        text-align: left;
-        padding: 8px;
     }
     .displayCommentsDiv{
         display: none;

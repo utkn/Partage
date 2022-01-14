@@ -79,18 +79,18 @@ func StartClient() {
 	mux.Handle("/post", http.HandlerFunc(client.SinglePostHandler()))
 	//POST
 	mux.Handle("/comment", http.HandlerFunc(client.CommentHandler()))
-	//POST & DELETE
+	//POST & GET
 	mux.Handle("/react", http.HandlerFunc(client.ReactHandler()))
-	//GET & POST & PUT
+	//GET 
 	mux.Handle("/profile", http.HandlerFunc(client.ProfileHandler()))
+	//GET & POST
+	mux.Handle("/user", http.HandlerFunc(client.UserHandler()))
 	//GET
 	mux.Handle("/discover", http.HandlerFunc(client.DiscoverHandler()))
 	//GET & POST
 	mux.Handle("/endorse", http.HandlerFunc(client.EndorsementHandler()))
 	//POST
 	mux.Handle("/postPrivate", http.HandlerFunc(client.PrivatePostHandler()))
-
-	
 
 	err = http.ListenAndServe(":8000", mux)
 	if err != nil {
@@ -107,11 +107,12 @@ type Homepage struct {
 	UserID          template.HTML
 	Posts           []Text
 	TimestampToDate func(string) string
-	FromPage string
 }
 
 func timestampToDate(d string) string {
+	fmt.Println(d)
 	t, _ := strconv.ParseInt(d, 10, 64)
+	fmt.Println(time.Unix(t, 0).Format("2006-01-02 15:04:05"))
 	return time.Unix(t, 0).Format("2006-01-02 15:04:05")
 }
 
@@ -148,7 +149,6 @@ type PostPage struct {
 	UserID          template.HTML
 	Post            Text
 	TimestampToDate func(string) string
-	FromPage string
 }
 
 // [GET] singular Post (all info) & [POST] create new post
@@ -192,6 +192,9 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 			if content != "" {
 				c.PostText(content)
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
+			return 
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -214,12 +217,12 @@ func (c Client) PrivatePostHandler() http.HandlerFunc {
 				err := c.PostPrivateText(text, recipientsArr)
 				if err != nil {
 					http.Error(w, "bad request", 400)
-					return
 				}
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
-				return
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -240,12 +243,14 @@ func (c Client) CommentHandler() http.HandlerFunc {
 				err := c.PostComment(text, postID)
 				if err != nil {
 					http.Error(w, "bad request", 400)
-					return
+					
 				}
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
-				return
+			
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -265,21 +270,23 @@ func (c Client) ReactHandler() http.HandlerFunc {
 			reaction := stringToReaction(reactVal)
 			if reaction.String() == "unknown" {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
+				from:=r.FormValue("from")
+				http.Redirect(w, r, from , http.StatusSeeOther)
 				return
 			}
-			err := c.ReactToPost(reaction, postID)
-			if err != nil {
-				http.Error(w, "bad request", 400)
-				return
-			}
-		case http.MethodDelete:
+			fmt.Println(reaction)
+			c.ReactToPost(reaction, postID)
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
+		case http.MethodGet:
 			// Undo react made to post
 			postID := r.FormValue("PostID")
 			if err := c.UndoReaction(postID); err != nil {
 				http.Error(w, "no content", http.StatusNoContent)
-				return
+			
 			}
-
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -313,7 +320,6 @@ type ProfilePage struct {
 	IFollow         bool //i follow this user
 	TimestampToDate func(string) string
 	MyUserID        string
-	FromPage string
 }
 
 // [GET] shows profile info and respective posts & [POST] is used to follow user & [PUT] is used to unfollow user
@@ -363,12 +369,42 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			if userID != "" {
 				c.FollowUser(userID)
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		case http.MethodPut:
 			// Unfollow
 			userID := r.FormValue("UserID")
 			if userID != "" {
 				c.UnfollowUser(userID)
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+}
+
+func (c Client) UserHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			// Unfollow
+			userID := r.FormValue("UserID")
+			if userID != "" {
+				c.UnfollowUser(userID)
+			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
+		case http.MethodGet:
+			// Follow
+			userID := r.FormValue("UserID")
+			if userID != "" {
+				c.FollowUser(userID)
+			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -383,7 +419,6 @@ type DiscoverPage struct {
 	SuggestedUsers  []string
 	TimestampToDate func(string) string
 	UserID          string
-	FromPage string
 }
 
 // [GET] shows suggested profiles to follow and latest posts from different users (users that are not followed by the user itself)
@@ -444,6 +479,8 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 			if err != nil {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		case http.MethodPost:
 			// Endorse User
 			userID := r.FormValue("UserID")
@@ -453,6 +490,8 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 					http.Error(w, "invalid", http.StatusNotAcceptable)
 				}
 			}
+			from:=r.FormValue("from")
+			http.Redirect(w, r, from , http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
