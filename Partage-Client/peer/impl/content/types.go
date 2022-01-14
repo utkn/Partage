@@ -148,6 +148,20 @@ func CreateCommentMetadata(userID string, timestamp int64, refContentID string, 
 	}
 }
 
+func CreateDownloadableContentMetadata(userID string, timestamp int64, refContentID string, metahash string, t Type) Metadata {
+	// Create a random content id.
+	contentID := xid.New().String()
+	return Metadata{
+		Type:         t,
+		ContentID:    contentID,
+		FeedUserID:   userID,
+		RefContentID: refContentID,
+		Timestamp:    timestamp,
+		Data:         []byte(metahash),
+		Signature:    nil,
+	}
+}
+
 func CreateReactionMetadata(userID string, reaction Reaction, timestamp int64, refContentID string) Metadata {
 	return Metadata{
 		Type:         REACTION,

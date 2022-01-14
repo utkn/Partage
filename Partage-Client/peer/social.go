@@ -9,7 +9,7 @@ import (
 type SocialPeer interface {
 	RegisterUser() error
 	// ShareDownloadableContent shares the given content into the network and returns the generated metadata and its block hash.
-	ShareDownloadableContent(post content.PrivateContent) (content.Metadata, string, error)
+	ShareDownloadableContent(post content.PrivateContent, p content.Type) (content.Metadata, string, error)
 	// DownloadContent fetches the post with the given content id from the network.
 	DownloadContent(contentID string) ([]byte, error)
 	// QueryFeedContents queries the feed store and returns all the matching contents from the stored blockchains.

@@ -27,7 +27,7 @@ var DEBUG = map[string]bool{
 	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
-	"social":        false,
+	"social":        true,
 	"statemachine":  false,
 	"tls":           false,
 }

@@ -510,7 +510,7 @@ func Test_Partage_Share_Text_Post(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted(), content.TEXT)
 	contentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the file.
@@ -579,11 +579,11 @@ func Test_Partage_Share_Comment_Post(t *testing.T) {
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	originalComment := "Whoa! Nice placeholder you got there, man!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted(), content.TEXT)
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Comment on it.
-	md2, _, _ := node2.ShareDownloadableContent(content.NewPublicContent(node2.GetUserID(), originalComment, utils.Time(), textContentID).Unencrypted())
+	md2, _, _ := node2.ShareDownloadableContent(content.NewPublicContent(node2.GetUserID(), originalComment, utils.Time(), textContentID).Unencrypted(), content.TEXT)
 	commentContentID := md2.ContentID
 	time.Sleep(1 * time.Second)
 	// Let each node try to download the comment.
@@ -645,7 +645,7 @@ func Test_Partage_Reaction(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
+	md, _, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted(), content.TEXT)
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	// Let node 2 to be confused by the meaning of this placeholder text.
@@ -704,7 +704,7 @@ func Test_Partage_Undo(t *testing.T) {
 	// Share a text post.
 	originalText := "Lorem ipsum dolor sit amet!!!"
 	nodes := []z.TestNode{node1, node2, node3}
-	md, n1TextBlockHash, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted())
+	md, n1TextBlockHash, _ := node1.ShareDownloadableContent(content.NewPublicContent(node1.GetUserID(), originalText, utils.Time(), "").Unencrypted(), content.TEXT)
 	textContentID := md.ContentID
 	time.Sleep(1 * time.Second)
 	for _, n := range nodes {
@@ -838,7 +838,7 @@ func Test_Partage_Private_Post(t *testing.T) {
 	// Let node 2 share a private message with node 4 & node 2 (itself).
 	encryptedContent, err := content.NewPublicContent(node2.GetUserID(), privateText, utils.Time(), "").Encrypted(recipientMap)
 	require.NoError(t, err)
-	md, _, err := node2.ShareDownloadableContent(encryptedContent)
+	md, _, err := node2.ShareDownloadableContent(encryptedContent, content.TEXT)
 	time.Sleep(time.Second * 1)
 	require.NoError(t, err)
 	// Node 2 and node 4 should be able to decrypt the message.

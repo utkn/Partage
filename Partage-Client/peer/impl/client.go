@@ -50,6 +50,7 @@ func (c *Client) GetUserData(userID string) UserData {
 
 // GetTexts returns the texts with the given filters.
 func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text {
+	utils.PrintDebug("social", "Client at GetTexts")
 	// First, create the filter accordingly.
 	filter := content.Filter{
 		MaxTime:  maxTime,
@@ -58,6 +59,7 @@ func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text
 		Types:    []content.Type{content.TEXT},
 	}
 	textThings := c.getDownloadableThings(filter, c.downloadText)
+	utils.PrintDebug("social", "Client fetched", len(textThings), "many texts")
 	var texts []Text
 	for _, t := range textThings {
 		texts = append(texts, t.(Text))
@@ -102,7 +104,7 @@ func (c *Client) GetReactions(contentID string) []Reaction {
 func (c *Client) PostText(text string) error {
 	// Create an unencrypted content.
 	cnt := content.NewPublicContent(c.Peer.GetUserID(), text, utils.Time(), "").Unencrypted()
-	_, _, err := c.Peer.ShareDownloadableContent(cnt)
+	_, _, err := c.Peer.ShareDownloadableContent(cnt, content.TEXT)
 	return err
 }
 
@@ -119,7 +121,7 @@ func (c *Client) PostPrivateText(text string, recipientUserIDs []string) error {
 		return fmt.Errorf("error during encrypting private text: %v", err)
 	}
 	// Share the encrypted content.
-	_, _, err = c.Peer.ShareDownloadableContent(prCnt)
+	_, _, err = c.Peer.ShareDownloadableContent(prCnt, content.TEXT)
 	return err
 }
 
@@ -150,7 +152,7 @@ func (c *Client) PostComment(comment string, postContentID string) error {
 		}
 	}
 	// Post the comment. Finally.
-	_, _, err := c.Peer.ShareDownloadableContent(privateContent)
+	_, _, err := c.Peer.ShareDownloadableContent(privateContent, content.COMMENT)
 	return err
 }
 
@@ -269,6 +271,7 @@ func (c *Client) downloadComment(cnt feed.Content) (interface{}, error) {
 func (c *Client) getDownloadableThings(filter content.Filter, downloader func(feed.Content) (interface{}, error)) []interface{} {
 	// First, query the text content from the feed store.
 	contents := c.Peer.QueryFeedContents(filter)
+	utils.PrintDebug("social", "Feed store returned", len(contents), "many metadata.")
 	var thingsList []interface{}
 	// Now, let's download the thing. Also check if we need to perform a discovery over the network.
 	shouldDiscover := false
@@ -284,7 +287,9 @@ func (c *Client) getDownloadableThings(filter content.Filter, downloader func(fe
 	}
 	// If required, discover the content and continue from where we left.
 	if shouldDiscover {
-		_, _ = c.Peer.DiscoverContentIDs(filter)
+		utils.PrintDebug("social", "Client initiating discovery...")
+		cIDs, _ := c.Peer.DiscoverContentIDs(filter)
+		utils.PrintDebug("social", "Discovery returned", len(cIDs), "many content IDs.")
 		for _, cnt := range contents[lastContentIndex:] {
 			thing, _ := downloader(cnt)
 			// If we still get an error, we simply append the incomplete thing. We don't care anymore x(
