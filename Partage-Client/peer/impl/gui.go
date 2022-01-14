@@ -1,12 +1,12 @@
 package impl
 
 import (
-	"flag"
 	"fmt"
 	"go.dedis.ch/cs438/registry/standard"
 	"go.dedis.ch/cs438/storage/inmemory"
 	"html/template"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -16,23 +16,32 @@ import (
 	"go.dedis.ch/cs438/transport/tcptls"
 )
 
+func TemplatePath(fileName string) string {
+	wd, _ := os.Getwd()
+	rt := wd[:strings.Index(wd, "Partage")]
+	return rt + "Partage/Partage-Client/templates/" + fileName
+}
+
+var StaticFilePath = TemplatePath("") + "/static"
+
 var TemplateFileMap = map[string]string{
-	"index":    "peer/html/index.html",
-	"post":     "peer/html/post.html",
-	"profile":  "peer/html/profile.html",
-	"discover": "peer/html/discover.html",
+	"index":    TemplatePath("index.html"),
+	"post":     TemplatePath("post.html"),
+	"profile":  TemplatePath("profile.html"),
+	"discover": TemplatePath("discover.html"),
 }
 
 func NewDefaultConfig() peer.Configuration {
 	return peer.Configuration{
 		MessageRegistry:     standard.NewRegistry(),
-		AntiEntropyInterval: 0,
-		HeartbeatInterval:   0,
+		AntiEntropyInterval: time.Second,
+		HeartbeatInterval:   2 * time.Second,
 		AckTimeout:          time.Second * 3,
 		ContinueMongering:   0.5,
 		ChunkSize:           8192,
-		Storage:             inmemory.NewPersistency(),
-		BlockchainStorage:   inmemory.NewPersistentMultipurposeStorage(),
+		// For now, we use an in-memory storage.
+		Storage:           inmemory.NewPersistency(),
+		BlockchainStorage: inmemory.NewPersistentMultipurposeStorage(),
 		BackoffDataRequest: peer.Backoff{
 			Initial: time.Second * 2,
 			Factor:  2,
@@ -42,16 +51,15 @@ func NewDefaultConfig() peer.Configuration {
 		PaxosThreshold: func(u uint) int {
 			return int(u/2 + 1)
 		},
-		PaxosID:            0,
+		PaxosID:            1,
 		PaxosProposerRetry: time.Second * 5,
 	}
 }
 
-func StartClient() {
+func StartClient(port uint, peerID uint, introducerAddr string) {
 	mux := http.NewServeMux() //server multiplexer
 
 	//create and initiate new Client instance.. TODO:
-	//client:=partage.NewClient()
 	nodeAddr := "127.0.0.1:0"
 	transp := tcptls.NewTCP()
 	// Create TLS socket
@@ -63,36 +71,35 @@ func StartClient() {
 	// Create the configuration.
 	config := NewDefaultConfig()
 	config.Socket = sock
-	config.AntiEntropyInterval = *flag.Duration("antientropy", time.Second, "")
-	config.HeartbeatInterval = *flag.Duration("heartbeat", 2*time.Second, "")
-	config.AckTimeout = *flag.Duration("acktimeout", 3*time.Second, "")
-	config.ContinueMongering = *flag.Float64("continuemongering", 0.5, "")
-	config.PaxosID = *flag.Uint("peerid", 1, "")
-	client := NewClient(1, "", config)
-	fmt.Println("Starting Partage...")
-	fmt.Println("User ID:", client.Peer.GetUserID())
+	config.PaxosID = peerID
+	client := NewClient(1, introducerAddr, config)
 	//Start node....
 
+	// Start the static file server.
+	fs := http.FileServer(http.Dir(StaticFilePath))
+	// Start the actual server.
+	// Serve the static file directory.
+	mux.Handle("/static/", http.StripPrefix("/static", fs))
 	// Homepage
-	mux.Handle("/", http.HandlerFunc(client.IndexHandler()))
+	mux.Handle("/", client.IndexHandler())
 	//GET & POST
-	mux.Handle("/post", http.HandlerFunc(client.SinglePostHandler()))
+	mux.Handle("/post", client.SinglePostHandler())
 	//POST
-	mux.Handle("/comment", http.HandlerFunc(client.CommentHandler()))
+	mux.Handle("/comment", client.CommentHandler())
 	//POST & GET
-	mux.Handle("/react", http.HandlerFunc(client.ReactHandler()))
-	//GET 
-	mux.Handle("/profile", http.HandlerFunc(client.ProfileHandler()))
-	//GET & POST
-	mux.Handle("/user", http.HandlerFunc(client.UserHandler()))
+	mux.Handle("/react", client.ReactHandler())
 	//GET
-	mux.Handle("/discover", http.HandlerFunc(client.DiscoverHandler()))
+	mux.Handle("/profile", client.ProfileHandler())
 	//GET & POST
-	mux.Handle("/endorse", http.HandlerFunc(client.EndorsementHandler()))
+	mux.Handle("/user", client.UserHandler())
+	//GET
+	mux.Handle("/discover", client.DiscoverHandler())
+	//GET & POST
+	mux.Handle("/endorse", client.EndorsementHandler())
 	//POST
-	mux.Handle("/postPrivate", http.HandlerFunc(client.PrivatePostHandler()))
+	mux.Handle("/postPrivate", client.PrivatePostHandler())
 
-	err = http.ListenAndServe(":8000", mux)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -100,9 +107,14 @@ func StartClient() {
 
 //lacking filter implementation..TODO:!
 
+type Page struct {
+	StaticFilePath string
+}
+
 //--------------------------
 // Homepage handler
 type Homepage struct {
+	Page
 	Username        string
 	UserID          template.HTML
 	Posts           []Text
@@ -123,6 +135,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 		case http.MethodGet:
 			//<form action="/post" method="POST"> //TODO:
 			p := Homepage{
+				Page: Page{StaticFilePath},
 				// Get userID
 				UserID: template.HTML(c.Peer.GetUserID()),
 				// Get username
@@ -146,6 +159,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 
 //-------------------------
 type PostPage struct {
+	Page
 	UserID          template.HTML
 	Post            Text
 	TimestampToDate func(string) string
@@ -183,7 +197,11 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 				fmt.Println(err)
 				return
 			}
-			p := PostPage{TimestampToDate: timestampToDate, Post: *post, UserID: template.HTML(c.Peer.GetUserID())}
+			p := PostPage{
+				Page:            Page{StaticFilePath},
+				TimestampToDate: timestampToDate,
+				Post:            *post,
+				UserID:          template.HTML(c.Peer.GetUserID())}
 			t.Execute(w, p)
 
 		case http.MethodPost:
@@ -192,9 +210,9 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 			if content != "" {
 				c.PostText(content)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
-			return 
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -221,8 +239,8 @@ func (c Client) PrivatePostHandler() http.HandlerFunc {
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -243,14 +261,14 @@ func (c Client) CommentHandler() http.HandlerFunc {
 				err := c.PostComment(text, postID)
 				if err != nil {
 					http.Error(w, "bad request", 400)
-					
+
 				}
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
-			
+
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -270,23 +288,23 @@ func (c Client) ReactHandler() http.HandlerFunc {
 			reaction := stringToReaction(reactVal)
 			if reaction.String() == "unknown" {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
-				from:=r.FormValue("from")
-				http.Redirect(w, r, from , http.StatusSeeOther)
+				from := r.FormValue("from")
+				http.Redirect(w, r, from, http.StatusSeeOther)
 				return
 			}
 			fmt.Println(reaction)
 			c.ReactToPost(reaction, postID)
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodGet:
 			// Undo react made to post
 			postID := r.FormValue("PostID")
 			if err := c.UndoReaction(postID); err != nil {
 				http.Error(w, "no content", http.StatusNoContent)
-			
+
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -313,6 +331,7 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
+	Page
 	Data            UserData
 	Posts           []Text
 	IsMe            bool
@@ -355,7 +374,15 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 					}
 				}
 			}
-			profile := ProfilePage{MyUserID: c.Peer.GetUserID(), TimestampToDate: timestampToDate, Data: data, Posts: texts, IsMe: isMyProfile, ImFollowedBy: imFollowedBy, IFollow: iFollow}
+			profile := ProfilePage{
+				Page:            Page{StaticFilePath},
+				MyUserID:        c.Peer.GetUserID(),
+				TimestampToDate: timestampToDate,
+				Data:            data,
+				Posts:           texts,
+				IsMe:            isMyProfile,
+				ImFollowedBy:    imFollowedBy,
+				IFollow:         iFollow}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["profile"])
 			if err != nil {
@@ -369,16 +396,16 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			if userID != "" {
 				c.FollowUser(userID)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodPut:
 			// Unfollow
 			userID := r.FormValue("UserID")
 			if userID != "" {
 				c.UnfollowUser(userID)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -395,16 +422,16 @@ func (c Client) UserHandler() http.HandlerFunc {
 			if userID != "" {
 				c.UnfollowUser(userID)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodGet:
 			// Follow
 			userID := r.FormValue("UserID")
 			if userID != "" {
 				c.FollowUser(userID)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
@@ -415,6 +442,7 @@ func (c Client) UserHandler() http.HandlerFunc {
 //-------------------------
 // Discover
 type DiscoverPage struct {
+	Page
 	Posts           []Text
 	SuggestedUsers  []string
 	TimestampToDate func(string) string
@@ -455,7 +483,13 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 				suggestedUsers = append(suggestedUsers, undiscoveredUsers...)
 			}
 
-			discoverPage := DiscoverPage{UserID: c.Peer.GetUserID(), TimestampToDate: timestampToDate, Posts: texts, SuggestedUsers: suggestedUsers}
+			discoverPage := DiscoverPage{
+				Page:            Page{StaticFilePath},
+				UserID:          c.Peer.GetUserID(),
+				TimestampToDate: timestampToDate,
+				Posts:           texts,
+				SuggestedUsers:  suggestedUsers,
+			}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["discover"])
 			if err != nil {
@@ -479,8 +513,8 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 			if err != nil {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodPost:
 			// Endorse User
 			userID := r.FormValue("UserID")
@@ -490,8 +524,8 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 					http.Error(w, "invalid", http.StatusNotAcceptable)
 				}
 			}
-			from:=r.FormValue("from")
-			http.Redirect(w, r, from , http.StatusSeeOther)
+			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return

@@ -8,10 +8,13 @@ import (
 	"go.dedis.ch/cs438/peer/impl/gossip"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/types"
+	"sync"
 )
 
 type Paxos struct {
 	protocol.Protocol
+	proposalLock   sync.Mutex
+	handleLock     sync.RWMutex
 	ProtocolID     string
 	Clock          *Clock
 	acceptor       *Acceptor
@@ -52,6 +55,8 @@ func (p *Paxos) GetProtocolID() string {
 }
 
 func (p *Paxos) Propose(val types.PaxosValue) (string, error) {
+	p.proposalLock.Lock()
+	defer p.proposalLock.Unlock()
 	outputBlock := p.Proposer.Run(ProposerBeginState{
 		paxos: p,
 		value: val,
@@ -64,6 +69,8 @@ func (p *Paxos) Propose(val types.PaxosValue) (string, error) {
 }
 
 func (p *Paxos) HandleConsensusMessage(msg protocol.ConsensusMessage) error {
+	p.handleLock.RLock()
+	defer p.handleLock.RUnlock()
 	innerMsg := protocol.UnwrapConsensusMessage(msg)
 	switch innerMsg.Name() {
 	case "paxosaccept":
@@ -84,4 +91,29 @@ func (p *Paxos) HandleConsensusMessage(msg protocol.ConsensusMessage) error {
 		return p.acceptor.HandleTLC(*tlcMsg)
 	}
 	return nil
+}
+
+func (p *Paxos) UpdateSystemSize(oldSize uint, newSize uint) error {
+	if newSize < oldSize {
+		return fmt.Errorf("cannot decrease system size in Paxos")
+	}
+	if p.ProtocolID != "registration" {
+		// Wait for the proposal to finish before updating the system size.
+		p.proposalLock.Lock()
+		defer p.proposalLock.Unlock()
+		// Wait for the message handling to finish before updating the system size.
+		p.handleLock.Lock()
+		defer p.handleLock.Unlock()
+	}
+	// Update the last proposal ID.
+	if p.LastProposalID > oldSize {
+		incrementAmount := (p.LastProposalID - 1) / oldSize
+		diff := newSize - oldSize
+		p.LastProposalID += diff * incrementAmount
+	}
+	return nil
+}
+
+func (p *Paxos) LocalUpdate(value types.PaxosValue) (string, error) {
+	return "", nil
 }

@@ -23,10 +23,16 @@ func (l *Layer) registerUser(newUserID string) {
 		utils.PrintDebug("social", l.GetAddress(), "is registering", newUserID)
 		l.consensus.RegisterProtocol(protocolID, l.newFeedConsensusProtocol(newUserID))
 	}
+	// Update the system size if we are not self-registering.
+	if newUserID != l.UserID {
+		utils.PrintDebug("social", l.GetAddress(), "is updating system size to", l.consensus.Config.TotalPeers+1)
+		l.consensus.UpdateSystemSize(l.Config.TotalPeers + 1)
+	}
 }
 
-// loadRegisteredUsers loads the registered users from the registration blockchain.
-func (l *Layer) loadRegisteredUsers(blockchainStorage storage.MultipurposeStorage) bool {
+// LoadRegisteredUsers loads the registered users from the registration blockchain.
+// Returns the # of users registered.
+func (l *Layer) LoadRegisteredUsers(blockchainStorage storage.MultipurposeStorage) int {
 	// Get the blocks.
 	blocks := utils.LoadBlockchain(blockchainStorage.GetStore("registration"))
 	// Now we have a list of registration blocks. Register them one by one.
@@ -35,7 +41,7 @@ func (l *Layer) loadRegisteredUsers(blockchainStorage storage.MultipurposeStorag
 		newUserID := c.FeedUserID
 		l.registerUser(newUserID)
 	}
-	return true
+	return len(blocks)
 }
 
 // registrationBlockchainUpdater takes a user id and returns a paxos feed blockchain updater.

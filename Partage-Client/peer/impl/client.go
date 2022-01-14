@@ -9,6 +9,7 @@ import (
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"go.dedis.ch/cs438/peer/impl/utils"
 	"sort"
+	"time"
 )
 
 // Client is a useful Partage Client to be used by a frontend.
@@ -17,9 +18,11 @@ type Client struct {
 }
 
 func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) *Client {
+	fmt.Println("Starting client...")
 	// TODO: calculate dynamically from the registration blockchain.
 	config.TotalPeers = totalPeers
 	// Create the peer.
+	fmt.Println("Constructing peer...")
 	p := NewPeer(config)
 	// Add to the network.
 	if joinNodeAddr != "" {
@@ -31,6 +34,13 @@ func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) 
 		fmt.Printf("error during start: %v\n", err)
 		return nil
 	}
+	// Load the registered users during the construction.
+	fmt.Println("Loading registered users...")
+	registered := p.(*node).social.LoadRegisteredUsers(config.BlockchainStorage)
+	fmt.Println("Registered", registered, "many users.")
+	// Initiate the self-register after acquiring the registration blockchain from the community.
+	time.Sleep(5 * time.Second)
+	fmt.Println("Initiating self-register...")
 	err = p.RegisterUser()
 	if err != nil {
 		fmt.Printf("error during registration: %v\n", err)

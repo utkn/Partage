@@ -43,8 +43,6 @@ func Construct(config *peer.Configuration,
 	}
 	// Register the registration consensus protocol.
 	consensus.RegisterProtocol("registration", l.newRegistrationConsensusProtocol(config, gossip, l.FeedStore))
-	// Load the registered users during the construction.
-	l.loadRegisteredUsers(config.BlockchainStorage)
 	return l
 }
 
@@ -57,7 +55,7 @@ func (l *Layer) GetUserID() string {
 }
 
 func (l *Layer) Register() error {
-	utils.PrintDebug("social", l.GetAddress(), "has initiated registration with id", l.UserID)
+	utils.PrintDebug("social", l.GetAddress(), "is self-registering with id", l.UserID)
 	regMetadata := content.CreateJoinMetadata(l.UserID, utils.Time())
 	val := content.UnparseMetadata(regMetadata)
 	paxosVal := types.PaxosValue{

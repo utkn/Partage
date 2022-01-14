@@ -5,7 +5,8 @@
     {{else}}
     <title>{{.Data.Username}} Profile</title>
     {{end}}
-    <title>Pr</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
 </head>
 
 <body>
@@ -202,104 +203,3 @@
         {{end}}
     </div>
 </body>
-<style>
-    .navbar {
-    overflow: hidden;
-    background-color: #333;
-    }
-    .navbar a {
-    float: left;
-    font-size: 16px;
-    color: white;
-    text-align: center;
-    padding: 14px 16px;
-    text-decoration: none;
-    }
-    .navbar a:hover {
-    background-color: rgb(6, 85, 204);
-    }
-    .postDiv {
-        border: 5px outset rgb(6, 85, 204);
-        background-color: rgb(206, 221, 245);
-        text-align: left;
-    }
-    .displayCommentsDiv{
-        display: none;
-        text-align: right;
-    }
-    .commentsDiv{
-        text-align: center;
-    }
-    .displayCommentDiv {
-        border: 5px outset rgb(183, 193, 207);
-        background-color: rgb(91, 109, 138);
-        text-align: center;
-    }
-    .displayReactionsDiv{
-        display: none;
-        text-align: right;
-    }
-    .reactionsDiv{
-        text-align: center;
-    }
-    .displayCommentReactionsDiv{
-        display: none;
-        text-align: right;
-    }
-</style>
-<script>
-  function showComments() {
-    var x = document.getElementsByClassName("displayCommentsDiv");
-    if (x.style.display === "none") {
-      x.style.display = "block";
-    } else {
-      x.style.display = "none";
-    }
-}
-
-function showReactions() {
-    var x = document.getElementsByClassName("displayReactionsDiv");
-    if (x.style.display === "none") {
-      x.style.display = "block";
-    } else {
-      x.style.display = "none";
-    }
-}
-
-function showCommentReactions() {
-  var x = document.getElementsByClassName("displayReactionsDiv");
-  if (x.style.display === "none") {
-    x.style.display = "block";
-  } else {
-    x.style.display = "none";
-  }
-}
-
-function showFollowers() {
-  var x = document.getElementsByClassName("followersList");
-  if (x.style.display === "none") {
-    x.style.display = "block";
-  } else {
-    x.style.display = "none";
-  }
-}
-
-function showFollowees() {
-  var x = document.getElementsByClassName("followeesList");
-  if (x.style.display === "none") {
-    x.style.display = "block";
-  } else {
-    x.style.display = "none";
-  }
-}
-
-function showPrivMsgWriteBox(){
-  var checkBox = document.getElementById("privMsgCheckbox");
-  var text = document.getElementById("privMsgWriteBox");
-  if (checkBox.checked == true){
-    text.style.display = "block";
-  } else {
-     text.style.display = "none";
-  }
-}
-</script>

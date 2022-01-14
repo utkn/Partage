@@ -67,15 +67,33 @@ func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) (
 	l.RLock()
 	p, ok := l.protocols[protocolID]
 	if !ok {
+		l.RUnlock()
 		return "", fmt.Errorf("could not find the consensus protocol with id %s", protocolID)
 	}
 	// Consensus should not be invoked when there are <= 1 many peers.
 	//if l.Config.TotalPeers <= 1 {
-	//	return "", fmt.Errorf("consensus is disabled for <= 1 many peers")
+	//	utils.PrintDebug("consensus", "consensus is disabled for <= 1 many peers")
+	//	l.RUnlock()
+	//	return p.LocalUpdate(value)
 	//}
 	l.RUnlock()
 	// Initiate the Paxos consensus protocol.
 	return p.Propose(value)
+}
+
+func (l *Layer) UpdateSystemSize(newSize uint) {
+	l.Lock()
+	defer l.Unlock()
+	oldSize := l.Config.TotalPeers
+	l.Config.TotalPeers = newSize
+	utils.PrintDebug("consensus", l.GetAddress(), "is updating system size from", oldSize, "to", newSize)
+	for _, p := range l.protocols {
+		err := p.UpdateSystemSize(oldSize, newSize)
+		if err != nil {
+			fmt.Printf("error during updating system size: %v", err)
+			return
+		}
+	}
 }
 
 // -- Paxos functions for the default protocol.
