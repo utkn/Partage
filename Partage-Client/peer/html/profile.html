@@ -36,18 +36,18 @@
         {{ if not .IsMe}}
             {{ if .IFollow}}
             <form action="/profile" method="PUT">
-                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
                 <input type="submit" value="Unfollow">
             </form>
             {{else}}
             <form action="/profile" method="POST">
-                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
                 <input type="submit" value="Follow">
             </form>
             {{end}}
             {{if .Data.CanBeEndorsed}}
             <form action="/endorse" method="POST">
-                <input type="hidden" id="UserID" name="UserID" value="{{Data.UserData.UserID}}">
+                <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
                 <input type="submit" value="Endorse">
             </form>
             <br>

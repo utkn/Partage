@@ -101,7 +101,13 @@ func (s *Store) QueryContents(filter content.Filter) []Content {
 	}
 	var filtered []Content
 	for _, user := range selectedUsers {
-		contents := s.getFeed(user).GetContents()
+		userFeed := s.getFeed(user)
+		// If the user does not exist, skip him.
+		if userFeed == nil {
+			fmt.Printf("feed.Store.QueryContent: Warning: %s does not exist", user)
+			continue
+		}
+		contents := userFeed.GetContents()
 		for _, c := range contents {
 			if filter.Match(c.Metadata) {
 				filtered = append(filtered, c)

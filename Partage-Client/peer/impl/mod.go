@@ -362,7 +362,17 @@ func (n *node) GetReactions(contentID string) []feed.ReactionInfo {
 
 // GetUserState implements peer.SocialPeer
 func (n *node) GetUserState(userID string) feed.UserState {
-	return n.social.FeedStore.GetFeedCopy(userID).GetUserStateCopy()
+	f := n.social.FeedStore.GetFeedCopy(userID)
+	if f == nil {
+		return feed.UserState{
+			CurrentCredits:     0,
+			Username:           "unknown",
+			Followees:          nil,
+			Followers:          nil,
+			EndorsementHandler: feed.EndorsementHandler{},
+		}
+	}
+	return f.GetUserStateCopy()
 }
 
 // ShareDownloadableContent implements peer.SocialPeer.
