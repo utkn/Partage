@@ -16,10 +16,30 @@ type Client struct {
 	Peer peer.SocialPeer
 }
 
-func NewClient(joinNodeAddr string) *Client {
-	c := &Client{}
-	// ...
-	return c
+func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) *Client {
+	// TODO: calculate dynamically from the registration blockchain.
+	config.TotalPeers = totalPeers
+	// Create the peer.
+	p := NewPeer(config)
+	// Add to the network.
+	if joinNodeAddr != "" {
+		p.AddPeer(joinNodeAddr)
+	}
+	// Try to start the node.
+	err := p.Start()
+	if err != nil {
+		fmt.Printf("error during start: %v\n", err)
+		return nil
+	}
+	err = p.RegisterUser()
+	if err != nil {
+		fmt.Printf("error during registration: %v\n", err)
+		return nil
+	}
+	// Return the client.
+	return &Client{
+		Peer: p,
+	}
 }
 
 // GetUserData returns the user data associated with the given user id.

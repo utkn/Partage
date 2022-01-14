@@ -63,16 +63,16 @@ func (l *Layer) Propose(value types.PaxosValue) (string, error) {
 // Returns the newly appended block hash.
 func (l *Layer) ProposeWithProtocol(protocolID string, value types.PaxosValue) (string, error) {
 	utils.PrintDebug("consensus", l.GetAddress(), "is proposing with", protocolID)
-	// Consensus should not be invoked when there are <= 1 many peers.
-	if l.Config.TotalPeers <= 1 {
-		return "", fmt.Errorf("consensus is disabled for <= 1 many peers")
-	}
 	// Get the protocol
 	l.RLock()
 	p, ok := l.protocols[protocolID]
 	if !ok {
 		return "", fmt.Errorf("could not find the consensus protocol with id %s", protocolID)
 	}
+	// Consensus should not be invoked when there are <= 1 many peers.
+	//if l.Config.TotalPeers <= 1 {
+	//	return "", fmt.Errorf("consensus is disabled for <= 1 many peers")
+	//}
 	l.RUnlock()
 	// Initiate the Paxos consensus protocol.
 	return p.Propose(value)
