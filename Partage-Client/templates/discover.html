@@ -1,114 +1,108 @@
 <!-- discover.html -->
-<head>
-    <title>Discover</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="/static/script.js"></script>
-</head>
-
-
-<body>
-    <div class="navbar">
-    <a href="/">Home</a>
-    <a href="/discover">Discover</a>
-    <a href="/profile?UserID={{.UserID}}">Profile</a>
-    </div>
-
-    <div class="suggestedUsers">
-        {{if ne (len .SuggestedUsers) 0}}
-        <h4>Suggested Partage users</h4>
-        {{end}}
-        {{range .SuggestedUsers}}
-        <a href="/profile?UserID={{.}}">{{.}}</a>                            
-        <br>
-        {{end}}
-    </div>
-    <div class="postsDiv">
-        <h4>Discover Posts from other Partage users</h4>
-        {{range .Posts}}
-            <div class="postDiv">
-                <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a href="/post?PostID={{.ContentID}}">{{( .Timestamp)}}</a></p>
-                <p>{{.Text}}</p>
-                <span onclick="showReactions()">{{len .Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
-                <span onclick="showComments()">{{len .Comments}} comments</span>
-                <div class="reactionsDiv">
-                    <div class="reactionDiv">
-                        <form action="/react" method="POST">
-                            <input type="hidden" id="from" name="from" value="/discover">
-                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                            <select name="Reaction" id="Reaction"></select>
-                                <option value="" selected disabled hidden>Choose reaction</option>
-                                <option value="happy">Happy</option>
-                                <option value="angry">Angry</option>
-                                <option value="confused">Confused</option>
-                                <option value="approve">Approve</option>
-                                <option value="disapprove">Disapprove</option>
-                            </select>
-                            <input type="submit" value="React">
-                        </form>
-                        <form action="/react" method="GET">
-                            <input type="hidden" id="from" name="from" value="/discover">
-                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                            <input type="submit" value="Undo">
-                        </form>
-                    </div>
-                    <div class="displayReactionsDiv">
-                        <!--Show 1 reaction only..-->
-                        {{ if ne (len .Reactions) 0}}
-                        <div class="displayReactionDiv">
-                            <p><a href="/profile?UserID={{(index .Reactions 0).AuthorID}}">{{(index .Reactions 0).AuthorID}}</a> reacted: {{(index .Reactions 0).ReactionText}}</p>                            
-                            <br>
-                            <!--Redirect to post's single page-->
-                            <a style="text-align: center;" href="/post?PostID={{.ContentID}}"><button>See more</button></a>
-                            <br>
-                        </div>
-                        {{end}}
-                    </div>
-                </div>
-                <div class="commentsDiv">
-                    <div class="displayCommentsDiv">
-                        <!--Show 1 comment only..-->
-                        {{ if ne (len .Comments) 0}}
-                        <div class="displayCommentDiv">
-                            <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a> commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
-                            <p>{{len .Reactions}} reactions</p>
-                            <form action="/react" method="POST">
-                                <input type="hidden" id="from" name="from" value="/discover">
-                                <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
-                                <select name="Reaction" id="Reaction"></select>
-                                    <option value="" selected disabled hidden>Choose reaction</option>
-                                    <option value="happy">Happy</option>
-                                    <option value="angry">Angry</option>
-                                    <option value="confused">Confused</option>
-                                    <option value="approve">Approve</option>
-                                    <option value="disapprove">Disapprove</option>
-                                </select>
-                                <input type="submit" value="React">
-                            </form>
-                            <form action="/react" method="GET">
-                                <input type="hidden" id="from" name="from" value="/discover">
-                                <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
-                                <input type="submit" value="Undo">
-                            </form>
-                            <br>
-                            <!--Redirect to post's single page-->
-                            <a style="text-align: center;" href="/post?PostID={{.ContentID}}"><button>See more</button></a>
-                            <br>
-                        </div>
-                        {{end}}
-                    </div>
-                    <div class="commentDiv">
-                        <!--Post comment..-->
-                        <form action="/comment" method="POST">
-                            <input type="hidden" id="from" name="from" value="/discover">
-                            <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                            <input type="text" id="Text" name="Text" required>
-                            <input type="submit" value="Comment">
-                        </form>
-                    </div>
-                </div>
+{{define "title"}}Discover{{end}}
+{{define "content"}}
+<div class="suggestedUsers">
+    {{if ne (len .SuggestedUsers) 0}}
+    <h4>Suggested Partage users</h4>
+    {{end}}
+    {{range .SuggestedUsers}}
+    <a href="/profile?UserID={{.}}">{{.}}</a>
+    <br>
+    {{end}}
+</div>
+<div class="postsDiv">
+    <h4>Discover Posts from other Partage users</h4>
+    {{range .Posts}}
+    <div class="postDiv">
+        <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a
+                href="/post?PostID={{.ContentID}}">{{( .Timestamp)}}</a></p>
+        <p>{{.Text}}</p>
+        <span onclick="showReactions()">{{len .Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <span onclick="showComments()">{{len .Comments}} comments</span>
+        <div class="reactionsDiv">
+            <div class="reactionDiv">
+                <form action="/react" method="POST">
+                    <input type="hidden" id="from" name="from" value="/discover">
+                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                    <select name="Reaction" id="Reaction"></select>
+                    <option value="" selected disabled hidden>Choose reaction</option>
+                    <option value="happy">Happy</option>
+                    <option value="angry">Angry</option>
+                    <option value="confused">Confused</option>
+                    <option value="approve">Approve</option>
+                    <option value="disapprove">Disapprove</option>
+                    </select>
+                    <input type="submit" value="React">
+                </form>
+                <form action="/react" method="GET">
+                    <input type="hidden" id="from" name="from" value="/discover">
+                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                    <input type="submit" value="Undo">
+                </form>
             </div>
-        <br><br>
-        {{end}}
+            <div class="displayReactionsDiv">
+                <!--Show 1 reaction only..-->
+                {{ if ne (len .Reactions) 0}}
+                <div class="displayReactionDiv">
+                    <p><a href="/profile?UserID={{(index .Reactions 0).AuthorID}}">{{(index .Reactions 0).AuthorID}}</a>
+                        reacted: {{(index .Reactions 0).ReactionText}}</p>
+                    <br>
+                    <!--Redirect to post's single page-->
+                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
+                        <button>See more</button>
+                    </a>
+                    <br>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        <div class="commentsDiv">
+            <div class="displayCommentsDiv">
+                <!--Show 1 comment only..-->
+                {{ if ne (len .Comments) 0}}
+                <div class="displayCommentDiv">
+                    <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a>
+                        commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
+                    <p>{{len .Reactions}} reactions</p>
+                    <form action="/react" method="POST">
+                        <input type="hidden" id="from" name="from" value="/discover">
+                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <select name="Reaction" id="Reaction"></select>
+                        <option value="" selected disabled hidden>Choose reaction</option>
+                        <option value="happy">Happy</option>
+                        <option value="angry">Angry</option>
+                        <option value="confused">Confused</option>
+                        <option value="approve">Approve</option>
+                        <option value="disapprove">Disapprove</option>
+                        </select>
+                        <input type="submit" value="React">
+                    </form>
+                    <form action="/react" method="GET">
+                        <input type="hidden" id="from" name="from" value="/discover">
+                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <input type="submit" value="Undo">
+                    </form>
+                    <br>
+                    <!--Redirect to post's single page-->
+                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
+                        <button>See more</button>
+                    </a>
+                    <br>
+                </div>
+                {{end}}
+            </div>
+            <div class="commentDiv">
+                <!--Post comment..-->
+                <form action="/comment" method="POST">
+                    <input type="hidden" id="from" name="from" value="/discover">
+                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                    <input type="text" id="Text" name="Text" required>
+                    <input type="submit" value="Comment">
+                </form>
+            </div>
+        </div>
     </div>
-  
-</body>
+    <br><br>
+    {{end}}
+</div>
+{{end}}

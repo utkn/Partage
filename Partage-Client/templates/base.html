@@ -1,0 +1,13 @@
+<head>
+    <title>{{block "title" .}}Undefined Title{{end}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
+</head>
+<body>
+<div class="navbar">
+    <a href="/">Home</a>
+    <a href="/discover">Discover</a>
+    <a href="/profile?UserID={{.UserID}}">Profile</a>
+</div>
+{{block "content" .}}Undefined Content{{end}}
+</body>

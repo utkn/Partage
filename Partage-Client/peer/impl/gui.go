@@ -29,6 +29,7 @@ var TemplateFileMap = map[string]string{
 	"post":     TemplatePath("post.html"),
 	"profile":  TemplatePath("profile.html"),
 	"discover": TemplatePath("discover.html"),
+	"base":     TemplatePath("base.html"),
 }
 
 func NewDefaultConfig() peer.Configuration {
@@ -107,14 +108,9 @@ func StartClient(port uint, peerID uint, introducerAddr string) {
 
 //lacking filter implementation..TODO:!
 
-type Page struct {
-	StaticFilePath string
-}
-
 //--------------------------
 // Homepage handler
 type Homepage struct {
-	Page
 	Username        string
 	UserID          template.HTML
 	Posts           []Text
@@ -135,7 +131,6 @@ func (c Client) IndexHandler() http.HandlerFunc {
 		case http.MethodGet:
 			//<form action="/post" method="POST"> //TODO:
 			p := Homepage{
-				Page: Page{StaticFilePath},
 				// Get userID
 				UserID: template.HTML(c.Peer.GetUserID()),
 				// Get username
@@ -144,7 +139,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 				Posts:           c.GetTexts(c.GetUserData(c.Peer.GetUserID()).Followees, 0, MaxTimeLimit),
 				TimestampToDate: timestampToDate,
 			}
-			t, err := template.ParseFiles(TemplateFileMap["index"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"])
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -159,7 +154,6 @@ func (c Client) IndexHandler() http.HandlerFunc {
 
 //-------------------------
 type PostPage struct {
-	Page
 	UserID          template.HTML
 	Post            Text
 	TimestampToDate func(string) string
@@ -192,13 +186,12 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 				return
 			}
 			// Render Post with all info, comments and reactions
-			t, err := template.ParseFiles(TemplateFileMap["post"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["post"])
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
 			p := PostPage{
-				Page:            Page{StaticFilePath},
 				TimestampToDate: timestampToDate,
 				Post:            *post,
 				UserID:          template.HTML(c.Peer.GetUserID())}
@@ -331,14 +324,16 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
-	Page
 	Data            UserData
 	Posts           []Text
 	IsMe            bool
 	ImFollowedBy    bool //this user follows me
 	IFollow         bool //i follow this user
 	TimestampToDate func(string) string
-	MyUserID        string
+	// For navbar.
+	UserID string
+	// For the page itself.
+	MyUserID string
 }
 
 // [GET] shows profile info and respective posts & [POST] is used to follow user & [PUT] is used to unfollow user
@@ -375,7 +370,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				}
 			}
 			profile := ProfilePage{
-				Page:            Page{StaticFilePath},
+				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
 				TimestampToDate: timestampToDate,
 				Data:            data,
@@ -384,7 +379,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				ImFollowedBy:    imFollowedBy,
 				IFollow:         iFollow}
 			// Render
-			t, err := template.ParseFiles(TemplateFileMap["profile"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["profile"])
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -442,7 +437,6 @@ func (c Client) UserHandler() http.HandlerFunc {
 //-------------------------
 // Discover
 type DiscoverPage struct {
-	Page
 	Posts           []Text
 	SuggestedUsers  []string
 	TimestampToDate func(string) string
@@ -484,14 +478,13 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 			}
 
 			discoverPage := DiscoverPage{
-				Page:            Page{StaticFilePath},
 				UserID:          c.Peer.GetUserID(),
 				TimestampToDate: timestampToDate,
 				Posts:           texts,
 				SuggestedUsers:  suggestedUsers,
 			}
 			// Render
-			t, err := template.ParseFiles(TemplateFileMap["discover"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["discover"])
 			if err != nil {
 				fmt.Println(err)
 				return

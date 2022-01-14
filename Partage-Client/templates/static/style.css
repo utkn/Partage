@@ -1,7 +1,14 @@
+body {
+    font-family: "Helvetica Neue", sans-serif;
+    margin: 0 auto;
+    width: 70%
+}
+
 .navbar {
     overflow: hidden;
     background-color: #333;
 }
+
 .navbar a {
     float: left;
     font-size: 16px;
@@ -10,34 +17,43 @@
     padding: 14px 16px;
     text-decoration: none;
 }
+
 .navbar a:hover {
     background-color: rgb(6, 85, 204);
 }
+
 .postDiv {
     border: 5px outset rgb(6, 85, 204);
     background-color: rgb(206, 221, 245);
     text-align: left;
+    padding: 5px 10px;
 }
-.displayCommentsDiv{
+
+.displayCommentsDiv {
     display: none;
     text-align: right;
 }
-.commentsDiv{
+
+.commentsDiv {
     text-align: center;
 }
+
 .displayCommentDiv {
     border: 5px outset rgb(183, 193, 207);
     background-color: rgb(91, 109, 138);
     text-align: center;
 }
-.displayReactionsDiv{
+
+.displayReactionsDiv {
     display: none;
     text-align: right;
 }
-.reactionsDiv{
+
+.reactionsDiv {
     text-align: center;
 }
-.displayCommentReactionsDiv{
+
+.displayCommentReactionsDiv {
     display: none;
     text-align: right;
 }
