@@ -1,13 +1,33 @@
 <head>
     <title>{{block "title" .}}Undefined Title{{end}}</title>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css"
+          integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/script.js"></script>
 </head>
 <body>
 <div class="navbar">
-    <a href="/">Home</a>
-    <a href="/discover">Discover</a>
-    <a href="/profile?UserID={{.UserID}}">Profile</a>
+    <div style="margin:0 auto; width:80%">
+        <a href="/">Home</a>
+        <a href="/discover">Discover</a>
+        <a href="/profile?UserID={{.UserID}}">Profile</a>
+    </div>
 </div>
-{{block "content" .}}Undefined Content{{end}}
+<div class="main-content">
+    <h4 class="heading">
+        {{block "heading" .}}{{end}}
+    </h4>
+    <div class="pure-g">
+        <div class="pure-u-4-5">
+            <div class="content-box">
+                {{block "content" .}}Undefined Content{{end}}
+            </div>
+        </div>
+        <div class="pure-u-1-5">
+            <div class="content-box" style="margin-left:10px">
+                Right menu
+            </div>
+        </div>
+    </div>
+</div>
 </body>

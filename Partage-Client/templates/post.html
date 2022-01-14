@@ -1,7 +1,11 @@
 <!-- post.html -->
 {{define "title"}}Post from {{.Post.AuthorID}}{{end}}
+
+{{define "heading"}}
+Post {{.Post.ContentID}}
+{{end}}
+
 {{define "content"}}
-<h4>Post {{.Post.ContentID}}</h4>
 <div class="postDiv">
     <p><b></b><a href="/profile?UserID={{.Post.AuthorID}}">{{.Post.AuthorID}}</a></b> at <a
             href="/post?PostID={{.Post.ContentID}}">{{( .Post.Timestamp)}}</a></p>
@@ -44,7 +48,8 @@
             <!--Show all comments!-->
             {{range .Post.Comments}}
             <div class="displayCommentDiv">
-                <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a> commented: {{.Text}} at {{( .Timestamp)}}
+                <p>
+                    <a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a> commented: {{.Text}} at {{( .Timestamp)}}
                 </p>
                 <p onclick="showCommentReactions()">{{len .Reactions}} reactions</p>
                 <form action="/react" method="POST">
@@ -76,6 +81,7 @@
                     {{end}}
                 </div>
             </div>
+
             {{end}}
         </div>
         <div class="commentDiv">
@@ -90,8 +96,3 @@
     </div>
 </div>
 {{end}}
-<head>
-    <title>Post from {{.Post.AuthorID}}</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="/static/script.js"></script>
-</head>

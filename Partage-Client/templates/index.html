@@ -1,6 +1,10 @@
 {{define "title"}}Homepage{{end}}
+
+{{define "heading"}}
+Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({{slice .UserID 0 8}}...)</a>!
+{{end}}
+
 {{define "content"}}
-<h4>Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({{.UserID}})</a> !</h4>
 <br>
 <div class="writePostBox">
     <!--Create post..-->
@@ -37,29 +41,29 @@
         <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a
                 href="/post?PostID={{.ContentID}}">{{.Timestamp}}</a></p>
         <p>{{.Text}}</p>
-        <span onclick="showReactions()">{{len .Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <span onclick="showComments()">{{len .Comments}} comments</span>
+        <a href="javascript:;" onclick="showComments()">{{len .Comments}} comments</a>
+        <a href="javascript:;" onclick="showReactions()" style="margin-left:3px">{{len .Reactions}} reactions</a>
+        <div class="reactionDiv" style="display:inline">
+            <form action="/react" method="POST" style="display:inline;">
+                <input type="hidden" id="from" name="from" value="/">
+                <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                <select name="Reaction" id="Reaction">
+                    <option value="" selected disabled hidden>Choose reaction</option>
+                    <option value="happy">Happy</option>
+                    <option value="angry">Angry</option>
+                    <option value="confused">Confused</option>
+                    <option value="approve">Approve</option>
+                    <option value="disapprove">Disapprove</option>
+                </select>
+                <input type="submit" value="React">
+            </form>
+            <form action="/react" method="GET" style="display:inline;">
+                <input type="hidden" id="from" name="from" value="/">
+                <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                <input type="submit" value="Undo">
+            </form>
+        </div>
         <div class="reactionsDiv">
-            <div class="reactionDiv">
-                <form action="/react" method="POST">
-                    <input type="hidden" id="from" name="from" value="/">
-                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                    <select name="Reaction" id="Reaction">
-                        <option value="" selected disabled hidden>Choose reaction</option>
-                        <option value="happy">Happy</option>
-                        <option value="angry">Angry</option>
-                        <option value="confused">Confused</option>
-                        <option value="approve">Approve</option>
-                        <option value="disapprove">Disapprove</option>
-                    </select>
-                    <input type="submit" value="React">
-                </form>
-                <form action="/react" method="GET">
-                    <input type="hidden" id="from" name="from" value="/">
-                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                    <input type="submit" value="Undo">
-                </form>
-            </div>
             <div class="displayReactionsDiv">
                 <!--Show 1 reaction only..-->
                 {{ if ne (len .Reactions) 0}}
@@ -84,7 +88,7 @@
                     <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a>
                         commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
                     <p>{{len .Reactions}} reactions</p>
-                    <form action="/react" method="POST">
+                    <form action="/react" method="POST" style="display:inline;">
                         <input type="hidden" id="from" name="from" value="/">
                         <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
                         <select name="Reaction" id="Reaction">
@@ -97,7 +101,7 @@
                         </select>
                         <input type="submit" value="React">
                     </form>
-                    <form action="/react" method="GET">
+                    <form action="/react" method="GET" style="display:inline;">
                         <input type="hidden" id="from" name="from" value="/">
                         <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
                         <input type="submit" value="Undo">

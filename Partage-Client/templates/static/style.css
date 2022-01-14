@@ -1,7 +1,26 @@
 body {
     font-family: "Helvetica Neue", sans-serif;
     margin: 0 auto;
-    width: 70%
+    background: #ededed;
+}
+div {
+    display: block;
+}
+.main-content {
+    width: 80%;
+    margin: 0 auto;
+}
+
+.content-box {
+    background: #fafafa;
+    margin: 5px auto;
+    border: 1px solid gray;
+    border-radius: 3px;
+    padding: 5px 7px;
+}
+
+.heading {
+    margin: 10px 2px 5px 2px;
 }
 
 .navbar {
@@ -23,10 +42,14 @@ body {
 }
 
 .postDiv {
-    border: 5px outset rgb(6, 85, 204);
-    background-color: rgb(206, 221, 245);
+    border: solid #dedede;
+    border-width: 1px 0;
     text-align: left;
     padding: 5px 10px;
+}
+
+.postDiv:hover {
+    background-color: #fdfdfd;
 }
 
 .displayCommentsDiv {

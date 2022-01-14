@@ -1,6 +1,6 @@
 function showComments() {
-    var x = document.getElementsByClassName("displayCommentsDiv");
-    if (x.style.display === "none") {
+    var x = document.getElementsByClassName("displayCommentsDiv")[0];
+    if (x.style.display !== "block") {
         x.style.display = "block";
     } else {
         x.style.display = "none";
@@ -8,8 +8,8 @@ function showComments() {
 }
 
 function showReactions() {
-    var x = document.getElementsByClassName("displayReactionsDiv");
-    if (x.style.display === "none") {
+    var x = document.getElementsByClassName("displayReactionsDiv")[0];
+    if (x.style.display !== "block") {
         x.style.display = "block";
     } else {
         x.style.display = "none";
@@ -18,7 +18,7 @@ function showReactions() {
 
 function showCommentReactions() {
     var x = document.getElementsByClassName("displayReactionsDiv");
-    if (x.style.display === "none") {
+    if (x.style.display !== "block") {
         x.style.display = "block";
     } else {
         x.style.display = "none";

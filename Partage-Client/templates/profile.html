@@ -1,32 +1,26 @@
 <!-- profile.html -->
-<head>
-    {{ if .IsMe}}
-    <title>Your Profile</title>
-    {{else}}
-    <title>{{.Data.Username}} Profile</title>
-    {{end}}
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="/static/script.js"></script>
-</head>
 
 {{define "title"}}
-    {{ if .IsMe}}
-    Your Profile
-    {{else}}
-    {{.Data.Username}} Profile
-    {{end}}
+{{ if .IsMe}}
+Your Profile
+{{else}}
+{{.Data.Username}} Profile
+{{end}}
+{{end}}
+
+{{define "heading"}}
+{{ if .IsMe}}
+You're looking at your profile, @{{.Data.Username}} <a
+        href="/profile?UserID={{.Data.UserID}}">
+    ({{slice .Data.UserID 0 8}}...)
+</a>
+{{end}}
 {{end}}
 
 {{define "content"}}
-{{ if .IsMe}}
-<h4>You're looking at your profile, @{{.Data.Username}} <a
-        href="/profile?UserID={{.Data.UserID}}">({{.Data.UserID}})</a></h4>
-<br><br>
-{{end}}
 
 <div class="userInfo">
-    <h2>@{{.Data.Username}}</h2>
-    <h3><a href="/profile?UserID={{.Data.UserID}}">({{.Data.UserID}})</a></h3>
+    <h2>@{{.Data.Username}}&nbsp;<a href="/profile?UserID={{.Data.UserID}}">({{slice .Data.UserID 0 8}}...)</a></h2>
     <p><b>{{.Data.Credits}}</b> Tokens</p>
     <span onclick="showFollowers()"><b>{{len .Data.Followers}}</b> Followers&nbsp;&nbsp;&nbsp;&nbsp;</span>
     <span onclick="showFollowees()"><b>{{len .Data.Followees}}</b> Following</span>

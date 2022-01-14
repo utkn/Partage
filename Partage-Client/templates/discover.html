@@ -1,5 +1,10 @@
 <!-- discover.html -->
 {{define "title"}}Discover{{end}}
+
+{{define "heading"}}
+Discover Posts from other Partage users
+{{end}}
+
 {{define "content"}}
 <div class="suggestedUsers">
     {{if ne (len .SuggestedUsers) 0}}
@@ -11,7 +16,6 @@
     {{end}}
 </div>
 <div class="postsDiv">
-    <h4>Discover Posts from other Partage users</h4>
     {{range .Posts}}
     <div class="postDiv">
         <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a
