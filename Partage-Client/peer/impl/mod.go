@@ -376,14 +376,14 @@ func (n *node) GetUserState(userID string) feed.UserState {
 }
 
 // ShareDownloadableContent implements peer.SocialPeer.
-func (n *node) ShareDownloadableContent(cnt content.PrivateContent) (content.Metadata, string, error) {
+func (n *node) ShareDownloadableContent(cnt content.PrivateContent, t content.Type) (content.Metadata, string, error) {
 	// First, upload the comment.
 	metahash, err := n.data.Upload(bytes.NewReader(content.UnparseContent(cnt)))
 	if err != nil {
 		return content.Metadata{}, "", err
 	}
 	// Then, update the feed with the new metadata.
-	metadata := content.CreateCommentMetadata(cnt.AuthorID, cnt.Timestamp, cnt.RefContentID, metahash)
+	metadata := content.CreateDownloadableContentMetadata(cnt.AuthorID, cnt.Timestamp, cnt.RefContentID, metahash, t)
 	blockHash, err := n.UpdateFeed(metadata)
 	return metadata, blockHash, err
 }

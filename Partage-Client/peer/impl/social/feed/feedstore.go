@@ -104,7 +104,7 @@ func (s *Store) QueryContents(filter content.Filter) []Content {
 		userFeed := s.getFeed(user)
 		// If the user does not exist, skip him.
 		if userFeed == nil {
-			fmt.Printf("feed.Store.QueryContent: Warning: %s does not exist", user)
+			utils.PrintDebug("social", "feed.Store.QueryContent: ", user, "does not exist")
 			continue
 		}
 		contents := userFeed.GetContents()
