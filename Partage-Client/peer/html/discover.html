@@ -1,7 +1,5 @@
 <!-- discover.html -->
 <head>
-    <script src="script.js"></script> 
-    <link rel="stylesheet" href="style.css">
     <title>Discover</title>
 </head>
 
@@ -13,11 +11,11 @@
     <a href="/profile?UserID={{.UserID}}">Profile</a>
     </div>
 
-    <div class="sugestedUsers">
-        {{if ne (len .SugestedUsers) "0"}}
+    <div class="suggestedUsers">
+        {{if ne (len .SuggestedUsers) 0}}
         <h4>Suggested Partage users</h4>
         {{end}}
-        {{range .SugestedUsers}}
+        {{range .SuggestedUsers}}
         <a href="/profile?UserID={{.}}">{{.}}</a>                            
         <br>
         {{end}}
@@ -59,7 +57,7 @@
                     </div>
                     <div class="displayReactionsDiv">
                         <!--Show 1 reaction only..-->
-                        {{ if ne (len .Reactions) "0"}}
+                        {{ if ne (len .Reactions) 0}}
                         <div class="displayReactionDiv">
                             <p><a href="/profile?UserID={{(index .Reaction 0).AuthorID}}">{{(index .Reaction 0).AuthorID}}</a> reacted: {{(index .Reaction 0).ReactionText}}</p>                            
                             <br>
@@ -73,7 +71,7 @@
                 <div class="commentsDiv">
                     <div class="displayCommentsDiv">
                         <!--Show 1 comment only..-->
-                        {{ if ne (len .Comments) "0"}}
+                        {{ if ne (len .Comments) 0}}
                         <div class="displayCommentDiv">
                             <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a> commented: {{(index .Comments 0).Text}} at {{(call .TimestampToDate (index .Comments 0).Timestamp)}}</p>
                             <p>{{len .Reactions}} reactions</p>
@@ -115,3 +113,86 @@
     </div>
   
 </body>
+<style>
+    .navbar {
+    overflow: hidden;
+    background-color: #333;
+    }
+    .navbar a {
+    float: left;
+    font-size: 16px;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    }
+    .navbar a:hover {
+    background-color: rgb(6, 85, 204);
+    }
+    .postDiv {
+        border: 5px outset rgb(6, 85, 204);
+        background-color: rgb(206, 221, 245);
+        text-align: left;
+    }
+    table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+    }
+    td, th {
+        border: 0px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+    }
+    .displayCommentsDiv{
+        display: none;
+        text-align: right;
+    }
+    .commentsDiv{
+        text-align: center;
+    }
+    .displayCommentDiv {
+        border: 5px outset rgb(183, 193, 207);
+        background-color: rgb(91, 109, 138);
+        text-align: center;
+    }
+    .displayReactionsDiv{
+        display: none;
+        text-align: right;
+    }
+    .reactionsDiv{
+        text-align: center;
+    }
+    .displayCommentReactionsDiv{
+        display: none;
+        text-align: right;
+    }
+</style>
+<script>
+    function showComments() {
+    var x = document.getElementsByClassName("displayCommentsDiv");
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
+}
+
+function showReactions() {
+    var x = document.getElementsByClassName("displayReactionsDiv");
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
+}
+
+function showCommentReactions() {
+  var x = document.getElementsByClassName("displayReactionsDiv");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+</script>

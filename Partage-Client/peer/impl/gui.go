@@ -90,6 +90,8 @@ func StartClient() {
 	//POST
 	mux.Handle("/postPrivate", http.HandlerFunc(client.PrivatePostHandler()))
 
+	
+
 	err = http.ListenAndServe(":8000", mux)
 	if err != nil {
 		fmt.Println(err)
@@ -105,6 +107,7 @@ type Homepage struct {
 	UserID          template.HTML
 	Posts           []Text
 	TimestampToDate func(string) string
+	FromPage string
 }
 
 func timestampToDate(d string) string {
@@ -145,6 +148,7 @@ type PostPage struct {
 	UserID          template.HTML
 	Post            Text
 	TimestampToDate func(string) string
+	FromPage string
 }
 
 // [GET] singular Post (all info) & [POST] create new post
@@ -309,6 +313,7 @@ type ProfilePage struct {
 	IFollow         bool //i follow this user
 	TimestampToDate func(string) string
 	MyUserID        string
+	FromPage string
 }
 
 // [GET] shows profile info and respective posts & [POST] is used to follow user & [PUT] is used to unfollow user
@@ -378,6 +383,7 @@ type DiscoverPage struct {
 	SuggestedUsers  []string
 	TimestampToDate func(string) string
 	UserID          string
+	FromPage string
 }
 
 // [GET] shows suggested profiles to follow and latest posts from different users (users that are not followed by the user itself)
@@ -393,6 +399,7 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 				//if it exists in the knownUsers map..remove it
 				delete(knownUsers, user)
 			}
+			delete(knownUsers, c.Peer.GetUserID())
 			// slice with users that i'm not currently following
 			undiscoveredUsers := make([]string, len(knownUsers))
 			i := 0

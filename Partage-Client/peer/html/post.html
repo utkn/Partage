@@ -1,7 +1,5 @@
 <!-- post.html -->
 <head>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js"></script> 
     <title>Post from {{.Post.AuthorID}}</title>
 </head>
 <body>
@@ -27,7 +25,7 @@
             <div class="reactionDiv">
                 <form action="/react" method="POST">
                     <input type="hidden" id="PostID" name="PostID" value="{{.Post.ContentID}}">
-                    <select name="Reaction" id="Reaction"></select>
+                    <select name="Reaction" id="Reaction">
                         <option value="" selected disabled hidden>Choose reaction</option>
                         <option value="happy">Happy</option>
                         <option value="angry">Angry</option>
@@ -61,7 +59,7 @@
                     <p onclick="showCommentReactions()">{{len .Reactions}} reactions</p>
                     <form action="/react" method="POST">
                         <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
-                        <select name="Reaction" id="Reaction"></select>
+                        <select name="Reaction" id="Reaction">
                             <option value="" selected disabled hidden>Choose reaction</option>
                             <option value="happy">Happy</option>
                             <option value="angry">Angry</option>
@@ -98,5 +96,88 @@
             </div>
         </div>
     </div>
-  
 </body>
+
+<style>
+    .navbar {
+    overflow: hidden;
+    background-color: #333;
+    }
+    .navbar a {
+    float: left;
+    font-size: 16px;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    }
+    .navbar a:hover {
+    background-color: rgb(6, 85, 204);
+    }
+    .postDiv {
+        border: 5px outset rgb(6, 85, 204);
+        background-color: rgb(206, 221, 245);
+        text-align: left;
+    }
+    table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+    }
+    td, th {
+        border: 0px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+    }
+    .displayCommentsDiv{
+        display: none;
+        text-align: right;
+    }
+    .commentsDiv{
+        text-align: center;
+    }
+    .displayCommentDiv {
+        border: 5px outset rgb(183, 193, 207);
+        background-color: rgb(91, 109, 138);
+        text-align: center;
+    }
+    .displayReactionsDiv{
+        display: none;
+        text-align: right;
+    }
+    .reactionsDiv{
+        text-align: center;
+    }
+    .displayCommentReactionsDiv{
+        display: none;
+        text-align: right;
+    }
+</style>
+<script>
+  function showComments() {
+    var x = document.getElementsByClassName("displayCommentsDiv");
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
+}
+
+function showReactions() {
+    var x = document.getElementsByClassName("displayReactionsDiv");
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
+}
+
+function showCommentReactions() {
+  var x = document.getElementsByClassName("displayReactionsDiv");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+</script>
