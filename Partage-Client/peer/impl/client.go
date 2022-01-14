@@ -46,6 +46,7 @@ func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) 
 		fmt.Printf("error during registration: %v\n", err)
 		return nil
 	}
+	fmt.Println("OK!")
 	// Return the client.
 	return &Client{
 		Peer: p,
