@@ -4,15 +4,15 @@
 {{ if .IsMe}}
 Your Profile
 {{else}}
-{{.Data.Username}} Profile
+{{.MyData.Username}} Profile
 {{end}}
 {{end}}
 
 {{define "heading"}}
 {{ if .IsMe}}
-You're looking at your profile, @{{.Data.Username}} <a
-        href="/profile?UserID={{.Data.UserID}}">
-    ({{slice .Data.UserID 0 8}}...)
+You're looking at your profile, @{{.MyData.Username}} <a
+        href="/profile?UserID={{.MyData.UserID}}">
+    ({{slice .MyData.UserID 0 8}}...)
 </a>
 {{end}}
 {{end}}
@@ -20,29 +20,29 @@ You're looking at your profile, @{{.Data.Username}} <a
 {{define "content"}}
 
 <div class="userInfo">
-    <h2>@{{.Data.Username}}&nbsp;<a href="/profile?UserID={{.Data.UserID}}">({{slice .Data.UserID 0 8}}...)</a></h2>
-    <p><b>{{.Data.Credits}}</b> Tokens</p>
-    <span onclick="showFollowers()"><b>{{len .Data.Followers}}</b> Followers&nbsp;&nbsp;&nbsp;&nbsp;</span>
-    <span onclick="showFollowees()"><b>{{len .Data.Followees}}</b> Following</span>
-    <p>Received <b>{{.Data.ReceivedEndorsements}}</b> Endorsements</p>
+    <h2>@{{.MyData.Username}}&nbsp;<a href="/profile?UserID={{.MyData.UserID}}">({{slice .MyData.UserID 0 8}}...)</a></h2>
+    <span href="javascript:;" onclick="showFollowers()"><b><u>{{len .MyData.Followers}}</u></b> Followers&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    <span href="javascript:;" onclick="showFollowees()"><b><u>{{len .MyData.Followees}}</u></b> Following</span>
+    <p><b>{{.MyData.Credits}}</b> Tokens</p>
+    <p>Received <b>{{.MyData.ReceivedEndorsements}}</b> Endorsements</p>
     {{ if not .IsMe}}
     {{ if .IFollow}}
     <form action="/user" method="POST">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+        <input type="hidden" id="UserID" name="UserID" value="{{.MyData.UserID}}">
         <input type="submit" value="Unfollow">
     </form>
     {{else}}
     <form action="/user" method="GET">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+        <input type="hidden" id="UserID" name="UserID" value="{{.MyData.UserID}}">
         <input type="submit" value="Follow">
     </form>
     {{end}}
-    {{if .Data.CanBeEndorsed}}
+    {{if .MyData.CanBeEndorsed}}
     <form action="/endorse" method="POST">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+        <input type="hidden" id="UserID" name="UserID" value="{{.MyData.UserID}}">
         <input type="submit" value="Endorse">
     </form>
     <br>
@@ -54,26 +54,26 @@ You're looking at your profile, @{{.Data.Username}} <a
     {{end}}
     {{else}}
     <form action="/endorse" method="GET">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
         <input type="submit" value="Request Endorsement">
     </form>
     {{end}}
     <div class="followersList">
-        {{if ne (len .Data.Followers) 0}}
+        {{if ne (len .MyData.Followers) 0}}
         <br>
         <h3 onclick="showFollowers()">Followers:</h3>
         {{end}}
-        {{range .Data.Followers}}
+        {{range .MyData.Followers}}
         <a href="/profile?UserID={{.}}">{{.}}</a>
         <br>
         {{end}}
     </div>
     <div class="followeesList">
-        {{if ne (len .Data.Followees) 0}}
+        {{if ne (len .MyData.Followees) 0}}
         <br>
         <h3 onclick="showFollowees()">Following:</h3>
         {{end}}
-        {{range .Data.Followees}}
+        {{range .MyData.Followees}}
         <a href="/profile?UserID={{.}}">{{.}}</a>
         <br>
         {{end}}
@@ -81,11 +81,12 @@ You're looking at your profile, @{{.Data.Username}} <a
 </div>
 
 {{ if .IsMe}}
+<br><br>
 <div class="writePostBox">
     <!--Create post..-->
     <p>Publish your thoughts..</p>
     <form action="/post" method="POST">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
         <textarea id="Content" name="Content" rows="4" cols="60" required></textarea>
         <!-- <input type="text" id="Content" name="Content" required>-->
         <br>
@@ -98,7 +99,7 @@ You're looking at your profile, @{{.Data.Username}} <a
     <div id="privMsgWriteBox" style="display:none">
         <p>Privately..</p>
         <form action="/postPrivate" method="POST">
-            <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
+            <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
             <label for="Content">Content:</label>
             <textarea id="Content" name="Content" rows="4" cols="53" required></textarea>
             <br>
@@ -113,46 +114,41 @@ You're looking at your profile, @{{.Data.Username}} <a
 <br>
 <!-- USER POSTS-->
 <div class="postsDiv">
-    <h4>@{{.Data.Username}} Posts</h4>
+    <h4>({{len .Posts}}) @{{.MyData.Username}} Posts </h4>
     {{range .Posts}}
     <div class="postDiv">
         <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a
-                href="/post?PostID={{.ContentID}}">{{( .Timestamp)}}</a></p>
+                href="/post?PostID={{.ContentID}}">{{call $.TimestampToDate .Timestamp}}</a></p>
         <p>{{.Text}}</p>
-        <span onclick="showReactions()">{{len .Reactions}} reactions&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <span onclick="showComments()">{{len .Comments}} comments</span>
+        <a href="javascript:;" onclick="showComments()">{{len .Comments}} comments</a>
+        <a href="javascript:;" onclick="showReactions()" style="margin-left:3px">{{len .Reactions}} reactions</a>
+        <div class="reactionDiv" style="display:inline">
+            <form action="/react" method="POST" style="display:inline;">
+                <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+                <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                <select name="Reaction" id="Reaction">
+                    <option value="" selected disabled hidden>Choose reaction</option>
+                    <option value="happy">Happy</option>
+                    <option value="angry">Angry</option>
+                    <option value="confused">Confused</option>
+                    <option value="approve">Approve</option>
+                    <option value="disapprove">Disapprove</option>
+                </select>
+                <input type="submit" value="React">
+            </form>
+            <form action="/react" method="GET" style="display:inline;">
+                <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+                <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                <input type="submit" value="Undo">
+            </form>
+        </div>
         <div class="reactionsDiv">
-            <div class="reactionDiv">
-                <form action="/react" method="POST">
-                    <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                    <select name="Reaction" id="Reaction">
-                        <option value="" selected disabled hidden>Choose reaction</option>
-                        <option value="happy">Happy</option>
-                        <option value="angry">Angry</option>
-                        <option value="confused">Confused</option>
-                        <option value="approve">Approve</option>
-                        <option value="disapprove">Disapprove</option>
-                    </select>
-                    <input type="submit" value="React">
-                </form>
-                <form action="/react" method="GET">
-                    <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
-                    <input type="submit" value="Undo">
-                </form>
-            </div>
             <div class="displayReactionsDiv">
-                <!--Show 1 reaction only..-->
-                {{ if ne (len .Reactions) 0}}
+                <!--Show all reactions!-->
+                {{range .Reactions}}
                 <div class="displayReactionDiv">
-                    <p><a href="/profile?UserID={{(index .Reactions 0).AuthorID}}">{{(index .Reactions 0).AuthorID}}</a>
-                        reacted: {{(index .Reactions 0).ReactionText}}</p>
-                    <br>
-                    <!--Redirect to post's single page-->
-                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
-                        <button>See more</button>
-                    </a>
+                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                        reacted: {{.ReactionText}}</p>
                     <br>
                 </div>
                 {{end}}
@@ -160,15 +156,15 @@ You're looking at your profile, @{{.Data.Username}} <a
         </div>
         <div class="commentsDiv">
             <div class="displayCommentsDiv">
-                <!--Show 1 comment only..-->
-                {{ if ne (len .Comments) 0}}
+                <!--Show all comments!-->
+                {{range .Comments}}
                 <div class="displayCommentDiv">
-                    <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a>
-                        commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
-                    <p>{{len .Reactions}} reactions</p>
-                    <form action="/react" method="POST">
-                        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                        commented: {{.Text}} at {{call $.TimestampToDate .Timestamp}}</p>
+                    <p href="javascript:;" onclick="showCommentReactions()">{{len .Reactions}} reactions</p>
+                    <form action="/react" method="POST" style="display:inline;">
+                        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <select name="Reaction" id="Reaction">
                             <option value="" selected disabled hidden>Choose reaction</option>
                             <option value="happy">Happy</option>
@@ -180,23 +176,28 @@ You're looking at your profile, @{{.Data.Username}} <a
                         <input type="submit" value="React">
                     </form>
                     <form action="/react" method="GET">
-                        <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <input type="submit" value="Undo">
                     </form>
                     <br>
-                    <!--Redirect to post's single page-->
-                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
-                        <button>See more</button>
-                    </a>
-                    <br>
+                    <div class="displayCommentReactionsDiv">
+                        <!--Show all reactions to comment!-->
+                        {{range .Reactions}}
+                        <div class="displayReactionDiv">
+                            <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                                reacted: {{.ReactionText}}</p>
+                            <br>
+                        </div>
+                        {{end}}
+                    </div>
                 </div>
                 {{end}}
             </div>
             <div class="commentDiv">
                 <!--Post comment..-->
                 <form action="/comment" method="POST">
-                    <input type="hidden" id="from" name="from" value="/profile?UserID={{.MyUserID}}">
+                    <input type="hidden" id="from" name="from" value="/profile?UserID={{$.MyUserID}}">
                     <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                     <input type="text" id="Text" name="Text" required>
                     <input type="submit" value="Comment">

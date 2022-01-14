@@ -26,6 +26,13 @@
         <div class="pure-u-1-5">
             <div class="content-box" style="margin-left:10px">
                 Right menu
+    
+                <p><b>@{{.MyData.Username}}</b>&nbsp;<a href="/profile?UserID={{.MyData.UserID}}">({{slice .MyData.UserID 0 8}}...)</a></p>
+                <span><b>{{len .MyData.Followers}}</b> Followers&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                <span><b>{{len .MyData.Followees}}</b> Following</span>
+                <p><b>{{.MyData.Credits}}</b> Tokens</p>
+                <p><b>{{.MyData.ReceivedEndorsements}}&nbsp;</b>Endorsements received</p>
+                
             </div>
         </div>
     </div>

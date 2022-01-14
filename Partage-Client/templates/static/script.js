@@ -7,21 +7,35 @@ function showComments() {
     }
 }
 
-function showReactions() {
+/*
+function showReactions(i) {
     var x = document.getElementsByClassName("displayReactionsDiv")[0];
-    if (x.style.display !== "block") {
-        x.style.display = "block";
-    } else {
-        x.style.display = "none";
+        if (x.style.display !== "block") {
+            x.style.display = "block";
+        } else {
+            x.style.display = "none";
+        }
+} 
+*/
+function showReactions() {
+    var x = document.getElementsByClassName("displayReactionsDiv");
+    for (let i=0;i<x.length;i++){
+        if (x[i].style.display !== "block") {
+            x[i].style.display = "block";
+        } else {
+            x[i].style.display = "none";
+        }
     }
-}
+} 
 
 function showCommentReactions() {
-    var x = document.getElementsByClassName("displayReactionsDiv");
-    if (x.style.display !== "block") {
-        x.style.display = "block";
-    } else {
-        x.style.display = "none";
+    var x = document.getElementsByClassName("displayCommentReactionsDiv");
+    for (let i=0;i<x.length;i++){
+        if (x[i].style.display !== "block") {
+            x[i].style.display = "block";
+        } else {
+            x[i].style.display = "none";
+        }
     }
 }
 
@@ -36,7 +50,7 @@ function showPrivMsgWriteBox(){
 }
 
 function showFollowers() {
-    var x = document.getElementsByClassName("followersList");
+    var x = document.getElementsByClassName("followersList")[0];
     if (x.style.display === "none") {
         x.style.display = "block";
     } else {
@@ -45,7 +59,7 @@ function showFollowers() {
 }
 
 function showFollowees() {
-    var x = document.getElementsByClassName("followeesList");
+    var x = document.getElementsByClassName("followeesList")[0];
     if (x.style.display === "none") {
         x.style.display = "block";
     } else {

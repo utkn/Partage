@@ -2,14 +2,14 @@ package impl
 
 import (
 	"fmt"
-	"go.dedis.ch/cs438/registry/standard"
-	"go.dedis.ch/cs438/storage/inmemory"
 	"html/template"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
+
+	"go.dedis.ch/cs438/registry/standard"
+	"go.dedis.ch/cs438/storage/inmemory"
 
 	"go.dedis.ch/cs438/peer"
 	"go.dedis.ch/cs438/peer/impl/content"
@@ -113,15 +113,13 @@ func StartClient(port uint, peerID uint, introducerAddr string) {
 type Homepage struct {
 	Username        string
 	UserID          template.HTML
+	MyData          UserData
 	Posts           []Text
-	TimestampToDate func(string) string
+	TimestampToDate func(int64) string
 }
 
-func timestampToDate(d string) string {
-	fmt.Println(d)
-	t, _ := strconv.ParseInt(d, 10, 64)
-	fmt.Println(time.Unix(t, 0).Format("2006-01-02 15:04:05"))
-	return time.Unix(t, 0).Format("2006-01-02 15:04:05")
+func timestampToDate(d int64) string {
+	return time.Unix(d, 0).Format("15:04:05 2006-01-02 ")
 }
 
 var MaxTimeLimit = int64(0) //TODO: change..limit max time!
@@ -129,15 +127,17 @@ func (c Client) IndexHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
+			userdata := c.GetUserData(c.Peer.GetUserID())
 			//<form action="/post" method="POST"> //TODO:
 			p := Homepage{
 				// Get userID
 				UserID: template.HTML(c.Peer.GetUserID()),
 				// Get username
-				Username: c.GetUserData(c.Peer.GetUserID()).Username,
+				Username: userdata.Username,
 				// Get Texts from Followes
 				Posts:           c.GetTexts(c.GetUserData(c.Peer.GetUserID()).Followees, 0, MaxTimeLimit),
 				TimestampToDate: timestampToDate,
+				MyData:          userdata,
 			}
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"])
 			if err != nil {
@@ -156,7 +156,8 @@ func (c Client) IndexHandler() http.HandlerFunc {
 type PostPage struct {
 	UserID          template.HTML
 	Post            Text
-	TimestampToDate func(string) string
+	TimestampToDate func(int64) string
+	MyData          UserData
 }
 
 // [GET] singular Post (all info) & [POST] create new post
@@ -191,10 +192,13 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 				fmt.Println(err)
 				return
 			}
+
 			p := PostPage{
 				TimestampToDate: timestampToDate,
 				Post:            *post,
-				UserID:          template.HTML(c.Peer.GetUserID())}
+				UserID:          template.HTML(c.Peer.GetUserID()),
+				MyData:          c.GetUserData(c.Peer.GetUserID()),
+			}
 			t.Execute(w, p)
 
 		case http.MethodPost:
@@ -251,14 +255,9 @@ func (c Client) CommentHandler() http.HandlerFunc {
 			postID := r.FormValue("PostID")
 			text := r.FormValue("Text")
 			if text != "" {
-				err := c.PostComment(text, postID)
-				if err != nil {
-					http.Error(w, "bad request", 400)
-
-				}
+				c.PostComment(text, postID)
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
-
 			}
 			from := r.FormValue("from")
 			http.Redirect(w, r, from, http.StatusSeeOther)
@@ -324,12 +323,12 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
-	Data            UserData
+	MyData          UserData
 	Posts           []Text
 	IsMe            bool
 	ImFollowedBy    bool //this user follows me
 	IFollow         bool //i follow this user
-	TimestampToDate func(string) string
+	TimestampToDate func(int64) string
 	// For navbar.
 	UserID string
 	// For the page itself.
@@ -373,7 +372,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
 				TimestampToDate: timestampToDate,
-				Data:            data,
+				MyData:          data,
 				Posts:           texts,
 				IsMe:            isMyProfile,
 				ImFollowedBy:    imFollowedBy,
@@ -439,8 +438,9 @@ func (c Client) UserHandler() http.HandlerFunc {
 type DiscoverPage struct {
 	Posts           []Text
 	SuggestedUsers  []string
-	TimestampToDate func(string) string
+	TimestampToDate func(int64) string
 	UserID          string
+	MyData          UserData
 }
 
 // [GET] shows suggested profiles to follow and latest posts from different users (users that are not followed by the user itself)
@@ -482,6 +482,7 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 				TimestampToDate: timestampToDate,
 				Posts:           texts,
 				SuggestedUsers:  suggestedUsers,
+				MyData:          c.GetUserData(c.Peer.GetUserID()),
 			}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["discover"])

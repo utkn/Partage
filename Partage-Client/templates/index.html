@@ -39,7 +39,7 @@ Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({
     {{range .Posts}}
     <div class="postDiv">
         <p><b></b><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a></b> at <a
-                href="/post?PostID={{.ContentID}}">{{.Timestamp}}</a></p>
+                href="/post?PostID={{.ContentID}}">{{call $.TimestampToDate .Timestamp}}</a></p>
         <p>{{.Text}}</p>
         <a href="javascript:;" onclick="showComments()">{{len .Comments}} comments</a>
         <a href="javascript:;" onclick="showReactions()" style="margin-left:3px">{{len .Reactions}} reactions</a>
@@ -65,16 +65,11 @@ Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({
         </div>
         <div class="reactionsDiv">
             <div class="displayReactionsDiv">
-                <!--Show 1 reaction only..-->
-                {{ if ne (len .Reactions) 0}}
+                <!--Show all reactions!-->
+                {{range .Reactions}}
                 <div class="displayReactionDiv">
-                    <p><a href="/profile?UserID={{(index .Reactions 0).AuthorID}}">{{(index .Reactions 0).AuthorID}}</a>
-                        reacted: {{(index .Reactions 0).ReactionText}}</p>
-                    <br>
-                    <!--Redirect to post's single page-->
-                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
-                        <button>See more</button>
-                    </a>
+                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                        reacted: {{.ReactionText}}</p>
                     <br>
                 </div>
                 {{end}}
@@ -82,15 +77,15 @@ Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({
         </div>
         <div class="commentsDiv">
             <div class="displayCommentsDiv">
-                <!--Show 1 comment only..-->
-                {{ if ne (len .Comments) 0}}
+                <!--Show all comments!-->
+                {{range .Comments}}
                 <div class="displayCommentDiv">
-                    <p><a href="/profile?UserID={{(index .Comments 0).AuthorID}}">{{(index .Comments 0).AuthorID}}</a>
-                        commented: {{(index .Comments 0).Text}} at {{( (index .Comments 0).Timestamp)}}</p>
-                    <p>{{len .Reactions}} reactions</p>
+                    <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                        commented: {{.Text}} at {{call $.TimestampToDate .Timestamp}}</p>
+                    <p href="javascript:;" onclick="showCommentReactions()">{{len .Reactions}} reactions</p>
                     <form action="/react" method="POST" style="display:inline;">
                         <input type="hidden" id="from" name="from" value="/">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <select name="Reaction" id="Reaction">
                             <option value="" selected disabled hidden>Choose reaction</option>
                             <option value="happy">Happy</option>
@@ -101,17 +96,22 @@ Welcome back to Partage, @{{.Username}} <a href="/profile?UserID={{.UserID}}">({
                         </select>
                         <input type="submit" value="React">
                     </form>
-                    <form action="/react" method="GET" style="display:inline;">
+                    <form action="/react" method="GET">
                         <input type="hidden" id="from" name="from" value="/">
-                        <input type="hidden" id="PostID" name="PostID" value="{{(index .Comments 0).ContentID}}">
+                        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
                         <input type="submit" value="Undo">
                     </form>
                     <br>
-                    <!--Redirect to post's single page-->
-                    <a style="text-align: center;" href="/post?PostID={{.ContentID}}">
-                        <button>See more</button>
-                    </a>
-                    <br>
+                    <div class="displayCommentReactionsDiv">
+                        <!--Show all reactions to comment!-->
+                        {{range .Reactions}}
+                        <div class="displayReactionDiv">
+                            <p><a href="/profile?UserID={{.AuthorID}}">{{.AuthorID}}</a>
+                                reacted: {{.ReactionText}}</p>
+                            <br>
+                        </div>
+                        {{end}}
+                    </div>
                 </div>
                 {{end}}
             </div>
