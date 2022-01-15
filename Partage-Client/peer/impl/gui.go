@@ -147,11 +147,7 @@ type Homepage struct {
 	UserID          template.HTML
 	MyData          UserData
 	Posts           []Text
-	TimestampToDate func(int64) string
-}
 
-func timestampToDate(d int64) string {
-	return time.Unix(d, 0).Format("15:04:05 2006-01-02 ")
 }
 
 var MaxTimeLimit = int64(0) //TODO: change..limit max time!
@@ -169,7 +165,6 @@ func (c Client) IndexHandler() http.HandlerFunc {
 				Username: userdata.Username,
 				// Get Texts from Followes
 				Posts:           c.GetTexts(c.GetUserData(c.Peer.GetUserID()).Followees, 0, MaxTimeLimit),
-				TimestampToDate: timestampToDate,
 				MyData:          userdata,
 			}
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"], TemplatePath("components.html"))
@@ -190,7 +185,7 @@ type PostPage struct {
 	ErrorMsg        string
 	UserID          template.HTML
 	Post            Text
-	TimestampToDate func(int64) string
+
 	MyData          UserData
 }
 
@@ -229,7 +224,6 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 
 			p := PostPage{
 				ErrorMsg:        ParseErrorMsg(r),
-				TimestampToDate: timestampToDate,
 				Post:            *post,
 				UserID:          template.HTML(c.Peer.GetUserID()),
 				MyData:          c.GetUserData(c.Peer.GetUserID()),
@@ -376,7 +370,7 @@ type ProfilePage struct {
 	ImFollowedBy    bool //this user follows me
 	IFollow         bool //i follow this user
 	IsBlocked       bool
-	TimestampToDate func(int64) string
+
 	// For navbar.
 	UserID string
 	// For the page itself.
@@ -434,7 +428,6 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				MyUserID:        c.Peer.GetUserID(),
 				FollowerUsers:   followerUsers,
 				FolloweeUsers:   followeeUsers,
-				TimestampToDate: timestampToDate,
 				Data:            data,
 				Posts:           texts,
 				IsMe:            isMyProfile,
@@ -557,7 +550,7 @@ type DiscoverPage struct {
 	ErrorMsg        string
 	Posts           []Text
 	SuggestedUsers  []UserData
-	TimestampToDate func(int64) string
+
 	UserID          string
 	MyData          UserData
 }
@@ -603,7 +596,6 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 			discoverPage := DiscoverPage{
 				ErrorMsg:        ParseErrorMsg(r),
 				UserID:          c.Peer.GetUserID(),
-				TimestampToDate: timestampToDate,
 				Posts:           texts,
 				SuggestedUsers:  suggestedUsers,
 				MyData:          c.GetUserData(c.Peer.GetUserID()),
