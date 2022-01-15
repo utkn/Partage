@@ -298,7 +298,11 @@ func (n *node) UpdateFeed(metadata content.Metadata) (string, error) {
 	// If the proposal has failed, try to get a meaningful error by checking the metadata locally.
 	if err != nil {
 		metadataError := n.social.FeedStore.CheckMetadata(metadata)
-		return "", fmt.Errorf("could not update feed: %v (Reason: %v)", err, metadataError)
+		if metadataError != nil {
+			return "", fmt.Errorf("could not update feed: %v (Reason: %v)", err, metadataError)
+		} else {
+			return "", fmt.Errorf("most likely isolated")
+		}
 	}
 	return blockHash, nil
 }
@@ -317,7 +321,7 @@ func (n *node) BlockUser(publicKeyHash [32]byte) {
 }
 
 // BlockUser implements peer.SocialPeer
-func (n *node) IsBlocked(userID string) bool{
+func (n *node) IsBlocked(userID string) bool {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
 	if ok {
 		hashedPK, err := hex.DecodeString(userID)

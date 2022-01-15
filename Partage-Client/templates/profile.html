@@ -20,11 +20,13 @@ You're looking at your profile, {{block "user" .Data}}{{end}}
 <div class="userInfo">
     <h2>{{block "user" .Data}}{{end}}</h2>
     Full ID: {{.Data.UserID}}
-    <form action="/changeusername" method="POST" class="pure-form">
+    {{if .IsMe}}
+    <form action="/changeusername" method="POST" class="pure-form" style="margin-top:10px">
         <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
-        <input type="text" placeholder="New username" name="NewUsername">
+        <input type="text" placeholder="New username" name="NewUsername" required>
         <input class="pure-button" type="submit" value="Change">
     </form>
+    {{end}}
     <hr>
     <a href="javascript:;" onclick="showFollowers()"><b>{{len .Data.Followers}}</b> Followers</a>
     <a href="javascript:;" onclick="showFollowees()" style="margin-left:5px"><b>{{len .Data.Followees}}</b> Following</a>
@@ -47,26 +49,31 @@ You're looking at your profile, {{block "user" .Data}}{{end}}
         {{end}}
     </div>
     <p><b>{{.Data.Credits}}</b> Tokens</p>
-    <p>Received <b>{{.Data.ReceivedEndorsements}}</b> Endorsements</p>
     {{ if not .IsMe}}
     {{ if .IFollow}}
-    <form action="/user" method="POST" class="pure-form">
+    <form action="/user" method="POST" class="pure-form" style="display:inline">
         <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
         <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
         <input class="pure-button" type="submit" value="Unfollow">
     </form>
     {{else}}
-    <form action="/user" method="GET" class="pure-form">
+    <form action="/user" method="GET" class="pure-form" style="display:inline">
         <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
         <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
         <input class="pure-button" type="submit" value="Follow">
     </form>
     {{end}}
-    {{if .Data.CanBeEndorsed}}
-    <form action="/endorse" method="POST" class="pure-form">
+    {{ if not .IsBlocked}}
+    <form action="/block" method="POST" class="pure-form" style="display:inline">
         <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
         <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
-        <input class="pure-button" type="submit" value="Endorse">
+        <input class="pure-button" type="submit" value="Block">
+    </form>
+    {{else}}
+    <form action="/block" method="GET" class="pure-form" style="display:inline">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
+        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
+        <input class="pure-button" type="submit" value="Unblock">
     </form>
     {{end}}
     {{ if .ImFollowedBy}}
@@ -74,24 +81,27 @@ You're looking at your profile, {{block "user" .Data}}{{end}}
     {{else}}
     <p>Doesn't follow you</p>
     {{end}}
-    {{ if not .IsBlocked}}
-    <form action="/block" method="POST" class="pure-form">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
-        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
-        <input class="pure-button" type="submit" value="Block">
-    </form>
+    <div class="commentDiv" style="padding:10px">
+        {{if .Data.CanBeEndorsed}}
+        <b>You can endorse this user.</b>
+        <form action="/endorse" method="POST" class="pure-form" style="margin-top:10px">
+            <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
+            <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
+            <input class="pure-button" type="submit" value="Endorse">
+        </form>
+        {{else}}
+        <b>You cannot endorse this user.</b>
+        {{end}}
+    </div>
     {{else}}
-    <form action="/block" method="GET" class="pure-form">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
-        <input type="hidden" id="UserID" name="UserID" value="{{.Data.UserID}}">
-        <input class="pure-button" type="submit" value="Unblock">
-    </form>
-    {{end}}
-    {{else}}
-    <form action="/endorse" method="GET" class="pure-form" style="margin-bottom:10px">
-        <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
-        <input class="pure-button" type="submit" value="Request Endorsement">
-    </form>
+<!--    Endorsement stuff-->
+    <div class="commentDiv" style="padding:10px; margin-bottom:10px">
+        Received <b>{{.Data.ReceivedEndorsements}}</b> Endorsements
+        <form action="/endorse" method="GET" class="pure-form" style="margin-top:10px">
+            <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
+            <input class="pure-button" type="submit" value="Request Endorsement">
+        </form>
+    </div>
     {{end}}
 </div>
 

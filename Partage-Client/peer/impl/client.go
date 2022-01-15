@@ -46,7 +46,7 @@ func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) 
 		fmt.Printf("error during registration: %v\n", err)
 		return nil
 	}
-	fmt.Println("OK!")
+	fmt.Println("OK! Peer IP:", p.(*node).social.GetAddress())
 	// Return the client.
 	return &Client{
 		Peer: p,
@@ -139,12 +139,15 @@ func (c *Client) PostPrivateText(text string, recipientUserIDs []string) error {
 
 // PostComment posts a new comment. If the given post is private, the comment will also be encrypted in the same fashion.
 func (c *Client) PostComment(comment string, postContentID string) error {
-	// Download the content associated with the content id. Since we are posting a comment to it, we most likely have it in the local storage already.
+	// Download the content associated with the post content id. Since we are posting a comment to it, we most likely have it in the local storage already.
 	contents := c.getDownloadableThings(content.Filter{ContentID: postContentID}, c.downloadUploadedContent)
 	if len(contents) != 1 {
 		return fmt.Errorf("there are %d != 1 associated texts", len(contents))
 	}
 	// Get the recipients associated with this
+	if contents[0] == nil {
+		return fmt.Errorf("unreachable content id")
+	}
 	referredPostRecipientList := contents[0].(content.PrivateContent).RecipientList
 	publicContent := content.NewPublicContent(c.Peer.GetUserID(), comment, utils.Time(), postContentID)
 	var privateContent content.PrivateContent
