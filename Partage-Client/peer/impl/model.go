@@ -1,6 +1,8 @@
 package impl
 
 import (
+	"time"
+
 	"go.dedis.ch/cs438/peer/impl/social/feed"
 	"go.dedis.ch/cs438/peer/impl/utils"
 )
@@ -21,6 +23,7 @@ type Reaction struct {
 	ReactionText string
 	BlockHash    string
 	Timestamp    int64
+	TimestampToDate func(int64) string
 }
 
 type Comment struct {
@@ -32,6 +35,7 @@ type Comment struct {
 	Timestamp      int64
 	Reactions      []Reaction
 	AlreadyReacted string
+	TimestampToDate func(int64) string
 }
 
 type Text struct {
@@ -44,6 +48,7 @@ type Text struct {
 	Comments       []Comment
 	Recipients     []string
 	AlreadyReacted string
+	TimestampToDate func(int64) string
 }
 
 func NewUserData(selfUserID string, userState feed.UserState) UserData {
@@ -73,6 +78,7 @@ func NewReaction(info feed.ReactionInfo, author UserData) Reaction {
 		ReactionText: info.Reaction.String(),
 		BlockHash:    info.BlockHash,
 		Timestamp:    info.Timestamp,
+		TimestampToDate: timestampToDate,
 	}
 }
 
@@ -85,6 +91,7 @@ func NewComment(text string, c feed.Content, author UserData, reactions []Reacti
 		BlockHash:    c.BlockHash,
 		Timestamp:    c.Timestamp,
 		Reactions:    reactions,
+		TimestampToDate: timestampToDate,
 	}
 }
 
@@ -97,5 +104,10 @@ func NewText(text string, c feed.Content, author UserData, reactions []Reaction,
 		Timestamp: c.Timestamp,
 		Reactions: reactions,
 		Comments:  comments,
+		TimestampToDate: timestampToDate,
 	}
+}
+
+func timestampToDate(d int64) string {
+	return time.Unix(d, 0).Format("15:04:05 2006-01-02 ")
 }

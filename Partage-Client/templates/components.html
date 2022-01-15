@@ -8,7 +8,7 @@
         {{if eq .AlreadyReacted "approve"}}<i class="far fa-thumbs-up"></i>{{end}}
         {{if eq .AlreadyReacted "disapprove"}}<i class="far fa-thumbs-down"></i>{{end}}
         <form action="/react" method="GET" style="display:inline;">
-            <input type="hidden" id="from" name="from" value="/post?PostID={{$.ContentID}}">
+            <input type="hidden" id="from" name="from" value="/">
             <input type="hidden" id="PostID" name="PostID" value="{{$.ContentID}}">
             <input class="pure-button" type="submit" value="Undo">
         </form>
@@ -68,7 +68,7 @@
 {{define "reaction"}}
 <div class="commentDiv">
     <div class="postTopBar">
-        {{block "user" .Author}}{{end}} reacted at {{.Timestamp}}: {{.ReactionText}}
+        {{block "user" .Author}}{{end}} reacted at {{call .TimestampToDate .Timestamp}}: {{.ReactionText}}
     </div>
 </div>
 {{end}}
@@ -76,7 +76,7 @@
 {{define "comment"}}
 <div class="commentDiv">
     <div class="postTopBar">
-        {{block "user" .Author}}{{end}} commented at {{.Timestamp}}
+        {{block "user" .Author}}{{end}} commented at {{call .TimestampToDate .Timestamp}}
     </div>
     <p>{{.Text}}</p>
     <a href="javascript:" onclick="toggleDisplay('reactions-comment-{{.ContentID}}')" style="margin-left:3px">{{len
@@ -95,7 +95,7 @@
 <div class="commentDiv">
     <div class="postTopBar">
         {{block "user" .Author}}{{end}} posted at
-        <a href="/post?PostID={{.ContentID}}">{{.Timestamp}}</a>
+        <a href="/post?PostID={{.ContentID}}">{{call .TimestampToDate .Timestamp}}</a>
     </div>
     <div class="postBottom">
         <p>{{.Text}}</p>
