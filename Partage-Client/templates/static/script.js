@@ -1,6 +1,38 @@
-function showComments() {
-    var x = document.getElementsByClassName("displayCommentsDiv")[0];
-    if (x.style.display !== "block") {
+function choosePrivateVisibility() {
+    let privBox = document.getElementById("privMsgWriteBox")
+    let publicBox = document.getElementById("publicMsgWriteBox")
+    let privBtn = document.getElementById("privatePostButton")
+    let publicBtn = document.getElementById("publicPostButton")
+    publicBox.style.display = "none"
+    privBox.style.display = "block"
+    publicBtn.classList.remove("pure-button-active")
+    privBtn.classList.add("pure-button-active")
+}
+
+function choosePublicVisibility() {
+    let privBox = document.getElementById("privMsgWriteBox")
+    let publicBox = document.getElementById("publicMsgWriteBox")
+    let privBtn = document.getElementById("privatePostButton")
+    let publicBtn = document.getElementById("publicPostButton")
+    publicBox.style.display = "block"
+    privBox.style.display = "none"
+    privBtn.classList.remove("pure-button-active")
+    publicBtn.classList.add("pure-button-active")
+}
+function toggleDisplays(toOpenID, toCloseID) {
+    let x = document.getElementById(toOpenID);
+    if (x.style.display === "none") {
+        let y = document.getElementById(toCloseID);
+        y.style.display = "none";
+        x.style.display = "block";
+    } else {
+        x.style.display = "none";
+    }
+}
+
+function toggleDisplay(toOpenID) {
+    let x = document.getElementById(toOpenID);
+    if (x.style.display === "none") {
         x.style.display = "block";
     } else {
         x.style.display = "none";
