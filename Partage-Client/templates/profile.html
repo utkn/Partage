@@ -20,6 +20,11 @@ You're looking at your profile, {{block "user" .Data}}{{end}}
 <div class="userInfo">
     <h2>{{block "user" .Data}}{{end}}</h2>
     Full ID: {{.Data.UserID}}
+    <form action="/changeusername" method="POST" class="pure-form">
+        <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
+        <input type="text" placeholder="New username" name="NewUsername">
+        <input class="pure-button" type="submit" value="Change">
+    </form>
     <hr>
     <a href="javascript:;" onclick="showFollowers()"><b>{{len .Data.Followers}}</b> Followers</a>
     <a href="javascript:;" onclick="showFollowees()" style="margin-left:5px"><b>{{len .Data.Followees}}</b> Following</a>

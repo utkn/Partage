@@ -102,10 +102,38 @@ func StartClient(port uint, peerID uint, introducerAddr string) {
 	mux.Handle("/postPrivate", client.PrivatePostHandler())
 	//GET & POST
 	mux.Handle("/block", client.BlockHandler())
+	// POST
+	mux.Handle("/changeusername", client.ChangeUsernameHandler())
 
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func (c Client) ChangeUsernameHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			// Add comment to post
+			newUsername := r.FormValue("NewUsername")
+			from := r.FormValue("from")
+			//parse recipients list
+			if newUsername != "" {
+				_, err := c.Peer.UpdateFeed(content.CreateChangeUsernameMetadata(c.Peer.GetUserID(), newUsername))
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			} else {
+				http.Error(w, "invalid", http.StatusNotAcceptable)
+				return
+			}
+			http.Redirect(w, r, from, http.StatusSeeOther)
+			return
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+			return
+		}
 	}
 }
 
@@ -134,6 +162,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 			userdata := c.GetUserData(c.Peer.GetUserID())
 			//<form action="/post" method="POST"> //TODO:
 			p := Homepage{
+				ErrorMsg: ParseErrorMsg(r),
 				// Get userID
 				UserID: template.HTML(c.Peer.GetUserID()),
 				// Get username
@@ -199,6 +228,7 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 			}
 
 			p := PostPage{
+				ErrorMsg:        ParseErrorMsg(r),
 				TimestampToDate: timestampToDate,
 				Post:            *post,
 				UserID:          template.HTML(c.Peer.GetUserID()),
@@ -209,10 +239,13 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 		case http.MethodPost:
 			// Publish post
 			content := r.FormValue("Content")
-			if content != "" {
-				c.PostText(content)
-			}
 			from := r.FormValue("from")
+			if content != "" {
+				err := c.PostText(content)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 			return
 		default:
@@ -233,15 +266,15 @@ func (c Client) PrivatePostHandler() http.HandlerFunc {
 			//parse recipients list
 			recipientsArr := strings.Split(recipients, ",")
 			text := r.FormValue("Content")
+			from := r.FormValue("from")
 			if text != "" && len(recipientsArr) > 0 {
 				err := c.PostPrivateText(text, recipientsArr)
 				if err != nil {
-					http.Error(w, "bad request", 400)
+					from = URLWithErrorMsg(from, err.Error())
 				}
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
 			}
-			from := r.FormValue("from")
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -259,12 +292,15 @@ func (c Client) CommentHandler() http.HandlerFunc {
 			// Add comment to post
 			postID := r.FormValue("PostID")
 			text := r.FormValue("Text")
+			from := r.FormValue("from")
 			if text != "" {
-				c.PostComment(text, postID)
+				err := c.PostComment(text, postID)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
 			} else {
 				http.Error(w, "invalid", http.StatusNotAcceptable)
 			}
-			from := r.FormValue("from")
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -290,17 +326,20 @@ func (c Client) ReactHandler() http.HandlerFunc {
 				return
 			}
 			fmt.Println(reaction)
-			c.ReactToPost(reaction, postID)
 			from := r.FormValue("from")
+			err := c.ReactToPost(reaction, postID)
+			if err != nil {
+				from = URLWithErrorMsg(from, err.Error())
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodGet:
 			// Undo react made to post
 			postID := r.FormValue("PostID")
-			if err := c.UndoReaction(postID); err != nil {
-				http.Error(w, "no content", http.StatusNoContent)
-
-			}
 			from := r.FormValue("from")
+			err := c.UndoReaction(postID)
+			if err != nil {
+				from = URLWithErrorMsg(from, err.Error())
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -357,10 +396,6 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				http.Error(w, "parameter missing", http.StatusNotFound)
 				return
 			}
-			errorMsg := ""
-			if len(r.URL.Query()["ErrorMsg"]) > 0 {
-				errorMsg = r.URL.Query()["ErrorMsg"][0]
-			}
 			UserID := keys[0]
 			// Get user data
 			data := c.GetUserData(UserID)
@@ -394,7 +429,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			}
 
 			profile := ProfilePage{
-				ErrorMsg:        errorMsg,
+				ErrorMsg:        ParseErrorMsg(r),
 				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
 				FollowerUsers:   followerUsers,
@@ -418,18 +453,24 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 		case http.MethodPost:
 			// Follow
 			userID := r.FormValue("UserID")
-			if userID != "" {
-				c.FollowUser(userID)
-			}
 			from := r.FormValue("from")
+			if userID != "" {
+				err := c.FollowUser(userID)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodPut:
 			// Unfollow
 			userID := r.FormValue("UserID")
-			if userID != "" {
-				c.UnfollowUser(userID)
-			}
 			from := r.FormValue("from")
+			if userID != "" {
+				err := c.UnfollowUser(userID)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -444,18 +485,24 @@ func (c Client) UserHandler() http.HandlerFunc {
 		case http.MethodPost:
 			// Unfollow
 			userID := r.FormValue("UserID")
-			if userID != "" {
-				c.UnfollowUser(userID)
-			}
 			from := r.FormValue("from")
+			if userID != "" {
+				err := c.UnfollowUser(userID)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		case http.MethodGet:
 			// Follow
 			userID := r.FormValue("UserID")
-			if userID != "" {
-				c.FollowUser(userID)
-			}
 			from := r.FormValue("from")
+			if userID != "" {
+				err := c.FollowUser(userID)
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -554,6 +601,7 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 			}
 
 			discoverPage := DiscoverPage{
+				ErrorMsg:        ParseErrorMsg(r),
 				UserID:          c.Peer.GetUserID(),
 				TimestampToDate: timestampToDate,
 				Posts:           texts,
@@ -578,24 +626,39 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
+			from := r.FormValue("from")
 			// Request Endorsement
 			err := c.RequestEndorsement()
-			from := r.FormValue("from")
-			http.Redirect(w, r, URLWithErrorMsg(from, err.Error()), http.StatusSeeOther)
+			if err != nil {
+				from = URLWithErrorMsg(from, err.Error())
+			}
+			http.Redirect(w, r, from, http.StatusSeeOther)
+			return
 		case http.MethodPost:
 			// Endorse User
 			userID := r.FormValue("UserID")
 			from := r.FormValue("from")
 			if userID != "" {
 				err := c.EndorseUser(userID)
-				from = URLWithErrorMsg(from, err.Error())
+				if err != nil {
+					from = URLWithErrorMsg(from, err.Error())
+				}
 			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
+			return
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
 		}
 	}
+}
+
+func ParseErrorMsg(r *http.Request) string {
+	errorMsg := ""
+	if len(r.URL.Query()["ErrorMsg"]) > 0 {
+		errorMsg = r.URL.Query()["ErrorMsg"][0]
+	}
+	return errorMsg
 }
 
 func URLWithErrorMsg(originalUrl string, errorMsg string) string {
