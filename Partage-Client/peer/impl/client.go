@@ -75,9 +75,9 @@ func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text
 	for _, t := range textThings {
 		texts = append(texts, t.(Text))
 	}
-	// Sort by the timestamp.
+	// Sort by the timestamp descending.
 	sort.SliceStable(texts, func(i, j int) bool {
-		return texts[i].Timestamp < texts[j].Timestamp
+		return texts[i].Timestamp > texts[j].Timestamp
 	})
 	return texts
 }
@@ -94,9 +94,9 @@ func (c *Client) GetComments(contentID string) []Comment {
 	for _, t := range commentThings {
 		comments = append(comments, t.(Comment))
 	}
-	// Sort by the timestamp.
+	// Sort by the timestamp descending.
 	sort.SliceStable(comments, func(i, j int) bool {
-		return comments[i].Timestamp < comments[j].Timestamp
+		return comments[i].Timestamp > comments[j].Timestamp
 	})
 	return comments
 }
@@ -109,6 +109,10 @@ func (c *Client) GetReactions(contentID string) []Reaction {
 		authorData := c.GetUserData(r.FeedUserID)
 		reactions = append(reactions, NewReaction(r, authorData))
 	}
+	// Sort by the timestamp descending.
+	sort.SliceStable(reactions, func(i, j int) bool {
+		return reactions[i].Timestamp > reactions[j].Timestamp
+	})
 	return reactions
 }
 
