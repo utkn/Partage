@@ -13,6 +13,8 @@ Discover posts from other users
     {{range .SuggestedUsers}}
         {{block "user" .}}{{end}}
         <br>
+    {{else}}
+    No new content to display.
     {{end}}
 </div>
 <div class="postsDiv">

@@ -8,7 +8,7 @@ import (
 	"go.dedis.ch/cs438/types"
 )
 
-var MAX_TRIALS uint = 3
+var MAX_TRIALS uint = 10
 
 type ProposerBeginState struct {
 	State

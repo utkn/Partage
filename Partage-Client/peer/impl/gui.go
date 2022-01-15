@@ -142,12 +142,11 @@ func (c Client) ChangeUsernameHandler() http.HandlerFunc {
 //--------------------------
 // Homepage handler
 type Homepage struct {
-	ErrorMsg        string
-	Username        string
-	UserID          template.HTML
-	MyData          UserData
-	Posts           []Text
-
+	ErrorMsg string
+	Username string
+	UserID   template.HTML
+	MyData   UserData
+	Posts    []Text
 }
 
 var MaxTimeLimit = int64(0) //TODO: change..limit max time!
@@ -164,8 +163,8 @@ func (c Client) IndexHandler() http.HandlerFunc {
 				// Get username
 				Username: userdata.Username,
 				// Get Texts from Followes
-				Posts:           c.GetTexts(c.GetUserData(c.Peer.GetUserID()).Followees, 0, MaxTimeLimit),
-				MyData:          userdata,
+				Posts:  c.GetTexts(userdata.Followees, 0, MaxTimeLimit),
+				MyData: userdata,
 			}
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"], TemplatePath("components.html"))
 			if err != nil {
@@ -182,11 +181,11 @@ func (c Client) IndexHandler() http.HandlerFunc {
 
 //-------------------------
 type PostPage struct {
-	ErrorMsg        string
-	UserID          template.HTML
-	Post            Text
+	ErrorMsg string
+	UserID   template.HTML
+	Post     Text
 
-	MyData          UserData
+	MyData UserData
 }
 
 // [GET] singular Post (all info) & [POST] create new post
@@ -223,10 +222,10 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 			}
 
 			p := PostPage{
-				ErrorMsg:        ParseErrorMsg(r),
-				Post:            *post,
-				UserID:          template.HTML(c.Peer.GetUserID()),
-				MyData:          c.GetUserData(c.Peer.GetUserID()),
+				ErrorMsg: ParseErrorMsg(r),
+				Post:     *post,
+				UserID:   template.HTML(c.Peer.GetUserID()),
+				MyData:   c.GetUserData(c.Peer.GetUserID()),
 			}
 			t.Execute(w, p)
 
@@ -361,15 +360,15 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
-	ErrorMsg        string
-	Data            UserData
-	FolloweeUsers   []UserData
-	FollowerUsers   []UserData
-	Posts           []Text
-	IsMe            bool
-	ImFollowedBy    bool //this user follows me
-	IFollow         bool //i follow this user
-	IsBlocked       bool
+	ErrorMsg      string
+	Data          UserData
+	FolloweeUsers []UserData
+	FollowerUsers []UserData
+	Posts         []Text
+	IsMe          bool
+	ImFollowedBy  bool //this user follows me
+	IFollow       bool //i follow this user
+	IsBlocked     bool
 
 	// For navbar.
 	UserID string
@@ -423,18 +422,18 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			}
 
 			profile := ProfilePage{
-				ErrorMsg:        ParseErrorMsg(r),
-				UserID:          c.Peer.GetUserID(),
-				MyUserID:        c.Peer.GetUserID(),
-				FollowerUsers:   followerUsers,
-				FolloweeUsers:   followeeUsers,
-				Data:            data,
-				Posts:           texts,
-				IsMe:            isMyProfile,
-				ImFollowedBy:    imFollowedBy,
-				IFollow:         iFollow,
-				MyData:          c.GetUserData(c.Peer.GetUserID()),
-				IsBlocked:       isBlocked,
+				ErrorMsg:      ParseErrorMsg(r),
+				UserID:        c.Peer.GetUserID(),
+				MyUserID:      c.Peer.GetUserID(),
+				FollowerUsers: followerUsers,
+				FolloweeUsers: followeeUsers,
+				Data:          data,
+				Posts:         texts,
+				IsMe:          isMyProfile,
+				ImFollowedBy:  imFollowedBy,
+				IFollow:       iFollow,
+				MyData:        c.GetUserData(c.Peer.GetUserID()),
+				IsBlocked:     isBlocked,
 			}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["profile"], TemplatePath("components.html"))
@@ -547,12 +546,12 @@ func (c Client) BlockHandler() http.HandlerFunc {
 //-------------------------
 // Discover
 type DiscoverPage struct {
-	ErrorMsg        string
-	Posts           []Text
-	SuggestedUsers  []UserData
+	ErrorMsg       string
+	Posts          []Text
+	SuggestedUsers []UserData
 
-	UserID          string
-	MyData          UserData
+	UserID string
+	MyData UserData
 }
 
 // [GET] shows suggested profiles to follow and latest posts from different users (users that are not followed by the user itself)
@@ -594,11 +593,11 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 			}
 
 			discoverPage := DiscoverPage{
-				ErrorMsg:        ParseErrorMsg(r),
-				UserID:          c.Peer.GetUserID(),
-				Posts:           texts,
-				SuggestedUsers:  suggestedUsers,
-				MyData:          c.GetUserData(c.Peer.GetUserID()),
+				ErrorMsg:       ParseErrorMsg(r),
+				UserID:         c.Peer.GetUserID(),
+				Posts:          texts,
+				SuggestedUsers: suggestedUsers,
+				MyData:         c.GetUserData(c.Peer.GetUserID()),
 			}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["discover"], TemplatePath("components.html"))

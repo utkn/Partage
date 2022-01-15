@@ -61,7 +61,7 @@ func (c *Client) GetUserData(userID string) UserData {
 
 // GetTexts returns the texts with the given filters.
 func (c *Client) GetTexts(userIDs []string, minTime int64, maxTime int64) []Text {
-	utils.PrintDebug("social", "Client at GetTexts")
+	utils.PrintDebug("social", "Client at GetTexts with users", len(userIDs))
 	// First, create the filter accordingly.
 	filter := content.Filter{
 		MaxTime:  maxTime,
@@ -94,9 +94,9 @@ func (c *Client) GetComments(contentID string) []Comment {
 	for _, t := range commentThings {
 		comments = append(comments, t.(Comment))
 	}
-	// Sort by the timestamp descending.
+	// Sort by the timestamp ascending.
 	sort.SliceStable(comments, func(i, j int) bool {
-		return comments[i].Timestamp > comments[j].Timestamp
+		return comments[i].Timestamp < comments[j].Timestamp
 	})
 	return comments
 }
