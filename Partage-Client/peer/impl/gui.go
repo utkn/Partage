@@ -114,6 +114,7 @@ func StartClient(port uint, peerID uint, introducerAddr string) {
 //--------------------------
 // Homepage handler
 type Homepage struct {
+	ErrorMsg        string
 	Username        string
 	UserID          template.HTML
 	MyData          UserData
@@ -157,6 +158,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 
 //-------------------------
 type PostPage struct {
+	ErrorMsg        string
 	UserID          template.HTML
 	Post            Text
 	TimestampToDate func(int64) string
@@ -326,6 +328,7 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
+	ErrorMsg        string
 	Data            UserData
 	FolloweeUsers   []UserData
 	FollowerUsers   []UserData
@@ -353,6 +356,10 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 				fmt.Println("Url Param 'UserID' is missing")
 				http.Error(w, "parameter missing", http.StatusNotFound)
 				return
+			}
+			errorMsg := ""
+			if len(r.URL.Query()["ErrorMsg"]) > 0 {
+				errorMsg = r.URL.Query()["ErrorMsg"][0]
 			}
 			UserID := keys[0]
 			// Get user data
@@ -387,6 +394,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			}
 
 			profile := ProfilePage{
+				ErrorMsg:        errorMsg,
 				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
 				FollowerUsers:   followerUsers,
@@ -499,6 +507,7 @@ func (c Client) BlockHandler() http.HandlerFunc {
 //-------------------------
 // Discover
 type DiscoverPage struct {
+	ErrorMsg        string
 	Posts           []Text
 	SuggestedUsers  []UserData
 	TimestampToDate func(int64) string
@@ -571,25 +580,27 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 		case http.MethodGet:
 			// Request Endorsement
 			err := c.RequestEndorsement()
-			if err != nil {
-				http.Error(w, "invalid", http.StatusNotAcceptable)
-			}
 			from := r.FormValue("from")
-			http.Redirect(w, r, from, http.StatusSeeOther)
+			http.Redirect(w, r, URLWithErrorMsg(from, err.Error()), http.StatusSeeOther)
 		case http.MethodPost:
 			// Endorse User
 			userID := r.FormValue("UserID")
+			from := r.FormValue("from")
 			if userID != "" {
 				err := c.EndorseUser(userID)
-				if err != nil {
-					http.Error(w, "invalid", http.StatusNotAcceptable)
-				}
+				from = URLWithErrorMsg(from, err.Error())
 			}
-			from := r.FormValue("from")
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
 			return
 		}
 	}
+}
+
+func URLWithErrorMsg(originalUrl string, errorMsg string) string {
+	if strings.Contains(originalUrl, "?") {
+		return originalUrl + "&ErrorMsg=" + errorMsg
+	}
+	return originalUrl + "?ErrorMsg=" + errorMsg
 }

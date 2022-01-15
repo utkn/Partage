@@ -20,6 +20,11 @@
     </h4>
     <div class="pure-g">
         <div class="pure-u-4-5">
+            {{if .ErrorMsg}}
+                <div class="content-box" style="border-color: #810b0b; color: #810b0b">
+                    Error: {{.ErrorMsg}}
+                </div>
+            {{end}}
             <div class="content-box">
                 {{block "content" .}}Undefined Content{{end}}
             </div>
