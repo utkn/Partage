@@ -46,6 +46,7 @@ func NewClient(totalPeers uint, joinNodeAddr string, config peer.Configuration) 
 		fmt.Printf("error during registration: %v\n", err)
 		return nil
 	}
+	fmt.Println("OK!")
 	// Return the client.
 	return &Client{
 		Peer: p,
@@ -105,7 +106,8 @@ func (c *Client) GetReactions(contentID string) []Reaction {
 	reactionInfos := c.Peer.GetReactions(contentID)
 	var reactions []Reaction
 	for _, r := range reactionInfos {
-		reactions = append(reactions, NewReaction(r))
+		authorData := c.GetUserData(r.FeedUserID)
+		reactions = append(reactions, NewReaction(r, authorData))
 	}
 	return reactions
 }
@@ -231,16 +233,26 @@ func (c *Client) downloadText(cnt feed.Content) (interface{}, error) {
 	// If for any reason, we are not able to download it, return an error and an incomplete post.
 	downloadedBytes, err := c.Peer.DownloadContent(cnt.ContentID)
 	if err != nil {
-		return NewText("[error: could not fetch]", cnt, reactions, comments), err
+		return NewText("[error: could not fetch]", cnt, UserData{}, reactions, comments), err
 	}
 	if downloadedBytes == nil {
-		return NewText("[error: could not fetch]", cnt, reactions, comments), fmt.Errorf("could not download the post at client.downloadText")
+		return NewText("[error: could not fetch]", cnt, UserData{}, reactions, comments), fmt.Errorf("could not download the post at client.downloadText")
 	}
 	// Otherwise, create the full post.
 	downloaded := content.ParseContent(downloadedBytes)
 	// But first, try to decrypt.
 	decrypted, err := downloaded.Decrypted(c.Peer.GetHashedPublicKey(), c.Peer.GetPrivateKey())
-	return NewText(decrypted.Text, cnt, reactions, comments), nil
+	authorData := c.GetUserData(cnt.FeedUserID)
+	txt := NewText(decrypted.Text, cnt, authorData, reactions, comments)
+	// Find whether already reacted or not.
+	alreadyReacted := ""
+	for _, r := range reactions {
+		if r.Author.UserID == c.Peer.GetUserID() {
+			alreadyReacted = r.ReactionText
+		}
+	}
+	txt.AlreadyReacted = alreadyReacted
+	return txt, nil
 }
 
 func (c *Client) downloadUploadedContent(cnt feed.Content) (interface{}, error) {
@@ -263,16 +275,25 @@ func (c *Client) downloadComment(cnt feed.Content) (interface{}, error) {
 	// If for any reason, we are not able to download it, return an error and an incomplete post.
 	downloadedBytes, err := c.Peer.DownloadContent(cnt.ContentID)
 	if err != nil {
-		return NewComment("[error: could not fetch]", cnt, reactions), err
+		return NewComment("[error: could not fetch]", cnt, UserData{}, reactions), err
 	}
 	if downloadedBytes == nil {
-		return NewComment("[error: could not fetch]", cnt, reactions), fmt.Errorf("could not download the post at client.downloadText")
+		return NewComment("[error: could not fetch]", cnt, UserData{}, reactions), fmt.Errorf("could not download the post at client.downloadText")
 	}
 	// Otherwise, create the full post.
 	downloaded := content.ParseContent(downloadedBytes)
 	// But first, try to decrypt.
 	decrypted, err := downloaded.Decrypted(c.Peer.GetHashedPublicKey(), c.Peer.GetPrivateKey())
-	return NewComment(decrypted.Text, cnt, reactions), nil
+	authorData := c.GetUserData(cnt.FeedUserID)
+	alreadyReacted := ""
+	for _, r := range reactions {
+		if r.Author.UserID == c.Peer.GetUserID() {
+			alreadyReacted = r.ReactionText
+		}
+	}
+	cmt := NewComment(decrypted.Text, cnt, authorData, reactions)
+	cmt.AlreadyReacted = alreadyReacted
+	return cmt, nil
 }
 
 // getDownloadableThings first loads the feed content from the feed store according to the given filter.

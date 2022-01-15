@@ -1,0 +1,134 @@
+{{define "react"}}
+<div class="reactionDiv" style="display:inline">
+    {{if ne .AlreadyReacted ""}}
+        You reacted:
+        {{if eq .AlreadyReacted "happy"}}<i class="far fa-laugh-beam"></i>{{end}}
+        {{if eq .AlreadyReacted "angry"}}<i class="far fa-angry"></i>{{end}}
+        {{if eq .AlreadyReacted "confused"}}<i class="far fa-question-circle"></i>{{end}}
+        {{if eq .AlreadyReacted "approve"}}<i class="far fa-thumbs-up"></i>{{end}}
+        {{if eq .AlreadyReacted "disapprove"}}<i class="far fa-thumbs-down"></i>{{end}}
+        <form action="/react" method="GET" style="display:inline;">
+            <input type="hidden" id="from" name="from" value="/post?PostID={{$.ContentID}}">
+            <input type="hidden" id="PostID" name="PostID" value="{{$.ContentID}}">
+            <input class="pure-button" type="submit" value="Undo">
+        </form>
+    {{else}}
+    <form action="/react" method="POST" style="display:inline">
+        <input type="hidden" id="from" name="from" value="/">
+        <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+        <div class="pure-button-group" role="group">
+            <button class="pure-button" name="Reaction" value="happy"><i class="far fa-laugh-beam"></i></button>
+            <button class="pure-button " name="Reaction" value="angry"><i class="far fa-angry"></i></button>
+            <button class="pure-button" name="Reaction" value="confused"><i class="far fa-question-circle"></i></button>
+            <button class="pure-button" name="Reaction" value="approve"><i class="far fa-thumbs-up"></i></button>
+            <button class="pure-button" name="Reaction" value="disapprove"><i class="far fa-thumbs-down"></i></button>
+        </div>
+    </form>
+    {{end}}
+</div>
+{{end}}
+
+{{define "newpost"}}
+<div class="writePostBox">
+    <!--Create post..-->
+    <div class="pure-button-group" role="group" style="margin-bottom: 5px">
+        <button class="pure-button pure-button-active" id="publicPostButton" onclick="choosePublicVisibility()">Public</button>
+        <button class="pure-button" id="privatePostButton" onclick="choosePrivateVisibility()" >Private</button>
+    </div>
+    <div id="publicMsgWriteBox">
+        <form action="/post" method="POST" class="pure-form">
+            <input type="hidden" id="from" name="from" value="/">
+            <textarea placeholder="Publish your thoughts..." id="Content" name="Content" rows="4" cols="60" style="margin-bottom: 5px; padding:5px" required></textarea>
+            <!-- <input type="text" id="Content" name="Content" required>-->
+            <br>
+            <input class="pure-button" type="submit" value="Post">
+        </form>
+    </div>
+    <div id="privMsgWriteBox" style="display:none">
+        <form action="/postPrivate" method="POST" class="pure-form">
+            <input type="hidden" id="from" name="from" value="/">
+            <textarea placeholder="Privately share your thoughts..." id="Content" name="Content" rows="4" cols="60" style="margin-bottom: 5px; padding:5px" required></textarea>
+            <br>
+            <textarea placeholder="Recipients list (comma separated)" id="Recipients" name="Recipients" rows="2" cols="60" style="margin-bottom: 5px; padding:5px" required></textarea>
+            <br>
+            <input class="pure-button" type="submit" value="Post">
+        </form>
+    </div>
+</div>
+{{end}}
+
+{{define "user"}}
+<div class="user">
+    <a href="/profile?UserID={{.UserID}}">
+        @{{.Username}} ({{slice .UserID 0 8}})
+    </a>
+</div>
+{{end}}
+
+{{define "reaction"}}
+<div class="commentDiv">
+    <div class="postTopBar">
+        {{block "user" .Author}}{{end}} reacted at {{.Timestamp}}: {{.ReactionText}}
+    </div>
+</div>
+{{end}}
+
+{{define "comment"}}
+<div class="commentDiv">
+    <div class="postTopBar">
+        {{block "user" .Author}}{{end}} commented at {{.Timestamp}}
+    </div>
+    <p>{{.Text}}</p>
+    <a href="javascript:" onclick="toggleDisplay('reactions-comment-{{.ContentID}}')" style="margin-left:3px">{{len
+        .Reactions}} reactions</a>
+    <div class="displayCommentReactionsDiv" id="reactions-comment-{{.ContentID}}" style="display:none;">
+        {{block "react" .}}{{end}}
+        <!--Show all reactions to comment!-->
+        {{range .Reactions}}
+        {{block "reaction" .}}{{end}}
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "post"}}
+<div class="commentDiv">
+    <div class="postTopBar">
+        {{block "user" .Author}}{{end}} posted at
+        <a href="/post?PostID={{.ContentID}}">{{.Timestamp}}</a>
+    </div>
+    <div class="postBottom">
+        <p>{{.Text}}</p>
+        <a href="javascript:" onclick="toggleDisplays('comments-{{.ContentID}}', 'reactions-{{.ContentID}}')">{{len
+            .Comments}} comments</a>
+        <a href="javascript:" onclick="toggleDisplays('reactions-{{.ContentID}}', 'comments-{{.ContentID}}')"
+           style="margin-left:3px">{{len .Reactions}} reactions</a>
+        <div class="reactionsDiv" id="reactions-{{.ContentID}}" style="display:none;">
+            {{block "react" .}}{{end}}
+            <!--Show all reactions!-->
+            {{range .Reactions}}
+            <div class="displayReactionDiv">
+                {{block "reaction" .}}{{end}}
+            </div>
+            {{end}}
+        </div>
+        <div class="commentsDiv" id="comments-{{.ContentID}}" style="display:none;">
+            <div class="postComment" style="margin-top:5px">
+                <!--Post comment..-->
+                <form action="/comment" method="POST" class="pure-form">
+                    <input type="hidden" id="from" name="from" value="/">
+                    <input type="hidden" id="PostID" name="PostID" value="{{.ContentID}}">
+                    <input type="text" placeholder="Type your comment" id="Text" name="Text" required>
+                    <input class="pure-button" type="submit" value="Comment">
+                </form>
+            </div>
+            <!--Show all comments!-->
+            {{range .Comments}}
+            <div class="displayCommentDiv">
+                {{block "comment" .}}{{end}}
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}

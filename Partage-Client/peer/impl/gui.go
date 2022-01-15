@@ -142,7 +142,7 @@ func (c Client) IndexHandler() http.HandlerFunc {
 				TimestampToDate: timestampToDate,
 				MyData:          userdata,
 			}
-			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["index"], TemplatePath("components.html"))
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -190,7 +190,7 @@ func (c Client) SinglePostHandler() http.HandlerFunc {
 				return
 			}
 			// Render Post with all info, comments and reactions
-			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["post"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["post"], TemplatePath("components.html"))
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -326,18 +326,20 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
-	Data          UserData
+	Data            UserData
+	FolloweeUsers   []UserData
+	FollowerUsers   []UserData
 	Posts           []Text
 	IsMe            bool
 	ImFollowedBy    bool //this user follows me
 	IFollow         bool //i follow this user
-	IsBlocked bool
+	IsBlocked       bool
 	TimestampToDate func(int64) string
 	// For navbar.
 	UserID string
 	// For the page itself.
 	MyUserID string
-	MyData UserData
+	MyData   UserData
 }
 
 // [GET] shows profile info and respective posts & [POST] is used to follow user & [PUT] is used to unfollow user
@@ -357,7 +359,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			data := c.GetUserData(UserID)
 			// Get all posts from user
 			texts := c.GetTexts([]string{UserID}, 0, 0)
-			var imFollowedBy, iFollow,isBlocked bool
+			var imFollowedBy, iFollow, isBlocked bool
 			isMyProfile := c.Peer.GetUserID() == UserID
 			if !isMyProfile {
 				for _, user := range data.Followers {
@@ -372,22 +374,34 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 						break
 					}
 				}
-				isBlocked=c.Peer.IsBlocked(UserID)
+				isBlocked = c.Peer.IsBlocked(UserID)
 			}
+			// Get the data of followers and followees.
+			var followerUsers []UserData
+			var followeeUsers []UserData
+			for _, userID := range data.Followers {
+				followerUsers = append(followerUsers, NewUserData(c.Peer.GetUserID(), c.Peer.GetUserState(userID)))
+			}
+			for _, userID := range data.Followees {
+				followeeUsers = append(followeeUsers, NewUserData(c.Peer.GetUserID(), c.Peer.GetUserState(userID)))
+			}
+
 			profile := ProfilePage{
 				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
+				FollowerUsers:   followerUsers,
+				FolloweeUsers:   followeeUsers,
 				TimestampToDate: timestampToDate,
-				Data:          data,
+				Data:            data,
 				Posts:           texts,
 				IsMe:            isMyProfile,
 				ImFollowedBy:    imFollowedBy,
 				IFollow:         iFollow,
-				MyData: c.GetUserData(c.Peer.GetUserID()),
-				IsBlocked: isBlocked,
+				MyData:          c.GetUserData(c.Peer.GetUserID()),
+				IsBlocked:       isBlocked,
 			}
 			// Render
-			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["profile"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["profile"], TemplatePath("components.html"))
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -486,7 +500,7 @@ func (c Client) BlockHandler() http.HandlerFunc {
 // Discover
 type DiscoverPage struct {
 	Posts           []Text
-	SuggestedUsers  []string
+	SuggestedUsers  []UserData
 	TimestampToDate func(int64) string
 	UserID          string
 	MyData          UserData
@@ -516,14 +530,18 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 
 			// Get posts from users that i'm not currently following
 			texts := c.GetTexts(undiscoveredUsers, 0, 0)
-
-			var suggestedUsers []string
+			// Convert to undiscovered user data.
+			var undiscoveredUserData []UserData
+			for _, uID := range undiscoveredUsers {
+				undiscoveredUserData = append(undiscoveredUserData, NewUserData(c.Peer.GetUserID(), c.Peer.GetUserState(uID)))
+			}
+			var suggestedUsers []UserData
 			if len(undiscoveredUsers) > 5 {
 				// Append first 5 profiles to sugest
-				suggestedUsers = append(suggestedUsers, undiscoveredUsers[:5]...)
+				suggestedUsers = append(suggestedUsers, undiscoveredUserData[:5]...)
 			} else {
 				// Append at most 3 profiles to sugest
-				suggestedUsers = append(suggestedUsers, undiscoveredUsers...)
+				suggestedUsers = append(suggestedUsers, undiscoveredUserData...)
 			}
 
 			discoverPage := DiscoverPage{
@@ -534,7 +552,7 @@ func (c Client) DiscoverHandler() http.HandlerFunc {
 				MyData:          c.GetUserData(c.Peer.GetUserID()),
 			}
 			// Render
-			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["discover"])
+			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["discover"], TemplatePath("components.html"))
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -575,4 +593,3 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 		}
 	}
 }
-

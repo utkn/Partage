@@ -16,7 +16,7 @@ type UserData struct {
 }
 
 type Reaction struct {
-	AuthorID     string
+	Author       UserData
 	RefContentID string
 	ReactionText string
 	BlockHash    string
@@ -24,24 +24,26 @@ type Reaction struct {
 }
 
 type Comment struct {
-	AuthorID     string
-	ContentID    string
-	Text         string
-	RefContentID string
-	BlockHash    string
-	Timestamp    int64
-	Reactions    []Reaction
+	Author         UserData
+	ContentID      string
+	Text           string
+	RefContentID   string
+	BlockHash      string
+	Timestamp      int64
+	Reactions      []Reaction
+	AlreadyReacted string
 }
 
 type Text struct {
-	AuthorID   string
-	ContentID  string
-	Text       string
-	BlockHash  string
-	Timestamp  int64
-	Reactions  []Reaction
-	Comments   []Comment
-	Recipients []string
+	Author         UserData
+	ContentID      string
+	Text           string
+	BlockHash      string
+	Timestamp      int64
+	Reactions      []Reaction
+	Comments       []Comment
+	Recipients     []string
+	AlreadyReacted string
 }
 
 func NewUserData(selfUserID string, userState feed.UserState) UserData {
@@ -64,9 +66,9 @@ func NewUserData(selfUserID string, userState feed.UserState) UserData {
 	}
 }
 
-func NewReaction(info feed.ReactionInfo) Reaction {
+func NewReaction(info feed.ReactionInfo, author UserData) Reaction {
 	return Reaction{
-		AuthorID:     info.FeedUserID,
+		Author:       author,
 		RefContentID: info.RefContentID,
 		ReactionText: info.Reaction.String(),
 		BlockHash:    info.BlockHash,
@@ -74,9 +76,9 @@ func NewReaction(info feed.ReactionInfo) Reaction {
 	}
 }
 
-func NewComment(text string, c feed.Content, reactions []Reaction) Comment {
+func NewComment(text string, c feed.Content, author UserData, reactions []Reaction) Comment {
 	return Comment{
-		AuthorID:     c.FeedUserID,
+		Author:       author,
 		ContentID:    c.ContentID,
 		Text:         text,
 		RefContentID: c.RefContentID,
@@ -86,9 +88,9 @@ func NewComment(text string, c feed.Content, reactions []Reaction) Comment {
 	}
 }
 
-func NewText(text string, c feed.Content, reactions []Reaction, comments []Comment) Text {
+func NewText(text string, c feed.Content, author UserData, reactions []Reaction, comments []Comment) Text {
 	return Text{
-		AuthorID:  c.FeedUserID,
+		Author:    author,
 		ContentID: c.ContentID,
 		Text:      text,
 		BlockHash: c.BlockHash,
