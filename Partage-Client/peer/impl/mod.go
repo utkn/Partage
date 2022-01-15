@@ -316,6 +316,21 @@ func (n *node) BlockUser(publicKeyHash [32]byte) {
 	}
 }
 
+// BlockUser implements peer.SocialPeer
+func (n *node) IsBlocked(userID string) bool{
+	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)
+	if ok {
+		hashedPK, err := hex.DecodeString(userID)
+		if err != nil {
+			return false
+		}
+		var hashedPKArray [32]byte
+		copy(hashedPKArray[:], hashedPK)
+		return tlsSock.IsBlocked(hashedPKArray)
+	}
+	return false
+}
+
 // UnblockUser implements peer.SocialPeer
 func (n *node) UnblockUser(publicKeyHash [32]byte) {
 	tlsSock, ok := n.conf.Socket.(*tcptls.Socket)

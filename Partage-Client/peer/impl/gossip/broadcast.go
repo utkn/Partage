@@ -76,7 +76,7 @@ func (l *Layer) sendRumors(msg types.RumorsMessage, unresponsiveNeighbors map[st
 		//send it via the cryptography layer (signed header)
 		err = l.cryptography.Send(randNeighbor, pkt.Copy(), time.Second*5)
 		if err != nil {
-			return fmt.Errorf("could not unicast the rumors message, using the crypto layer, within the broadcast: %w", err)
+			return fmt.Errorf(randNeighbor,"<--to could not unicast the rumors message, using the crypto layer, within the broadcast: %w", err)
 		}
 	} else {
 		err = l.network.Send(randNeighbor, pkt.Copy(), time.Second*1)

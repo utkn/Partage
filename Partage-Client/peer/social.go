@@ -30,4 +30,5 @@ type SocialPeer interface {
 	GetUserState(userID string) feed.UserState
 	BlockUser(publicKeyHash [32]byte)
 	UnblockUser(publicKeyHash [32]byte)
+	IsBlocked(userID string) bool
 }

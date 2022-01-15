@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -99,6 +100,8 @@ func StartClient(port uint, peerID uint, introducerAddr string) {
 	mux.Handle("/endorse", client.EndorsementHandler())
 	//POST
 	mux.Handle("/postPrivate", client.PrivatePostHandler())
+	//GET & POST
+	mux.Handle("/block", client.BlockHandler())
 
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
 	if err != nil {
@@ -323,16 +326,18 @@ func stringToReaction(r string) content.Reaction {
 //-------------------------
 //Profile
 type ProfilePage struct {
-	MyData          UserData
+	Data          UserData
 	Posts           []Text
 	IsMe            bool
 	ImFollowedBy    bool //this user follows me
 	IFollow         bool //i follow this user
+	IsBlocked bool
 	TimestampToDate func(int64) string
 	// For navbar.
 	UserID string
 	// For the page itself.
 	MyUserID string
+	MyData UserData
 }
 
 // [GET] shows profile info and respective posts & [POST] is used to follow user & [PUT] is used to unfollow user
@@ -352,7 +357,7 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 			data := c.GetUserData(UserID)
 			// Get all posts from user
 			texts := c.GetTexts([]string{UserID}, 0, 0)
-			var imFollowedBy, iFollow bool
+			var imFollowedBy, iFollow,isBlocked bool
 			isMyProfile := c.Peer.GetUserID() == UserID
 			if !isMyProfile {
 				for _, user := range data.Followers {
@@ -367,16 +372,20 @@ func (c Client) ProfileHandler() http.HandlerFunc {
 						break
 					}
 				}
+				isBlocked=c.Peer.IsBlocked(UserID)
 			}
 			profile := ProfilePage{
 				UserID:          c.Peer.GetUserID(),
 				MyUserID:        c.Peer.GetUserID(),
 				TimestampToDate: timestampToDate,
-				MyData:          data,
+				Data:          data,
 				Posts:           texts,
 				IsMe:            isMyProfile,
 				ImFollowedBy:    imFollowedBy,
-				IFollow:         iFollow}
+				IFollow:         iFollow,
+				MyData: c.GetUserData(c.Peer.GetUserID()),
+				IsBlocked: isBlocked,
+			}
 			// Render
 			t, err := template.ParseFiles(TemplateFileMap["base"], TemplateFileMap["profile"])
 			if err != nil {
@@ -425,6 +434,46 @@ func (c Client) UserHandler() http.HandlerFunc {
 				c.FollowUser(userID)
 			}
 			from := r.FormValue("from")
+			http.Redirect(w, r, from, http.StatusSeeOther)
+		default:
+			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+}
+
+func (c Client) BlockHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			// Block
+			userID := r.FormValue("UserID")
+			from := r.FormValue("from")
+			if userID != "" {
+				hashedPK, err := hex.DecodeString(userID)
+				if err != nil {
+					http.Redirect(w, r, from, http.StatusSeeOther)
+					return
+				}
+				var hashedPKArray [32]byte
+				copy(hashedPKArray[:], hashedPK)
+				c.Peer.BlockUser([32]byte(hashedPKArray))
+			}
+			http.Redirect(w, r, from, http.StatusSeeOther)
+		case http.MethodGet:
+			// Unblock
+			userID := r.FormValue("UserID")
+			from := r.FormValue("from")
+			if userID != "" {
+				hashedPK, err := hex.DecodeString(userID)
+				if err != nil {
+					http.Redirect(w, r, from, http.StatusSeeOther)
+					return
+				}
+				var hashedPKArray [32]byte
+				copy(hashedPKArray[:], hashedPK)
+				c.Peer.UnblockUser([32]byte(hashedPKArray))
+			}
 			http.Redirect(w, r, from, http.StatusSeeOther)
 		default:
 			http.Error(w, "forbidden method", http.StatusMethodNotAllowed)
@@ -526,3 +575,4 @@ func (c Client) EndorsementHandler() http.HandlerFunc {
 		}
 	}
 }
+

@@ -135,7 +135,24 @@ func (s *Socket) Send(dest string, pkt transport.Packet, timeout time.Duration) 
 	if err != nil {
 		//conn may have been closed due to read time out...
 		//return s.Send(dest,pkt,timeout)
-		return err
+		// Use Dialer to allow timeout on dial call
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", dest, s.tlsConfig)
+		if err != nil {
+			// Convert to a network error to specifically check for timeout errors.
+			netErr, ok := err.(net.Error)
+			if ok && netErr.Timeout() {
+				return transport.TimeoutErr(0)
+			}
+			return err
+		}
+		// Add conn to pool
+		s.connPool.AddConn(dest, conn)
+		utils.PrintDebug("tls", s.GetAddress(), " created a goroutine to handle ", dest, " conn")
+
+		// Create a pkt listening goroutine for this new conn
+		go s.HandleTLSConn(conn, true)
+		
+		//return err
 	}
 
 	s.outsLock.Lock()
