@@ -97,13 +97,13 @@ You're looking at your profile, {{block "user" .Data}}{{end}}
 <!--    Endorsement stuff-->
     <div class="commentDiv" style="padding:10px; margin-bottom:10px">
         {{if .Data.CanRequestEndorsements}}
-        <form action="/endorse" method="GET" class="pure-form" style="margin-top:10px">
+        <form action="/endorse" method="GET" class="pure-form">
             <input type="hidden" id="from" name="from" value="/profile?UserID={{.Data.UserID}}">
-            <input class="pure-button" type="submit" value="Request Endorsement">
+            <input class="pure-button" type="submit" value="Request Endorsements">
         </form>
         {{else}}
         Endorsement request is still in process. <br>
-        Received <b>{{.Data.ReceivedEndorsements}}</b> Endorsements
+        Received <b>{{.Data.ReceivedEndorsements}}</b> endorsements.
         {{end}}
     </div>
     {{end}}

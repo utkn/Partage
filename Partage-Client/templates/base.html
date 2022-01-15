@@ -37,6 +37,8 @@
                 <p><b>{{.MyData.Credits}}</b> Tokens</p>
                 {{if .MyData.CanRequestEndorsements}}
                 You may request endorsements on your profile.
+                {{else}}
+                Received <b>{{.MyData.ReceivedEndorsements}}</b> endorsements.
                 {{end}}
             </div>
         </div>
