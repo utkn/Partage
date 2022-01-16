@@ -34,11 +34,14 @@ func (e *EndorsementHandler) Copy() EndorsementHandler {
 	}
 }
 
+// Request initiates a new endorsement request, overriding the previous ones.
 func (e *EndorsementHandler) Request(time int64) {
-	if !e.CanRequest() {
+	if !e.CanRequest(time) {
 		return
 	}
 	e.LastRequestedTime = time
+	e.ReceivedEndorsements = 0
+	e.EndorsedUsers = make(map[string]struct{}, REQUIRED_ENDORSEMENTS)
 }
 
 func (e *EndorsementHandler) Reset() {
@@ -50,8 +53,16 @@ func (e *EndorsementHandler) Reset() {
 // CanRequest returns true if the user can request an endorsement.
 // For now, a user can always initiate a new endorsement request as long as their credits are within range,
 // overriding the last request.
-func (e EndorsementHandler) CanRequest() bool {
-	return true
+func (e EndorsementHandler) CanRequest(currTime int64) bool {
+	// If we have not requested any endorsements, then we can request.
+	if e.LastRequestedTime < 0 {
+		return true
+	}
+	// If the endorsement deadline of the last request has passed, we can request.
+	if currTime-e.LastRequestedTime >= ENDORSEMENT_INTERVAL {
+		return true
+	}
+	return false
 }
 
 func (e EndorsementHandler) CanEndorse(currTime int64, endorserID string) bool {

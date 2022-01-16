@@ -31,7 +31,7 @@ func (feedStore *Store) CheckMetadata(c content.Metadata) error {
 		if !withinRange {
 			return fmt.Errorf("too rich to request endorsements")
 		}
-		if !proposerFeed.userState.EndorsementHandler.CanRequest() {
+		if !proposerFeed.userState.EndorsementHandler.CanRequest(c.Timestamp) {
 			return fmt.Errorf("cannot request endorsements")
 		}
 	}

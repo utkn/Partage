@@ -59,9 +59,13 @@
 
 {{define "user"}}
 <div class="user">
+    {{if ne .UserID ""}}
     <a href="/profile?UserID={{.UserID}}">
         @{{.Username}} ({{slice .UserID 0 8}})
     </a>
+    {{else}}
+    ###
+    {{end}}
 </div>
 {{end}}
 
