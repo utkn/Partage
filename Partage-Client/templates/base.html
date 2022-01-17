@@ -20,19 +20,27 @@
     </h4>
     <div class="pure-g">
         <div class="pure-u-4-5">
+            {{if .ErrorMsg}}
+                <div class="content-box" style="border-color: #810b0b; color: #810b0b">
+                    Error: {{.ErrorMsg}}
+                </div>
+            {{end}}
             <div class="content-box">
                 {{block "content" .}}Undefined Content{{end}}
             </div>
         </div>
         <div class="pure-u-1-5">
-            <div class="content-box" style="margin-left:10px">
+            <div class="content-box" style="margin-left:10px; padding-bottom:20px">
                 <p>{{block "user" .MyData}}{{end}}</p>
                 <span><b>{{len .MyData.Followers}}</b> Followers&nbsp;&nbsp;&nbsp;&nbsp;</span>
                 <span><b>{{len .MyData.Followees}}</b> Following</span>
                 <p><b>{{.MyData.Credits}}</b> Tokens</p>
-                <p><b>{{.MyData.ReceivedEndorsements}}&nbsp;</b>Endorsements received</p>
+                {{if .MyData.CanRequestEndorsements}}
+                You may request endorsements on your profile.
+                {{else}}
+                Received <b>{{.MyData.ReceivedEndorsements}}</b> endorsements.
+                {{end}}
             </div>
-         
         </div>
     </div>
 </div>

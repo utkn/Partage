@@ -8,14 +8,18 @@ import (
 	"go.dedis.ch/cs438/types"
 )
 
+var MAX_TRIALS uint = 10
+
 type ProposerBeginState struct {
 	State
+	trial uint
 	paxos *Paxos
 	value types.PaxosValue
 }
 
 type ProposerWaitPromiseState struct {
 	State
+	trial         uint
 	paxos         *Paxos
 	proposalID    uint
 	proposalStep  uint
@@ -43,6 +47,10 @@ type ProposerDoneState struct {
 }
 
 func (s ProposerBeginState) Next() (State, types.BlockchainBlock) {
+	// If we exceeded the max number of trials, return an error.
+	if s.trial > MAX_TRIALS {
+		return nil, types.BlockchainBlock{}
+	}
 	s.paxos.Clock.Lock.RLock()
 	// Catch up with the clock!
 	for int(s.paxos.LastProposalID) < s.paxos.Clock.MaxID {
@@ -55,6 +63,7 @@ func (s ProposerBeginState) Next() (State, types.BlockchainBlock) {
 	// Update the next proposal ID.
 	s.paxos.LastProposalID += s.paxos.Config.TotalPeers
 	return ProposerWaitPromiseState{
+		trial:         s.trial + 1,
 		paxos:         s.paxos,
 		proposalID:    proposalID,
 		proposalStep:  proposalStep,
@@ -97,6 +106,7 @@ func (s ProposerWaitPromiseState) Next() (State, types.BlockchainBlock) {
 		utils.PrintDebug("proposer", s.paxos.Gossip.GetAddress(), "couldn't collect enough promises.")
 		//println(p.gossip.GetAddress(), "NOT ENOUGH PROMISES")
 		return ProposerBeginState{
+			trial: s.trial + 1,
 			paxos: s.paxos,
 			value: s.originalValue,
 		}, types.BlockchainBlock{}

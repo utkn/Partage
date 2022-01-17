@@ -8,46 +8,47 @@ import (
 )
 
 type UserData struct {
-	Username             string
-	UserID               string
-	Followers            []string
-	Followees            []string
-	CanBeEndorsed        bool
-	ReceivedEndorsements int
-	Credits              int
+	Username               string
+	UserID                 string
+	Followers              []string
+	Followees              []string
+	CanBeEndorsed          bool
+	CanRequestEndorsements bool
+	ReceivedEndorsements   int
+	Credits                int
 }
 
 type Reaction struct {
-	Author       UserData
-	RefContentID string
-	ReactionText string
-	BlockHash    string
-	Timestamp    int64
+	Author          UserData
+	RefContentID    string
+	ReactionText    string
+	BlockHash       string
+	Timestamp       int64
 	TimestampToDate func(int64) string
 }
 
 type Comment struct {
-	Author         UserData
-	ContentID      string
-	Text           string
-	RefContentID   string
-	BlockHash      string
-	Timestamp      int64
-	Reactions      []Reaction
-	AlreadyReacted string
+	Author          UserData
+	ContentID       string
+	Text            string
+	RefContentID    string
+	BlockHash       string
+	Timestamp       int64
+	Reactions       []Reaction
+	AlreadyReacted  string
 	TimestampToDate func(int64) string
 }
 
 type Text struct {
-	Author         UserData
-	ContentID      string
-	Text           string
-	BlockHash      string
-	Timestamp      int64
-	Reactions      []Reaction
-	Comments       []Comment
-	Recipients     []string
-	AlreadyReacted string
+	Author          UserData
+	ContentID       string
+	Text            string
+	BlockHash       string
+	Timestamp       int64
+	Reactions       []Reaction
+	Comments        []Comment
+	Recipients      []string
+	AlreadyReacted  string
 	TimestampToDate func(int64) string
 }
 
@@ -61,49 +62,50 @@ func NewUserData(selfUserID string, userState feed.UserState) UserData {
 		followees = append(followees, f)
 	}
 	return UserData{
-		Username:             userState.Username,
-		UserID:               userState.UserID,
-		Credits:              userState.CurrentCredits,
-		Followers:            followers,
-		Followees:            followees,
-		CanBeEndorsed:        userState.CanEndorse(utils.Time(), selfUserID),
-		ReceivedEndorsements: userState.ReceivedEndorsements,
+		Username:               userState.Username,
+		UserID:                 userState.UserID,
+		Credits:                userState.CurrentCredits,
+		Followers:              followers,
+		Followees:              followees,
+		CanRequestEndorsements: userState.CanRequest(utils.Time()),
+		CanBeEndorsed:          userState.CanEndorse(utils.Time(), selfUserID),
+		ReceivedEndorsements:   userState.ReceivedEndorsements,
 	}
 }
 
 func NewReaction(info feed.ReactionInfo, author UserData) Reaction {
 	return Reaction{
-		Author:       author,
-		RefContentID: info.RefContentID,
-		ReactionText: info.Reaction.String(),
-		BlockHash:    info.BlockHash,
-		Timestamp:    info.Timestamp,
+		Author:          author,
+		RefContentID:    info.RefContentID,
+		ReactionText:    info.Reaction.String(),
+		BlockHash:       info.BlockHash,
+		Timestamp:       info.Timestamp,
 		TimestampToDate: timestampToDate,
 	}
 }
 
 func NewComment(text string, c feed.Content, author UserData, reactions []Reaction) Comment {
 	return Comment{
-		Author:       author,
-		ContentID:    c.ContentID,
-		Text:         text,
-		RefContentID: c.RefContentID,
-		BlockHash:    c.BlockHash,
-		Timestamp:    c.Timestamp,
-		Reactions:    reactions,
+		Author:          author,
+		ContentID:       c.ContentID,
+		Text:            text,
+		RefContentID:    c.RefContentID,
+		BlockHash:       c.BlockHash,
+		Timestamp:       c.Timestamp,
+		Reactions:       reactions,
 		TimestampToDate: timestampToDate,
 	}
 }
 
 func NewText(text string, c feed.Content, author UserData, reactions []Reaction, comments []Comment) Text {
 	return Text{
-		Author:    author,
-		ContentID: c.ContentID,
-		Text:      text,
-		BlockHash: c.BlockHash,
-		Timestamp: c.Timestamp,
-		Reactions: reactions,
-		Comments:  comments,
+		Author:          author,
+		ContentID:       c.ContentID,
+		Text:            text,
+		BlockHash:       c.BlockHash,
+		Timestamp:       c.Timestamp,
+		Reactions:       reactions,
+		Comments:        comments,
 		TimestampToDate: timestampToDate,
 	}
 }
