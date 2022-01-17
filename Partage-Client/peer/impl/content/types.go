@@ -54,7 +54,7 @@ func (c Type) Cost() int {
 	case TEXT:
 		return 5
 	case COMMENT:
-		return 1
+		return 2
 	case REACTION:
 		return 1
 	}

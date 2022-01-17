@@ -3,6 +3,7 @@ package feed
 import (
 	"fmt"
 	"go.dedis.ch/cs438/peer/impl/content"
+	"go.dedis.ch/cs438/peer/impl/utils"
 	"go.dedis.ch/cs438/storage"
 	"sync"
 )
@@ -152,5 +153,8 @@ func (f *Feed) RemoveFollower(followerID string) {
 }
 
 func IDFromUserID(userID string) string {
+	if utils.GLOBAL_FEED {
+		return "feed"
+	}
 	return "feed-" + userID
 }

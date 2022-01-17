@@ -71,6 +71,10 @@ func (l *Layer) Register() error {
 
 func (l *Layer) ProposeMetadata(metadata content.Metadata) (string, error) {
 	utils.PrintDebug("social", l.GetAddress(), "is proposing a new post")
+	err := l.FeedStore.CheckMetadata(metadata)
+	if err != nil {
+		return "", err
+	}
 	val := content.UnparseMetadata(metadata)
 	paxosVal := types.PaxosValue{
 		UniqID:      xid.New().String(),

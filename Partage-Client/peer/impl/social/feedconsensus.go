@@ -35,7 +35,8 @@ func (l *Layer) feedProposalChecker(userID string) paxos.ProposalChecker {
 	return func(msg types.PaxosProposeMessage) bool {
 		metadata := content.ParseMetadata(msg.Value.CustomValue)
 		// Reject if the feed user id does not match.
-		if metadata.FeedUserID != userID {
+		if !utils.GLOBAL_FEED && metadata.FeedUserID != userID {
+			utils.PrintDebug("social", l.GetAddress(), metadata.FeedUserID, " != ", userID)
 			return false
 		}
 		// Reject the dummy blocks!

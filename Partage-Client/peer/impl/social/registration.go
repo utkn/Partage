@@ -26,7 +26,9 @@ func (l *Layer) registerUser(newUserID string) {
 	// Update the system size if we are not self-registering.
 	if newUserID != l.UserID {
 		utils.PrintDebug("social", l.GetAddress(), "is updating system size to", l.consensus.Config.TotalPeers+1)
-		l.consensus.UpdateSystemSize(l.Config.TotalPeers + 1)
+		if utils.DYNAMIC_SYSTEM_SIZE {
+			l.consensus.UpdateSystemSize(l.Config.TotalPeers + 1)
+		}
 	}
 }
 

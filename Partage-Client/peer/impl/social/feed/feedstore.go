@@ -34,10 +34,18 @@ func LoadStore(blockchainStorage storage.MultipurposeStorage, metadataStore stor
 // loadFeed loads the feed associated with the given user id from the blockchain storage into memory.
 // Warning: thread-unsafe
 func (s *Store) loadFeed(userID string) {
+	_, ok := s.feedMap["feed"]
+	if utils.GLOBAL_FEED && ok {
+		return
+	}
 	store := s.BlockchainStorage.GetStore(IDFromUserID(userID))
 	blocks := utils.LoadBlockchain(store)
 	// Create an empty feed.
-	s.feedMap[userID] = NewEmptyFeed(userID, s.MetadataStore)
+	feedName := userID
+	if utils.GLOBAL_FEED {
+		feedName = "feed"
+	}
+	s.feedMap[feedName] = NewEmptyFeed(userID, s.MetadataStore)
 	// Move into memory.
 	for _, block := range blocks {
 		s.appendToFeed(userID, block)
@@ -47,7 +55,11 @@ func (s *Store) loadFeed(userID string) {
 // getFeed returns the feed associated with the given user id.
 // Warning: thread-unsafe
 func (s *Store) getFeed(userID string) *Feed {
-	feed, _ := s.feedMap[userID]
+	feedName := userID
+	if utils.GLOBAL_FEED {
+		feedName = "feed"
+	}
+	feed, _ := s.feedMap[feedName]
 	return feed
 }
 

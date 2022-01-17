@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+var GLOBAL_FEED = false
+var DYNAMIC_SYSTEM_SIZE = true
+
 var DEBUG = map[string]bool{
 	"network":       false,
 	"communication": false,
@@ -23,11 +26,11 @@ var DEBUG = map[string]bool{
 	"gossip":        false,
 	"data":          false,
 	"consensus":     false,
-	"acceptor":      true,
-	"proposer":      true,
+	"acceptor":      false,
+	"proposer":      false,
 	"tlc":           false,
 	"searchPK":      false,
-	"social":        true,
+	"social":        false,
 	"statemachine":  false,
 	"tls":           false,
 }
