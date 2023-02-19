@@ -1,3 +1,6 @@
+## Partage: A blockchain-based social network
+This is an experiment on developing a blockchain-based social network as part of our project in CS438 conducted at EPFL.
+
 ## Running the Certificate Authority
 To run the certificate authority, navigate to `Partage-CA` and run the file `run.sh`.
 ## Running the Client
